@@ -5,7 +5,7 @@
 需要一台装了 Docker（带 Compose）的机器。云服务器建议至少 2 核、4 GB 内存，构建镜像时要用到。
 
 ```bash
-git clone https://github.com/KKKKhazix/AIHOT.git myhot
+git clone https://github.com/ttm43/myhot.git myhot
 cd myhot
 node scripts/init-env.ts --llm-key <你的模型 API Key>
 ```
