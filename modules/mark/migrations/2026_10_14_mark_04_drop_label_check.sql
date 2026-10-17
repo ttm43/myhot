@@ -1,0 +1,1 @@
+ALTER TABLE marks DROP CONSTRAINT IF EXISTS marks_label_check;
