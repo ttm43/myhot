@@ -146,11 +146,12 @@ function blockedHostname(host: string): boolean {
  * connect time; proxy requests supply their outbound resolver and pin its answer in the tunnel.
  * Only local debugging may disable the guard via ALLOW_PRIVATE_NETWORK_FETCH.
  */
-export async function assertPublicUrl(url: string, allowPrivate = false, resolve?: (host: string) => Promise<string[]>): Promise<URL> {
+export async function assertPublicUrl(url: string, allowPrivate = false, resolve?: (host: string) => Promise<string[]>, allowHosts?: ReadonlySet<string>): Promise<URL> {
   const u = new URL(url);
   if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error(`Blocked protocol ${u.protocol}`);
   if (allowPrivate) return u;
   const host = u.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (allowHosts?.has(host)) return u; // local patch: allowlisted sidecar host
   if (blockedHostname(host)) throw new Error(`Blocked host ${host}`);
   const literal = net.isIP(host) !== 0;
   const addresses = literal ? [{ address: host }] : resolve ? (await resolve(host)).map((address) => ({ address })) : await lookup(host, { all: true });

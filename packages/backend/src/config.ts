@@ -43,6 +43,8 @@ export const config = {
   siteUrl: str("SITE_URL", SITE.defaultUrl).replace(/\/+$/, ""),
   egressProxyUrl: env.EGRESS_PROXY_URL || null,
   allowPrivateNetworkFetch: bool("ALLOW_PRIVATE_NETWORK_FETCH", false),
+  /** Local patch: exact hostnames allowed to resolve to private addresses (sidecar services in the same compose network, e.g. a self-hosted RSSHub). Everything else keeps the SSRF guard. */
+  privateFetchAllowHosts: new Set((env.PRIVATE_FETCH_ALLOW_HOSTS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)),
   feishuContentPushEnabled: bool("FEISHU_CONTENT_PUSH_ENABLED", false),
   indexNowSubmitEnabled: bool("INDEXNOW_SUBMIT_ENABLED", false),
   /** IndexNow key (32 hex characters); without one nothing is submitted and no key file is served. */

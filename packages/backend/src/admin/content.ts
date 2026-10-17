@@ -223,6 +223,8 @@ const FieldsSchema = z
     score: z.number().min(0).max(100).nullable(),
     selected: z.boolean(),
     silent: z.boolean(),
+    // local patch: let an external judge admit a non-AI article to the pool (publish.ts already honours f.relevance)
+    relevance: z.enum(["pass", "block"]),
   })
   .partial()
   .strict();

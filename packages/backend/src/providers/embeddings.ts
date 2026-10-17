@@ -46,9 +46,11 @@ async function embedBatch(texts: string[], subject: string): Promise<{ vectors: 
     },
   );
   try {
-    const { data } = z.object({ data: z.array(z.object({
-      index: z.number().int().nonnegative(), embedding: VECTOR,
+    const { data: raw } = z.object({ data: z.array(z.object({
+      index: z.number().int().nonnegative().optional(), embedding: VECTOR,
     })).length(texts.length) }).parse(receipt.response);
+    // Gemini's OpenAI-compatible endpoint omits `index`; its items come back in input order.
+    const data = raw.map((item, position) => ({ ...item, index: item.index ?? position }));
     data.sort((a, b) => a.index - b.index);
     if (data.some((item, index) => item.index !== index)) throw new Error("Embedding indices do not match inputs");
     return { vectors: data.map((item) => item.embedding), receiptId: receipt.receiptId };
