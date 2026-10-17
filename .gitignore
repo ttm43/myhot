@@ -14,3 +14,11 @@ apps/web/.react-router/
 # Font package unpacked to regenerate the report nameplates (docs/customize.md)
 package/
 fontsource-noto-sans-sc-*.tgz
+
+# MyHOT recommender: personal profile, labels, predictions and caches stay local
+recommender/out/
+recommender/configs/profile*.md
+!recommender/configs/profile.example.md
+recommender/docs/profile-trimming-notes.md
+__pycache__/
+.pytest_cache/

@@ -1,0 +1,7 @@
+numpy
+pyyaml
+scikit-learn
+sentence-transformers
+torch
+google-genai
+pytest
