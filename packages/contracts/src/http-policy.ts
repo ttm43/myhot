@@ -102,11 +102,6 @@ function tables() {
   return built;
 }
 
-/** The engine's api paths, then the site's modules'. */
-export function apiOwnedPatterns(): readonly RegExp[] {
-  return tables().apiPaths;
-}
-
 export function isApiOwned(pathname: string): boolean {
   return tables().apiPaths.some((re) => re.test(pathname));
 }
