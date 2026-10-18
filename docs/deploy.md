@@ -82,6 +82,7 @@ docker compose run --rm setup && docker compose up -d
 精简留下的几样没人再写、也没人再读的数据和代码一并删掉。迁移只删列和改约束，不调用模型；删掉的列里的数据找不回来，要留的先用下方 [备份](#备份) 导出。
 
 - **分析结果里的入选和分数**：迁移 `0119`、`0120` 删掉 `analyses` 的 `score`、`selected` 两列。精选和分数只看人工覆盖（`editorial_overrides`），没有覆盖的资料不入选、没有分数；后台“内容诊断”的模型判断里不再显示“入选”和“分数”。删之前先确认每条精选都有覆盖：`SELECT count(*) FROM publications p WHERE p.selected AND NOT EXISTS (SELECT 1 FROM editorial_overrides o WHERE o.article_id = p.article_id AND o.fields ? 'selected');` 应为 0，不为 0 的那些更新后会掉出精选。硬分叉前按 AIHOT 评分打过分、没有覆盖的未入选资料，公开投影里的分数先留着，这条资料下次重新发布时变成没有分数。归组时模型给出的“有没有新信息”（`articles.selection_adds_value`）照旧记下，但覆盖设了入选的资料本来就不受它影响，所以它现在不改变精选。
+- **信源类型**：迁移 `0121`–`0123` 把 `sources.kind` 的约束收窄到 `rss`、`web_list`、`json_list`、`external`（先删旧约束，再以 `NOT VALID` 加新约束，最后单独验证）。库里还有 `x_search`、`mp_account` 信源时验证会失败，更新前先查：`SELECT id, kind FROM sources WHERE kind NOT IN ('rss', 'web_list', 'json_list', 'external');`，有的话先删掉或改成别的类型。
 
 #### 硬分叉精简（2026 年 10 月 18 日）
 
