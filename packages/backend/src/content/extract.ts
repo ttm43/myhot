@@ -145,11 +145,11 @@ export function pageFetchable(url: string): boolean {
 
 /** Fetches and stores the body of one article. Unconfirmed bodies are recorded as such. */
 export async function extractArticleBody(articleId: string): Promise<"ok" | "unconfirmed" | "skipped"> {
-  const [a] = await sql<{ id: string; url: string; body_status: string; revision: number; x_post: { tweetId?: string } | null; config: SourceRow["config"] }[]>`
-    SELECT a.id, a.url, a.body_status, a.revision, a.x_post, s.config
+  const [a] = await sql<{ id: string; url: string; body_status: string; revision: number; config: SourceRow["config"] }[]>`
+    SELECT a.id, a.url, a.body_status, a.revision, s.config
     FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.id = ${articleId}`;
   // A post's text came with it: there is no page to read.
-  if (!a || a.body_status === "ok" || a.x_post?.tweetId) return "skipped";
+  if (!a || a.body_status === "ok") return "skipped";
   const got = await extractFromUrl(a.url, articleUtcOffset(a.config));
   if (!got) {
     return markUnconfirmed(articleId, a.revision);

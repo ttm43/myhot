@@ -4,13 +4,11 @@
 import { one, sql, type Tx } from "../db.ts";
 import { stableJson } from "../lib/ids.ts";
 import { collapseWhitespace } from "../lib/text.ts";
-import type { XPostData } from "../content/materials.ts";
-import { originalPostCopy } from "../content/posts.ts";
 import { pickRepresentative, REPRESENTATIVE_COLUMNS, type RepresentativeIdentity } from "./representative.ts";
 import { enqueue, QUEUES, shutdownSignal } from "../jobs/queue.ts";
 import { emit } from "../modules.ts";
 import {
-  bodyModeOf, channelOf, displayTags, isPoolEligible, isSelectable, isIndependentSelectedSource, publicSourceName, type SourceFacts,
+  bodyModeOf, displayTags, isPoolEligible, isSelectable, isIndependentSelectedSource, publicSourceName, type SourceFacts,
 } from "./rules.ts";
 import { foldableSelectionCondition, latestCompositeCondition, ownFactEvidenceCondition } from "./scope.ts";
 
@@ -26,8 +24,6 @@ interface ArticleRow {
   backfill: boolean;
   body_status: string;
   body_text: string | null;
-  x_post: XPostData | null;
-  x_article: { text?: string } | null;
   grouped_at: Date | null;
   grouping_status: "pending" | "complete" | "failed";
 }
@@ -143,7 +139,7 @@ export async function publishArticle(articleId: string, options: PublishOptions 
 export async function publishArticleTx(tx: Tx, articleId: string, options: PublishOptions = {}): Promise<PublishResult | null> {
   const [article] = await tx<ArticleRow[]>`
     SELECT id, source_id, url, title, language, published_at, discovered_at, timeline_at, backfill, body_status,
-           body_text, x_post, x_article, grouped_at, grouping_status
+           body_text, grouped_at, grouping_status
     FROM articles WHERE id = ${articleId} FOR UPDATE`;
   if (!article) return null;
   // Explicit imports carry an already-public editorial decision, not a new pending judgement.
@@ -173,12 +169,10 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
 
   const f = override?.fields ?? {};
   const isChineseTitle = article.language === "zh" || /[一-鿿]/.test(article.title);
-  // An X post carries its Chinese in the summary; without a Chinese title its own
-  // text is the title, where an article would still be a half-finished card.
+  // Without a Chinese title an article would still be a half-finished card.
   const zhTitle = analysis?.title_zh?.trim() ? analysis.title_zh : null;
-  const original = originalPostCopy(article.x_post, article.url, article.x_article);
-  const title = pickString(f.title, original?.title ?? zhTitle ?? (isChineseTitle || article.x_post ? collapseWhitespace(article.title) : null));
-  const summary = pickString(f.summary, original ? original.summary : analysis?.summary_zh ?? null);
+  const title = pickString(f.title, zhTitle ?? (isChineseTitle ? collapseWhitespace(article.title) : null));
+  const summary = pickString(f.summary, analysis?.summary_zh ?? null);
   const category = pickString(f.category, analysis?.category ?? null);
   const tags = Array.isArray(f.tags) ? (f.tags as string[]) : [...new Set([...(analysis?.tags ?? []), ...(analysis?.subjects ?? []).map((s) => `entity:${s}`)])];
   const score = typeof f.score === "number" ? f.score : null;
@@ -189,18 +183,17 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
 
   // An undated archive has a readable detail page, but its discovery is not a news timestamp.
   // Explicit imports can retain an editorial decision already published elsewhere.
-  const eligible = isPoolEligible({ participationMode: source.participation_mode, relevance, title, summary, originalPost: !!original })
+  const eligible = isPoolEligible({ participationMode: source.participation_mode, relevance, title, summary })
     && (!article.backfill || article.published_at !== null || !!options.releasedAt);
   const selectionCandidate = isSelectable(eligible, judgedSelected, source.tier);
   // Only an editorial decision (the recommender's or an editor's override) nominates a report;
   // a completed identity decision admits it to selection. A historical import already has its
   // public decision. Preserve that confirmed state on rebuild.
   const selected = selectionCandidate && article.grouping_status === "complete";
-  const reason = selected ? pickString(f.reason, original ? null : analysis?.reason_zh ?? null) : null;
-  const hasXPost = !!article.x_post;
-  const channel = channelOf(hasXPost);
-  const hasBody = !!article.body_text || !!article.x_post?.text || !!article.x_post?.media?.length || !!article.x_post?.quoted?.text;
-  const bodyMode = bodyModeOf(source, article.body_status, hasBody);
+  const reason = selected ? pickString(f.reason, analysis?.reason_zh ?? null) : null;
+  // The channel only ever told X posts apart; every report is news now.
+  const channel = "news";
+  const bodyMode = bodyModeOf(source, article.body_status, !!article.body_text);
   const originalTitle = isChineseTitle && title === collapseWhitespace(article.title) ? null : collapseWhitespace(article.title);
 
   // Waiting candidates are readable in the pool, with no selected seat.

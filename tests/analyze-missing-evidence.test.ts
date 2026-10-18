@@ -1,5 +1,5 @@
 // A title cannot supply the missing article: no writing or public eligibility until material
-// arrives. Feed excerpts, quoted text and displayable original posts keep their path.
+// arrives. Feed excerpts keep their path.
 import { pointModels, stub, tag } from "./setup.ts";
 import { analysisStep } from "./analysis-steps.ts";
 import assert from "node:assert/strict";
@@ -24,7 +24,7 @@ after(async () => { await provider.close(); await closeDb(); });
 const article = (changes: Partial<AnalyzeInputArticle> = {}): AnalyzeInputArticle => ({
   id: `missing-${tag()}`, revision: 1, title: "模型发布", url: "https://example.org/news", author: null,
   publishedAt: new Date("2026-10-02T00:00:00Z"), bodyStatus: "unconfirmed", bodyText: null,
-  excerpt: null, media: [], xPost: null,
+  excerpt: null, media: [],
   source: { name: "Fixture", kind: "rss", tier: "T1", firstParty: true }, ...changes,
 });
 const runFresh = (input: AnalyzeInputArticle) => runAnalysis(input, { attemptTag: tag() });
@@ -45,28 +45,14 @@ test("title-only articles wait for evidence regardless of the prefilter label", 
   });
 });
 
-test("real body, feed excerpt and quoted text still receive the structure and the writing", async (t) => {
+test("real body and feed excerpt still receive the structure and the writing", async (t) => {
   label = "PASS";
-  for (const changes of [{ bodyText: BODY }, { excerpt: BODY },
-    { xPost: { text: "支持", quoted: { text: "来源确认模型发布。" } } }]) await t.test(JSON.stringify(changes), async () => {
+  for (const changes of [{ bodyText: BODY }, { excerpt: BODY }]) await t.test(JSON.stringify(changes), async () => {
     steps.length = 0;
     const out = normalizeAnalysis(await runFresh(article(changes)));
     assert.ok(steps.includes("structure"));
     assert.equal(out.relevance, "pass");
     assert.ok(out.titleZh && out.summaryZh);
-  });
-});
-
-test("an empty or link-only original post keeps its verbatim publication", async (t) => {
-  label = "PASS";
-  for (const text of ["", "https://example.org/launch"]) await t.test(text || "media-only", async () => {
-    steps.length = 0;
-    const run = await runFresh(article({ xPost: { text, media: [] } }));
-    const out = normalizeAnalysis(run);
-    assert.deepEqual(steps.slice().sort(), ["prefilter", "structure"], "no writing request");
-    assert.equal(run.writing?.kind, "verbatim");
-    assert.equal(out.relevance, "pass");
-    assert.equal(isPoolEligible({ participationMode: "editorial", relevance: out.relevance, title: out.titleZh, summary: out.summaryZh, originalPost: true }), true);
   });
 });
 

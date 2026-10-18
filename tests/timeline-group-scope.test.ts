@@ -15,7 +15,7 @@ test("timeline grouping preserves evidence scope and filter-local anchors", asyn
   const now = new Date(+at + 100_000);
   await sql`INSERT INTO sources (id, name, kind, tier) VALUES (${prefix}, ${prefix}, 'rss', 'T1')`;
   const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, title) VALUES (${prefix}, ${prefix}) RETURNING id`;
-  const add = async (suffix: string, seconds: number, options: { role?: string; scope?: string; channel?: string; visibility?: string; selected?: boolean; future?: boolean; missing?: boolean; standalone?: boolean } = {}) => {
+  const add = async (suffix: string, seconds: number, options: { role?: string; scope?: string; category?: string; visibility?: string; selected?: boolean; future?: boolean; missing?: boolean; standalone?: boolean } = {}) => {
     const id = `${prefix}-${suffix}`;
     const time = new Date(+at + seconds * 1000);
     await sql`INSERT INTO articles (id, source_id, identity_key, url, title, discovered_at, timeline_at)
@@ -23,15 +23,15 @@ test("timeline grouping preserves evidence scope and filter-local anchors", asyn
     const [analysis] = await sql<{ id: number }[]>`INSERT INTO analyses (article_id, input_revision, origin, output)
       VALUES (${id}, 1, 'rule', ${sql.json(options.scope ? { scope: options.scope } : {})}) RETURNING id`;
     await sql`INSERT INTO publications (article_id, source_id, analysis_id, title, url, discovered_at, timeline_at, sort_at, visible_after,
-      selected, eligible, visibility, channel, tags, fact_id)
+      selected, eligible, visibility, channel, category, tags, fact_id)
       VALUES (${id}, ${prefix}, ${analysis!.id}, ${id}, ${`https://example.org/${id}`}, ${time}, ${time}, ${time}, ${options.future ? new Date(+now + 1) : time},
-        ${options.selected ?? true}, true, ${options.visibility ?? "public"}, ${options.channel ?? "news"}, ${[prefix]}, ${options.standalone ? null : fact!.id})`;
+        ${options.selected ?? true}, true, ${options.visibility ?? "public"}, 'news', ${options.category ?? "ai-models"}, ${[prefix]}, ${options.standalone ? null : fact!.id})`;
     if (!options.missing && !options.standalone) await sql`INSERT INTO fact_articles (fact_id, article_id, role)
       VALUES (${fact!.id}, ${id}, ${options.role ?? "report"})`;
     return id;
   };
   await add("old-report", 0);
-  await add("x-report", 10, { channel: "x" });
+  await add("paper-report", 10, { category: "paper" });
   const standalone = [
     await add("composite", 20, { scope: "composite" }),
     await add("mention", 30, { role: "mention" }),
@@ -46,11 +46,11 @@ test("timeline grouping preserves evidence scope and filter-local anchors", asyn
   const full = await loadTimeline(filters);
   assert.deepEqual(full.cards.map(card => card.key), [...standalone.reverse().map(id => `a${id}`), `f${fact!.id}`]);
   assert.equal(full.cards.at(-1)!.anchorAt, at.toISOString());
-  assert.deepEqual(new Set(full.cards.at(-1)!.group!.memberIds), new Set([`${prefix}-old-report`, `${prefix}-x-report`]));
-  const filtered = await loadTimeline({ ...filters, channel: "x" });
+  assert.deepEqual(new Set(full.cards.at(-1)!.group!.memberIds), new Set([`${prefix}-old-report`, `${prefix}-paper-report`]));
+  const filtered = await loadTimeline({ ...filters, category: "paper" });
   assert.deepEqual(filtered.cards.map(card => [card.key, card.anchorAt]), [[`f${fact!.id}`, new Date(+at + 10_000).toISOString()]]);
-  const news = await loadTimeline({ ...filters, channel: "news" });
-  assert.deepEqual(news.cards.find(card => card.key === `f${fact!.id}`)!.group!.memberIds, [`${prefix}-old-report`]);
+  const models = await loadTimeline({ ...filters, category: "ai-models" });
+  assert.deepEqual(models.cards.find(card => card.key === `f${fact!.id}`)!.group!.memberIds, [`${prefix}-old-report`]);
   const paged = [];
   let cursor: string | null = null;
   do {

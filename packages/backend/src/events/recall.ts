@@ -1,7 +1,6 @@
 // Candidate recall for grouping (group.ts): the reports of the last RECALL_DAYS days that belong to a
 // live fact, compared with the report being decided by the same title-and-summary embedding on both
-// sides (without an embedding key, by their shared character bigrams), plus the same URL and the X
-// post it replies to or quotes. A membership counts as evidence only when its report is not a
+// sides (without an embedding key, by their shared character bigrams), plus the same URL. A membership counts as evidence only when its report is not a
 // composite or explicitly withdrawn (groupingEvidenceCondition).
 import { sql } from "../db.ts";
 import { beijingDate } from "@aihot/contracts/time";
@@ -251,20 +250,12 @@ export async function candidateViews(recalled: Recalled[]): Promise<CandidateVie
   });
 }
 
-/** The live fact another report of the same page, or the X post this one replies to or quotes, belongs to. */
-export async function relatedPosts(a: { id: string; url: string; x_post: { replyTo?: string | null; quoted?: { url?: string } | null } | null }): Promise<{ sameUrl: PoolRow | null; referenced: PoolRow[] }> {
+/** The live fact another report of the same page belongs to. */
+export async function sameUrlFact(a: { id: string; url: string }): Promise<PoolRow | null> {
   const [sameUrl] = await sql<PoolRow[]>`
     SELECT fa.article_id, fa.fact_id, f.story_id, f.title AS fact_title
     FROM articles b JOIN fact_articles fa ON fa.article_id = b.id AND fa.role IN ('primary', 'report')
     JOIN facts f ON f.id = fa.fact_id JOIN stories st ON st.id = f.story_id AND st.merged_into IS NULL
     WHERE b.url = ${a.url} AND b.id <> ${a.id} AND ${groupingEvidenceCondition(sql`fa.article_id`)} ORDER BY fa.created_at LIMIT 1`;
-  const ids = [a.x_post?.replyTo ?? null, a.x_post?.quoted?.url ? (/\/status\/(\d+)/.exec(a.x_post.quoted.url)?.[1] ?? null) : null].filter((x): x is string => !!x);
-  const referenced = ids.length
-    ? await sql<PoolRow[]>`
-        SELECT fa.article_id, fa.fact_id, f.story_id, f.title AS fact_title
-        FROM articles b JOIN fact_articles fa ON fa.article_id = b.id AND fa.role IN ('primary', 'report')
-        JOIN facts f ON f.id = fa.fact_id JOIN stories st ON st.id = f.story_id AND st.merged_into IS NULL
-        WHERE b.identity_key = ANY(${ids.map((id) => `x:${id}`)}) AND b.id <> ${a.id} AND ${groupingEvidenceCondition(sql`fa.article_id`)}`
-    : [];
-  return { sameUrl: sameUrl ?? null, referenced };
+  return sameUrl ?? null;
 }

@@ -14,11 +14,10 @@ import { compactAnswerFirstSummary, enforceIdentity, MAX_BODY_CHARS, parseTransl
 
 const T = tag();
 const SOURCE = `test-analyze-${T}`;
-const X_SOURCE = `test-analyze-x-${T}`;
 
 interface Req { step: AnalysisStep; marker: string; user: string }
 const requests: Req[] = [];
-const MARKERS = ["CLEAR", "OFFTOPIC", "BARE", "VAGUE", "THIN", "推文"];
+const MARKERS = ["CLEAR", "OFFTOPIC", "BARE", "VAGUE", "THIN"];
 
 // One stub stands in for DashScope (prefilter, structure) and DeepSeek (summarize).
 const provider = await stub((_hit, req) => {
@@ -37,8 +36,7 @@ pointModels(provider.url);
 
 before(async () => {
   await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, next_fetch_at) VALUES
-    (${SOURCE}, 'Test analyze source', 'rss', 'T1', 'editorial', '2100-01-01'),
-    (${X_SOURCE}, 'Test X account', 'rss', 'T1', 'editorial', '2100-01-01')`;
+    (${SOURCE}, 'Test analyze source', 'rss', 'T1', 'editorial', '2100-01-01')`;
 });
 after(async () => {
   await provider.close();
@@ -135,18 +133,6 @@ test("a feed summary alone: the article page is fetched first, then the whole ar
   await sql`UPDATE articles SET body_text = ${`THIN: ${LONG} (${T}) full page`}, body_status = 'ok', revision = revision + 1 WHERE id = ${id}`;
   const second = await analyzeArticle(id);
   assert.deepEqual([second!.needsBody ?? false, second!.output!.relevance], [false, "pass"]);
-});
-
-test("a short post in Chinese is its own copy", async () => {
-  // The tag rides as a hashtag, which the language check strips.
-  const text = `推文：今天把智能体接进了工作流，效果不错。#t${T}`;
-  const { articleId } = await upsertMaterial({
-    sourceId: X_SOURCE, url: `https://x.com/test/status/1${Date.now()}`, title: text, via: "fetch", publishedAt: new Date(),
-    xPost: { tweetId: `1${Date.now()}`, authorName: "测试", handle: "test", text },
-  });
-  const post = await analyzeArticle(articleId);
-  assert.deepEqual([post!.output!.titleZh, post!.output!.summaryZh], [text, text]);
-  assert.ok(!calls("推文").includes("summarize"), "no writing call");
 });
 
 test("guards: a company the input does not name is not written in; long summaries are cut at sentences", () => {

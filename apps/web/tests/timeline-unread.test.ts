@@ -15,12 +15,12 @@ const at = "2026-10-04T08:00:00.000Z";
 const earlier = "2026-10-03T08:00:00.000Z";
 
 function summaryOf(id: string, title: string, timelineAt = at): FeedItemSummary {
-  return { id, title, summary: "固定摘要", reason: "固定推荐理由", source: { name: "Fixture" }, publishedAt: timelineAt, timelineAt, category: "ai-models", tags: [], score: 80, selected: true, channel: "news", x: null };
+  return { id, title, summary: "固定摘要", reason: "固定推荐理由", source: { name: "Fixture" }, publishedAt: timelineAt, timelineAt, category: "ai-models", tags: [], score: 80, selected: true };
 }
 
 function detailOf(id: string, title: string): SiteItemDetail {
   return {
-    ...summaryOf(id, title), x: null, originalTitle: title, links: { original: "https://example.org/article" }, discoveredAt: at,
+    ...summaryOf(id, title), originalTitle: title, links: { original: "https://example.org/article" }, discoveredAt: at,
     readingMode: "full", author: null,
     body: "<p>固定正文</p>",
     outline: [], markdownAvailable: true, group: null,

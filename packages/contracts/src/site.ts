@@ -7,29 +7,7 @@ export interface SourceRef {
   name: string;
 }
 
-export interface MediaView {
-  kind: "image" | "video";
-  url: string;
-  /** Full image for an on-demand viewer; list previews stay small. */
-  fullUrl?: string;
-  width: number | null;
-  height: number | null;
-  alt: string | null;
-  poster: string | null;
-  srcSet?: string;
-}
-
-export interface XPostView {
-  authorName: string;
-  handle: string;
-  avatarUrl: string | null;
-  avatarSrcSet?: string;
-  text: string;
-  quoted: { authorName: string; handle: string; text: string; url: string } | null;
-  media: MediaView[];
-}
-
-/** What every site answer about an article carries; a card and a page each add the X post in their own form. */
+/** What every site answer about an article carries. */
 export interface ItemSummary {
   id: string;
   title: string;
@@ -45,14 +23,10 @@ export interface ItemSummary {
   tags: string[];
   score: number | null;
   selected: boolean;
-  channel: "news" | "x";
 }
 
 /** The fields rendered by a site feed card; full original text lives in the item detail. */
-export interface FeedItemSummary extends Pick<ItemSummary, "id" | "title" | "summary" | "reason" | "source" | "publishedAt" | "timelineAt" | "category" | "tags" | "score" | "selected" | "channel"> {
-  x: (Pick<XPostView, "authorName" | "handle" | "avatarUrl" | "avatarSrcSet" | "media"> & {
-    quoted: Omit<NonNullable<XPostView["quoted"]>, "url"> | null;
-  }) | null;
+export interface FeedItemSummary extends Pick<ItemSummary, "id" | "title" | "summary" | "reason" | "source" | "publishedAt" | "timelineAt" | "category" | "tags" | "score" | "selected"> {
   /**
    * A selected report whose fact is represented by another report (全部动态 and search): that report,
    * so the card can say "同一新闻，精选展示《…》" instead of claiming a seat of its own.
@@ -111,8 +85,6 @@ export interface OutlineEntry {
 
 /** An article page (/api/site/items/:id): its body as written, with its outline. */
 export interface SiteItemDetail extends ItemSummary {
-  /** The post with all its media; its text is the body. */
-  x: Omit<XPostView, "text"> | null;
   /** Selected, but its fact's seat is held by this report: marked 同新闻, without a reason of its own. */
   sameEvent?: { id: string; title: string } | null;
   readingMode: "full" | "summary-only";

@@ -9,7 +9,7 @@ import type { FeedItemSummary, RadarResponse } from "@aihot/contracts/site";
 import { startWebServer, type WebServer } from "./web-server.ts";
 
 const at = "2026-10-04T08:00:00.000Z";
-const item: FeedItemSummary = { id: "feed-card", title: "精选卡片", summary: "固定摘要", reason: null, source: { name: "Fixture" }, publishedAt: at, timelineAt: at, category: "ai-models", tags: [], score: 80, selected: true, channel: "news", x: null };
+const item: FeedItemSummary = { id: "feed-card", title: "精选卡片", summary: "固定摘要", reason: null, source: { name: "Fixture" }, publishedAt: at, timelineAt: at, category: "ai-models", tags: [], score: 80, selected: true };
 const radar: RadarResponse = { sources: [
   { sourceId: "s135-github-trending", sourceName: "GitHub Trending", items: [
     { title: "acme / rocket", url: "https://github.com/acme/rocket", excerpt: "A tiny rocket engine.", discoveredAt: at },

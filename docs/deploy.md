@@ -83,6 +83,7 @@ docker compose run --rm setup && docker compose up -d
 
 - **分析结果里的入选和分数**：迁移 `0119`、`0120` 删掉 `analyses` 的 `score`、`selected` 两列。精选和分数只看人工覆盖（`editorial_overrides`），没有覆盖的资料不入选、没有分数；后台“内容诊断”的模型判断里不再显示“入选”和“分数”。删之前先确认每条精选都有覆盖：`SELECT count(*) FROM publications p WHERE p.selected AND NOT EXISTS (SELECT 1 FROM editorial_overrides o WHERE o.article_id = p.article_id AND o.fields ? 'selected');` 应为 0，不为 0 的那些更新后会掉出精选。硬分叉前按 AIHOT 评分打过分、没有覆盖的未入选资料，公开投影里的分数先留着，这条资料下次重新发布时变成没有分数。归组时模型给出的“有没有新信息”（`articles.selection_adds_value`）照旧记下，但覆盖设了入选的资料本来就不受它影响，所以它现在不改变精选。
 - **信源类型**：迁移 `0121`–`0123` 把 `sources.kind` 的约束收窄到 `rss`、`web_list`、`json_list`、`external`（先删旧约束，再以 `NOT VALID` 加新约束，最后单独验证）。库里还有 `x_search`、`mp_account` 信源时验证会失败，更新前先查：`SELECT id, kind FROM sources WHERE kind NOT IN ('rss', 'web_list', 'json_list', 'external');`，有的话先删掉或改成别的类型。
+- **X 帖子的数据和样式**：硬分叉以后没有采集再写 `articles.x_post`、`articles.x_article`，迁移 `0124`、`0125` 删掉这两列。卡片和文章页上的 X 帖子样式（头像、@账号、配图、引用帖）、Markdown 导出里的帖子部分、只给帖子用的四份提示词 `industry/prompts/summarize-short-post*.md` 和 `summarize-long-post*.md`、`site/site.ts` 的 `POLICY`，以及频道 `x`（`?channel=x` 现在是无效参数）都去掉了；`/api/site/*` 的条目不再带 `channel` 和 `x` 两个字段。catbus 推来的 X 帖子带 `body`，一直按普通文章处理，不受影响。写标题摘要这一步的提示词版本因此变了：已有分析不重算，之后重新分析的资料不复用旧的写作回执。更新前可以先查库里有没有帖子数据：`SELECT count(*) FROM articles WHERE x_post IS NOT NULL OR x_article IS NOT NULL;`，有的话删列后只剩标题和正文。`publications.channel` 列留着，现在都是 `news`。
 
 #### 硬分叉精简（2026 年 10 月 18 日）
 
@@ -129,7 +130,7 @@ docker compose logs -f --tail 100 api worker web
 
 ## 花多少钱
 
-- **模型**：每条新资料先预筛一次；过了预筛的再做一次结构化、写一次标题摘要，然后归组（有相近的报道时才调用）。空正文、纯链接的 X 帖子不调用写作模型。每天用多少，取决于你的信源每天更新多少条。后台“模型”页能看到每一步的调用次数和输入输出 token 数。
+- **模型**：每条新资料先预筛一次；过了预筛的再做一次结构化、写一次标题摘要，然后归组（有相近的报道时才调用）。每天用多少，取决于你的信源每天更新多少条。后台“模型”页能看到每一步的调用次数和输入输出 token 数。
 - 所有付费服务都有每分钟、每小时、每天的调用上限（后台“设置 → 付费请求上限”），超过就暂停，不会一夜之间刷爆账单。填 0 表示立即停用这个服务。
 
 ## 不用 Docker

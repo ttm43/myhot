@@ -1,8 +1,8 @@
 // analyzeArticle: the judging and writing steps, each with its own prompt from the industry pack
 // (industry/prompts/):
 //   1. prefilter: does the material belong to this industry at all (wide recall). Only BLOCK stops an
-//      item; a BLOCK given while material is missing counts as UNKNOWN. Without material or a
-//      displayable original post, UNKNOWN waits for a new material revision before later steps;
+//      item; a BLOCK given while material is missing counts as UNKNOWN. Without material, UNKNOWN
+//      waits for a new material revision before later steps;
 //   2. structure: category, tags, subjects and the current news fact;
 //   3. writing, once the structure is in: the Chinese title and summary by the title/summary prompts.
 // 精选 is not judged here: an editor's or the external judge's override decides it (publication/publish.ts).
@@ -19,18 +19,17 @@ import { buildMaterial, loadAnalyzeInput, type AnalyzeInputArticle } from "./inp
 import { pageFetchable } from "../content/extract.ts";
 import { shutdownSignal } from "../jobs/queue.ts";
 import {
-  buildArticlePrompt, buildLongTweetPrompt, buildShortTweetPrompt, finalizeCopy, isShortTweetInput, looksZh, missingEvidence,
-  needsShortTweetTranslation, parseTranslateOutput, PREFILTER_SYSTEM, prefilterUser, translateInputOf, type IdentityGuard,
+  buildArticlePrompt, finalizeCopy, looksZh, missingEvidence, parseTranslateOutput, PREFILTER_SYSTEM, prefilterUser,
+  translateInputOf, type IdentityGuard,
 } from "./writing.ts";
 import { CATEGORY_GUIDE, CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, normalizeTags, TOPIC_TAGS } from "./vocabulary.ts";
 import { promptText, promptVersion } from "./prompts.ts";
-import { originalPostCopy } from "../content/posts.ts";
 
 export { buildMaterial, loadAnalyzeInput, type AnalyzeInputArticle };
 
 export const PROMPT_VERSIONS = {
   prefilter: promptVersion("prefilter"),
-  summarize: promptVersion("summarize-article", "summarize-article-empty", "summarize-short-post", "summarize-short-post-quoted", "summarize-long-post", "summarize-long-post-quoted", "identity-context"),
+  summarize: promptVersion("summarize-article", "summarize-article-empty", "identity-context"),
   structure: promptVersion("structure"),
 } as const;
 /** Every step's prompt, as stored on each judgement. */
@@ -85,9 +84,7 @@ export const STRUCTURE_SYSTEM = promptText("structure", {
 /** Keep only quotes present both in the original material and in the text the structure model saw. */
 export function normalizeStructure(data: z.infer<typeof StructureSchema>, a: AnalyzeInputArticle) {
   const visible = collapseWhitespace(buildMaterial(a));
-  const originals = (a.xPost
-    ? [String(a.xPost.text ?? a.title), String(a.xPost.quoted?.text ?? "")]
-    : [a.bodyText ?? a.excerpt ?? ""]).map(collapseWhitespace);
+  const originals = [a.bodyText ?? a.excerpt ?? ""].map(collapseWhitespace);
   // A title is not the unseen contents of a video/article, regardless of the model's confidence.
   const scope = originals.some(Boolean) ? data.scope : "unknown";
   const grounded = (quote: string | null | undefined) => {
@@ -112,9 +109,9 @@ export function normalizeStructure(data: z.infer<typeof StructureSchema>, a: Ana
 
 export interface AnalysisRun {
   prefilter: { label: "PASS" | "BLOCK" | "UNKNOWN"; reason: string; model: string; receiptId: number; reused: boolean };
-  /** The reader-facing copy: `summarize`, `verbatim` (a Chinese short post or an original post), `none`. */
+  /** The reader-facing copy: `summarize` or `none`. */
   writing: {
-    kind: "summarize" | "verbatim" | "none";
+    kind: "summarize" | "none";
     model: string | null;
     titleZh: string;
     summaryZh: string;
@@ -127,7 +124,7 @@ export interface AnalysisRun {
 
 /** Only a title or a feed summary, and a page to fetch: the article is judged on the page. */
 export function waitsForPage(a: AnalyzeInputArticle): boolean {
-  return a.bodyStatus === "pending" && !a.bodyText && !a.xPost && pageFetchable(a.url);
+  return a.bodyStatus === "pending" && !a.bodyText && pageFetchable(a.url);
 }
 
 type StepOpts = { attemptTag?: string };
@@ -178,16 +175,11 @@ export async function runStructure(a: AnalyzeInputArticle, opts: StepOpts = {}):
   return { ...normalizeStructure(res.data, a), model: res.model, receiptId: res.receiptId, reused: res.reused };
 }
 
-/** The title/summary prompts (articles, long and short posts). */
+/** The title/summary prompt. */
 async function runSummarize(a: AnalyzeInputArticle, opts: StepOpts): Promise<NonNullable<AnalysisRun["writing"]>> {
   const t = translateInputOf(a);
-  const isX = t.sourceKind === "x_search";
-  const short = isShortTweetInput(t);
-  const main = collapseWhitespace(t.mainText || t.title);
-  const plain = { receiptIds: [] as number[], reused: true };
-  // A short post already in Chinese is its own copy, and too little text is not written up from a title.
-  if (short && !needsShortTweetTranslation(main)) return { kind: "verbatim", model: null, titleZh: main, summaryZh: main, ...plain };
-  if (!short && t.text.trim().length < 20) return { kind: "none", model: null, titleZh: looksZh(t.title) ? t.title : "", summaryZh: "", ...plain };
+  // Too little text is not written up from a title.
+  if (t.text.trim().length < 20) return { kind: "none", model: null, titleZh: looksZh(t.title) ? t.title : "", summaryZh: "", receiptIds: [], reused: true };
   const model = await modelFor("summarize");
   checkAnalysisRunning();
   const res = await chatJson({
@@ -196,7 +188,7 @@ async function runSummarize(a: AnalyzeInputArticle, opts: StepOpts): Promise<Non
     subject: subjectOf(a),
     promptVersion: PROMPT_VERSIONS.summarize,
     system: "",
-    user: short ? buildShortTweetPrompt(t) : isX ? buildLongTweetPrompt(t) : buildArticlePrompt(t),
+    user: buildArticlePrompt(t),
     schema: SummarizeSchema,
     json: false,
     parse: parseTranslateOutput,
@@ -205,12 +197,7 @@ async function runSummarize(a: AnalyzeInputArticle, opts: StepOpts): Promise<Non
     attemptTag: tagged(opts.attemptTag, "summarize"),
   });
   const p = res.data;
-  const draft = short
-    ? { titleZh: p.titleZh || (looksZh(main) ? main : ""), summaryZh: p.bodyZh || p.summaryZh }
-    : isX
-      ? { titleZh: p.titleZh, summaryZh: p.summaryZh || p.bodyZh }
-      : { titleZh: p.titleZh || (looksZh(t.title) ? t.title : ""), summaryZh: p.summaryZh };
-  const copy = finalizeCopy(t, draft);
+  const copy = finalizeCopy(t, { titleZh: p.titleZh || (looksZh(t.title) ? t.title : ""), summaryZh: p.summaryZh });
   return { kind: "summarize", model: res.model, titleZh: copy.titleZh, summaryZh: copy.summaryZh, identityGuard: copy.identityGuard, receiptIds: [res.receiptId], reused: res.reused };
 }
 
@@ -218,15 +205,11 @@ async function runSummarize(a: AnalyzeInputArticle, opts: StepOpts): Promise<Non
 export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): Promise<AnalysisRun> {
   checkAnalysisRunning();
   const prefilter = await runPrefilter(a, opts);
-  // Missing article text waits for a later revision; displayable original posts keep their judgement.
-  if (prefilter.label === "BLOCK") return { prefilter, writing: null, structure: null };
-  const original = originalPostCopy(a.xPost, a.url);
-  if (missingEvidence(a) && !original) return { prefilter, writing: null, structure: null };
+  // Missing article text waits for a later revision.
+  if (prefilter.label === "BLOCK" || missingEvidence(a)) return { prefilter, writing: null, structure: null };
   // The writing waits for the structure: an unresolved identity must not buy copy.
   const structure = await runStructure(a, opts);
-  const writing: NonNullable<AnalysisRun["writing"]> = original
-    ? { kind: "verbatim", model: null, titleZh: original.title, summaryZh: original.summary ?? "", receiptIds: [], reused: true }
-    : await runSummarize(a, opts);
+  const writing = await runSummarize(a, opts);
   return { prefilter, writing, structure };
 }
 
@@ -235,8 +218,8 @@ export function normalizeAnalysis(run: AnalysisRun) {
   const label = run.prefilter.label;
   const titleZh = collapseWhitespace(run.writing?.titleZh ?? "");
   const summaryZh = (run.writing?.summaryZh ?? "").trim();
-  // Original posts can consist entirely of media. Model-written copy still needs a title and summary.
-  const relevance = label === "BLOCK" ? "block" : !run.writing || !titleZh || (!summaryZh && run.writing.kind !== "verbatim") ? "unknown" : "pass";
+  // Model-written copy needs a title and summary.
+  const relevance = label === "BLOCK" ? "block" : !run.writing || !titleZh || !summaryZh ? "unknown" : "pass";
   const subjects = run.structure?.subjects ?? [];
   const tags = [...(run.structure?.tags ?? [])];
   for (const s of subjects) {

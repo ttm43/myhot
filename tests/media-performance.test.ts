@@ -13,7 +13,6 @@ process.env.AIHOT_DATA_DIR = dir;
 process.env.ALLOW_PRIVATE_NETWORK_FETCH = "true";
 process.env.MODEL_CALLS_ENABLED = "false";
 const { produceImage } = await import("@aihot/backend/media/images");
-const { xView } = await import("@aihot/backend/publication/items");
 
 let imageHits = 0;
 let failureHits = 0;
@@ -123,23 +122,6 @@ test("SVG preparation retains compact transfer and intrinsic display size", asyn
     assert.equal(await readFile(`${file}.prepared`, "utf8"), "original");
     assert.deepEqual(await produceImage(url, "full"), { body, type: "image/svg+xml" });
   }
-});
-
-test("site media exposes responsive previews and full lightboxes while RSS retains thumb images", () => {
-  const row = { x_post: { media: [{ url: "https://example.org/1.png" }, { url: "https://example.org/2.png", poster: "https://example.org/poster.png" }] } };
-  assert.ok(xView(row, true)!.media.every((m) => m.url.includes("mode=card") && m.fullUrl?.includes("mode=full")));
-  assert.ok(xView(row, true)!.media[1]!.poster!.includes("mode=card"));
-  assert.ok(xView(row)!.media.every((m) => m.url.includes("mode=thumb") && m.fullUrl === undefined));
-  const detail = xView(row, false, true)!.media;
-  assert.ok(detail.every((m) => m.url.includes("mode=full") && m.srcSet?.includes("mode=thumb")));
-  for (const media of detail.filter((m) => !m.poster)) {
-    // Opening a picture already displayed at full resolution must reuse its browser cache entry.
-    assert.equal(media.srcSet!.split(", ").at(-1), `${media.poster ?? media.url} 1600w`);
-  }
-  row.x_post.media[1]!.url = "javascript:invalid";
-  const single = xView(row, true)!.media;
-  assert.equal(single.length, 1);
-  assert.ok(single[0]!.url.includes("mode=thumb"));
 });
 
 test("successive responsive candidates reuse the completed original download", async () => {
@@ -391,7 +373,6 @@ test("video pages mislabeled as images are excluded across ingestion and public 
   for (const url of pages) {
     assert.equal(proxiedImage(url, "full"), null);
     assert.equal(proxiedImageSet(url, "body"), null);
-    assert.equal(xView({ x_post: { media: [{ url }] } }, true)!.media.length, 0);
   }
   for (const url of pictures) {
     assert.ok(proxiedImage(url, "full"));

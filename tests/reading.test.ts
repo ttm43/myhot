@@ -9,7 +9,6 @@ import { closeDb, sql } from "@aihot/backend/db";
 import { upsertMaterial } from "@aihot/backend/content/materials";
 import { stopBoss } from "@aihot/backend/jobs/queue";
 import { publishArticle } from "@aihot/backend/publication/publish";
-import { textToHtml } from "@aihot/backend/content/sanitize";
 import { buildApp } from "../apps/api/src/app.ts";
 
 const T = tag();
@@ -83,11 +82,4 @@ test("a query that names a company also finds the articles about it", async () =
   assert.ok(relevance.indexOf(about) >= 0 && relevance.indexOf(about) < relevance.indexOf(mention), "the subject ranks first");
   // Only the whole query names the company: a narrower search stays a text search.
   assert.ok(!(await search(`claude ${T}-nothing`)).includes(about));
-});
-
-test("bare addresses in post text become safe links", () => {
-  const html = textToHtml("see https://arxiv.org/abs/2502.11089. <b>x</b>\n\n1. one\n2. two");
-  assert.match(html, /<a href="https:\/\/arxiv\.org\/abs\/2502\.11089" target="_blank" rel="noopener noreferrer nofollow">https:\/\/arxiv\.org\/abs\/2502\.11089<\/a>\./);
-  assert.match(html, /&lt;b&gt;x&lt;\/b&gt;/);
-  assert.match(html, /<ol><li>one<\/li><li>two<\/li><\/ol>/);
 });

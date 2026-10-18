@@ -13,8 +13,6 @@ import { ScoreLabel, shownScore } from "../components/ui/Score";
 import { ArticleLayout, RailSection } from "../components/ui/Page";
 import { Menu, MenuItem } from "../components/ui/Menu";
 import { GroupButton, GroupSources } from "../features/feed/ReadingGroup";
-import { MediaGallery } from "../features/item/MediaGallery";
-import { QuotedPost } from "../features/item/QuotedPost";
 import { ArticleBody } from "../features/item/ArticleBody";
 import { ActionsSheet, ReaderToolbar, type ActionRow } from "../features/item/ReaderTools";
 import { OutlineSheet, scrollToAnchor } from "../components/ui/OutlineSheet";
@@ -224,16 +222,14 @@ export default function ItemPage() {
 /** Phones, while the article loads: what the card showed, in the article's own places. */
 function ItemPreview({ preview }: { preview: FeedItemSummary }) {
   const [toast, setToast] = useToast();
-  const isX = preview.channel === "x" && !!preview.x;
   // Without a reliable date from the original, the card's time is when it was collected, and says so.
   const shownAt = preview.publishedAt ?? preview.timelineAt;
   return (
     <div className="mx-auto max-w-[var(--page-max-reading)] pb-8">
-      <PhoneBar back={{ to: preview.selected ? "/" : "/all", label: preview.selected ? "精选" : "全部" }} title={isX ? preview.x!.authorName : preview.title} />
+      <PhoneBar back={{ to: preview.selected ? "/" : "/all", label: preview.selected ? "精选" : "全部" }} title={preview.title} />
       <article className="pb-6 pt-3" aria-busy="true">
         <div className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-3">
-          <span className="font-semibold text-ink-2">{isX ? preview.x!.authorName : preview.source.name}</span>
-          {isX && <span>· @{preview.x!.handle} · X</span>}
+          <span className="font-semibold text-ink-2">{preview.source.name}</span>
           <span>·</span>
           {!preview.publishedAt && <span>收录于</span>}
           <time dateTime={shownAt} className="mono">{fullDateTime(shownAt)}</time>
@@ -244,10 +240,10 @@ function ItemPreview({ preview }: { preview: FeedItemSummary }) {
             </span>
           )}
         </div>
-        {!isX && <h1 data-page-title="" className="text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink">{preview.title}</h1>}
+        <h1 data-page-title="" className="text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink">{preview.title}</h1>
         {preview.summary && (
-          <section className={isX ? "mt-4" : "mt-7"}>
-            <div className="mb-2 text-[12px] font-semibold text-accent">{isX && preview.summary.replace(/\s+/g, " ").trim() === preview.title ? "原文" : "AI 导读"}</div>
+          <section className="mt-7">
+            <div className="mb-2 text-[12px] font-semibold text-accent">AI 导读</div>
             <p className="text-[18px] leading-[1.7] text-ink">{preview.summary}</p>
           </section>
         )}
@@ -264,7 +260,7 @@ function ItemPreview({ preview }: { preview: FeedItemSummary }) {
         </div>
       </article>
       <ReaderToolbar
-        originalLabel={isX ? "原推" : "原文"}
+        originalLabel="原文"
         onShare={async () => {
           if ((await shareOrCopy(preview)) === "copied") setToast("链接已复制");
         }}
@@ -324,13 +320,12 @@ function ItemView({ item }: { item: SiteItemDetail }) {
     }
   };
 
-  const isX = item.channel === "x" && !!item.x;
   // Without a reliable date from the original, the time shown is when it was collected, labelled as such.
   const shownAt = item.publishedAt ?? item.discoveredAt;
   const timeLabel = item.publishedAt ? "发布时间" : "收录时间";
   const summaryOnly = item.readingMode === "summary-only";
   const showOutline = item.outline.length >= 3;
-  const originalLabel = isX ? "在 X 查看原推" : "打开原文";
+  const originalLabel = "打开原文";
 
   const back = () => {
     if (window.history.state?.idx > 0) navigate(-1);
@@ -393,9 +388,9 @@ function ItemView({ item }: { item: SiteItemDetail }) {
   // under the facts (or under the notes when only the right rail shows).
   const facts = (
     <RailSection title="来源">
-      <div className="text-[14px] font-semibold leading-snug text-ink">{isX ? item.x!.authorName : item.source.name}</div>
+      <div className="text-[14px] font-semibold leading-snug text-ink">{item.source.name}</div>
       <div className="mt-1 text-[12.5px] leading-relaxed text-ink-3">
-        {isX ? `@${item.x!.handle} · X` : item.author ?? hostOf(item.links.original)}
+        {item.author ?? hostOf(item.links.original)}
       </div>
       <div className="mt-3 text-[12px] text-ink-4">{timeLabel}</div>
       <time dateTime={shownAt} className="mono mt-0.5 block text-[12.5px] text-ink-2">
@@ -438,7 +433,7 @@ function ItemView({ item }: { item: SiteItemDetail }) {
       {/* Phones: back to where the reader came from, the title once it has scrolled away, more actions. */}
       <PhoneBar
         back={{ to: item.selected ? "/" : "/all", label: item.selected ? "精选" : "全部" }}
-        title={isX ? item.x!.authorName : item.title}
+        title={item.title}
         actions={
           <BarButton label="更多操作" onClick={() => setActionsOpen(true)}>
             <IconMore size={22} />
@@ -466,10 +461,9 @@ function ItemView({ item }: { item: SiteItemDetail }) {
         {/* Between lg and 2xl the left rail is hidden: 返回 stays at the top while reading, as on the original site. */}
         <div className="sticky top-0 z-20 -mx-2 hidden bg-bg/95 px-2 py-1.5 backdrop-blur lg:block 2xl:hidden">{backButton}</div>
         <article className="pb-6 pt-3 lg:pt-2 2xl:pt-1">
-          <div className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-3 2xl:hidden ${isX ? "" : "mb-3"}`}>
-            <span className="font-semibold text-ink-2">{isX ? item.x!.authorName : item.source.name}</span>
-            {isX && <span>· @{item.x!.handle} · X</span>}
-            {item.author && !isX && <span>· {item.author}</span>}
+          <div className="mb-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-3 2xl:hidden">
+            <span className="font-semibold text-ink-2">{item.source.name}</span>
+            {item.author && <span>· {item.author}</span>}
             <span>·</span>
             {!item.publishedAt && <span>收录于</span>}
             <time dateTime={shownAt} className="mono">{fullDateTime(shownAt)}</time>
@@ -485,11 +479,11 @@ function ItemView({ item }: { item: SiteItemDetail }) {
               </span>
             )}
           </div>
-          {!isX && <h1 data-page-title="" className="text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink lg:text-[32px] lg:leading-[1.34] xl:text-[36px] xl:leading-[1.3]">{item.title}</h1>}
-          {!isX && item.originalTitle && <p className="mt-2.5 text-[14px] leading-relaxed text-ink-4">{item.originalTitle}</p>}
+          <h1 data-page-title="" className="text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink lg:text-[32px] lg:leading-[1.34] xl:text-[36px] xl:leading-[1.3]">{item.title}</h1>
+          {item.originalTitle && <p className="mt-2.5 text-[14px] leading-relaxed text-ink-4">{item.originalTitle}</p>}
 
-          {item.summary && (!isX || item.summary.replace(/\s+/g, " ").trim() !== item.title) && (
-            <section className={isX ? "mt-4" : "mt-7 xl:mt-8"}>
+          {item.summary && (
+            <section className="mt-7 xl:mt-8">
               <div className="mb-2 text-[12px] font-semibold text-accent">{summaryOnly ? "摘要" : "AI 导读"}</div>
               <p className="text-[18px] leading-[1.7] text-ink xl:text-[20px] xl:leading-[1.7]">{item.summary}</p>
             </section>
@@ -529,13 +523,10 @@ function ItemView({ item }: { item: SiteItemDetail }) {
             </section>
           )}
 
-          {isX && item.x!.media.length > 0 && <MediaGallery media={item.x!.media} postUrl={item.links.original} />}
-          {isX && item.x!.quoted?.text && <QuotedPost quoted={item.x!.quoted} />}
-
           <p className="mt-8 text-[13px] text-ink-4">
             来源：
             <a href={item.links.original} target="_blank" rel="noopener noreferrer" className="text-ink-3 hover:text-accent">
-              {isX ? item.x!.authorName : item.source.name}
+              {item.source.name}
             </a>
             <span> · {hostOf(item.links.original)}</span>
           </p>
@@ -555,7 +546,7 @@ function ItemView({ item }: { item: SiteItemDetail }) {
 
       <ReaderToolbar
         originalUrl={item.links.original}
-        originalLabel={isX ? "原推" : "原文"}
+        originalLabel="原文"
         onOutline={showOutline ? () => setOutlineOpen(true) : undefined}
         onShare={() => void share()}
       />

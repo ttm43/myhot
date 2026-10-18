@@ -1,10 +1,8 @@
 // Public read layer, item level. Every exit (site API, MCP) reads
 // items through these columns and views; which rows are public is decided by scope.ts.
 import { CATEGORY_KEYS, toPublicApiCategory, type CategoryKey, type ChannelKey, type PublicApiCategoryKey } from "@aihot/contracts/taxonomy";
-import type { FeedItemSummary, ItemSummary, MediaView, XPostView } from "@aihot/contracts/site";
-import { POLICY } from "@aihot/site";
+import type { FeedItemSummary, ItemSummary } from "@aihot/contracts/site";
 import { sql, type Db } from "../db.ts";
-import { proxiedImage, proxiedImageSet } from "../media/imgproxy.ts";
 import { displayTags, publicSourceName } from "./rules.ts";
 import { foldableSelectionCondition, seatedCondition } from "./scope.ts";
 
@@ -18,7 +16,6 @@ export interface ItemRow {
   tags: string[];
   score: number | null;
   selected: boolean;
-  channel: "news" | "x";
   url: string;
   published_at: Date | null;
   discovered_at: Date;
@@ -31,18 +28,17 @@ export interface ItemRow {
   source_name: string;
   /** Participation mode of the source now (editorial, hot_signal, isolated). */
   source_mode: string;
-  x_post: Record<string, any> | null;
   author: string | null;
 }
 
 /** Columns every item listing selects. Internal judgement details never leave this layer. */
 export const ITEM_COLUMNS = sql`
   p.article_id AS id, p.title, p.original_title, p.summary, p.reason, p.category, p.tags, p.score,
-  p.selected, p.seat, p.channel, p.url, p.published_at, p.discovered_at, p.timeline_at, p.visibility,
+  p.selected, p.seat, p.url, p.published_at, p.discovered_at, p.timeline_at, p.visibility,
   p.body_mode, p.fact_id, s.name AS source_name, s.participation_mode AS source_mode,
-  a.x_post, a.author`;
+  a.author`;
 
-/** MCP listings never render article bodies, X media or story metadata. */
+/** MCP listings never render article bodies or story metadata. */
 export type ApiItemRow = Pick<ItemRow, "id" | "title" | "original_title" | "summary" | "source_name" | "url" | "published_at" | "discovered_at" | "category" | "score" | "selected" | "reason">;
 /** `selected` is the machine meaning: the report holds its fact's selected seat (scope.ts seatedCondition). */
 export const API_ITEM_COLUMNS = sql`
@@ -78,57 +74,7 @@ export function tagCondition(tag: string | null | undefined) {
   return sql`AND p.tags @> ${[tag]}::text[]`;
 }
 
-function mediaView(m: Record<string, any>, mode: "card" | "thumb" | "full" = "thumb", responsive = false): MediaView | null {
-  const url = proxiedImage(m.url, mode);
-  if (!url) return null;
-  const srcSet = responsive ? proxiedImageSet(m.poster ?? m.url, mode === "full" ? "body" : "card") : null;
-  return {
-    kind: m.kind === "video" ? "video" : "image",
-    url,
-    ...(responsive && mode !== "full" ? { fullUrl: proxiedImage(m.url, "full")! } : {}),
-    ...(srcSet ? { srcSet } : {}),
-    width: typeof m.width === "number" ? m.width : null,
-    height: typeof m.height === "number" ? m.height : null,
-    alt: m.alt ?? null,
-    poster: m.poster ? proxiedImage(m.poster, mode === "card" ? "card" : "thumb") : null,
-  };
-}
-
-export function xView(row: Pick<ItemRow, "x_post">, compact = false, responsive = compact): XPostView | null {
-  const x = row.x_post;
-  if (!x) return null;
-  const quoted = x.quoted && typeof x.quoted === "object"
-    ? {
-      authorName: String(x.quoted.authorName ?? ""), handle: String(x.quoted.handle ?? ""), text: String(x.quoted.text ?? ""), url: String(x.quoted.url ?? ""),
-    }
-    : null;
-  const media = ((x.media ?? []) as Array<Record<string, any>>)
-    .map((raw) => ({ raw, view: mediaView(raw, compact || !responsive ? "thumb" : "full", responsive) }))
-    .filter((entry): entry is { raw: Record<string, any>; view: MediaView } => entry.view !== null);
-  const avatarUrl = x.avatarUrl;
-  const avatarSrcSet = responsive ? proxiedImageSet(avatarUrl, "avatar") : null;
-  return {
-    authorName: String(x.authorName ?? x.handle ?? ""),
-    handle: String(x.handle ?? ""),
-    avatarUrl: proxiedImage(avatarUrl, "avatar"),
-    ...(avatarSrcSet ? { avatarSrcSet } : {}),
-    text: String(x.text ?? ""),
-    quoted,
-    // A multi-image list grid is 112 CSS px wide; one image can be 240 px. Keep 3x pixels for both.
-    // Detail retains full media for the lightbox; srcSet bounds the displayed image.
-    media: media.map(({ raw, view }) => compact && media.length > 1 ? mediaView(raw, "card", responsive)! : view),
-  };
-}
-
-/**
- * Whether pages show an X post's own text and media. A site that counts them as full text shows them
- * only where the source allows full text, as it does an article's body.
- */
-export function showsPost(row: { channel: string; body_mode: string }): boolean {
-  return row.channel === "x" && (!POLICY.xPostIsFullText || row.body_mode === "full");
-}
-
-/** The shared public article; its X post is added as each answer shows it. */
+/** The shared public article. */
 export function toItemSummary(row: ItemRow): ItemSummary {
   return {
     id: row.id,
@@ -145,23 +91,16 @@ export function toItemSummary(row: ItemRow): ItemSummary {
     tags: displayTags(row.tags),
     score: row.score === null ? null : Math.round(Number(row.score)),
     selected: row.selected,
-    channel: row.channel,
   };
 }
 
 /** Project the shared public article into the exact fields a site card renders. */
 export function toFeedItemSummary(row: ItemRow): FeedItemSummary {
   const item = toItemSummary(row);
-  const x = showsPost(row) ? xView(row, true) : null;
   return {
-    id: item.id, title: item.title, summary: item.summary ?? (x?.text || null), reason: item.reason,
+    id: item.id, title: item.title, summary: item.summary, reason: item.reason,
     source: item.source, publishedAt: item.publishedAt, timelineAt: item.timelineAt,
-    category: item.category, tags: item.tags, score: item.score, selected: item.selected, channel: item.channel,
-    x: x ? {
-      authorName: x.authorName, handle: x.handle, avatarUrl: x.avatarUrl,
-      ...(x.avatarSrcSet ? { avatarSrcSet: x.avatarSrcSet } : {}), media: x.media,
-      quoted: x.quoted ? { authorName: x.quoted.authorName, handle: x.quoted.handle, text: x.quoted.text } : null,
-    } : null,
+    category: item.category, tags: item.tags, score: item.score, selected: item.selected,
   };
 }
 

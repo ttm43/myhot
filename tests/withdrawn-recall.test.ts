@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { after, test } from 'node:test';
 import { sql, closeDb } from '@aihot/backend/db';
-import { candidateViews, recallFacts, relatedPosts } from '@aihot/backend/events/recall';
+import { candidateViews, recallFacts, sameUrlFact } from '@aihot/backend/events/recall';
 import { consolidate } from '@aihot/backend/events/consolidate';
 const prompts: string[] = [];
 const provider = await stub((_hit,request) => {
@@ -23,9 +23,9 @@ async function fixture() {
   const [fact]=await sql`INSERT INTO facts(public_id,story_id,title) VALUES(${key},${story.id},${key}) RETURNING id`;
   return {key,storyId:Number(story.id),factId:Number(fact.id)};
 }
-async function report(f:Awaited<ReturnType<typeof fixture>>, label:string, visibility:'public'|'summary-only'|'withdrawn'|null, options:{role?:string;age?:number;identity?:string;factId?:number}={}) {
+async function report(f:Awaited<ReturnType<typeof fixture>>, label:string, visibility:'public'|'summary-only'|'withdrawn'|null, options:{role?:string;age?:number;factId?:number}={}) {
   const id=randomUUID(),url='https://example.invalid/'+id,title=f.key+' '+label;
-  await sql`INSERT INTO articles(id,source_id,identity_key,url,title,discovered_at,timeline_at) VALUES(${id},${f.key},${options.identity??id},${url},${title},now(),now()-make_interval(days=>${options.age??0}))`;
+  await sql`INSERT INTO articles(id,source_id,identity_key,url,title,discovered_at,timeline_at) VALUES(${id},${f.key},${id},${url},${title},now(),now()-make_interval(days=>${options.age??0}))`;
   await sql`INSERT INTO analyses(article_id,input_revision,origin,title_zh,summary_zh,output) VALUES(${id},1,'rule',${title},'',${sql.json({scope:'single'})})`;
   await sql`INSERT INTO fact_articles(fact_id,article_id,role) VALUES(${options.factId??f.factId},${id},${options.role??'report'})`;
   if(visibility!==null) await sql`INSERT INTO publications(article_id,title,summary,source_id,channel,url,visibility,discovered_at,timeline_at,sort_at) SELECT id,title,'',source_id,'news',url,${visibility},discovered_at,timeline_at,timeline_at FROM articles WHERE id=${id}`;
@@ -48,11 +48,7 @@ test('summary-only and reports without publication retain existing recall eligib
 });
 test('same URL cannot route directly through a withdrawn report',async()=>{
   const f=await fixture(); const a=await report(f,'same URL','withdrawn');
-  const rows=await relatedPosts({id:'new-'+f.key,url:a.url,x_post:null}); assert.equal(rows.sameUrl,null);
-});
-test('X reply and quote cannot boost a withdrawn report',async()=>{
-  const f=await fixture(); const identity='919177'+Date.now(); await report(f,'post','withdrawn',{identity:'x:'+identity});
-  const rows=await relatedPosts({id:'new-'+f.key,url:'https://example.invalid/new',x_post:{replyTo:identity,quoted:{url:'https://x.com/example/status/'+identity}}}); assert.deepEqual(Array.from(rows.referenced),[]);
+  assert.equal(await sameUrlFact({id:'new-'+f.key,url:a.url}),null);
 });
 test('a withdrawn-only earlier fact does not claim the root of an active candidate',async()=>{
   const f=await fixture(); await report(f,'old root','withdrawn',{role:'primary',age:2});

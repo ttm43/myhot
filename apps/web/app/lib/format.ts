@@ -31,8 +31,3 @@ export function fullDateTime(iso: string): string {
 export function monthDayTime(iso: string): string {
   return `${monthDay(beijingDate(iso))} ${beijingTime(iso)}`;
 }
-
-export function sourceInitial(name: string): string {
-  const s = name.replace(/^[^\p{L}\p{N}]+/u, "");
-  return (s[0] ?? "A").toUpperCase();
-}

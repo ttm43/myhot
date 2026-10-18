@@ -20,19 +20,14 @@ export interface SourceFacts {
   site_fulltext: boolean;
 }
 
-export function channelOf(hasXPost: boolean): "x" | "news" {
-  return hasXPost ? "x" : "news";
-}
-
-/** Public pool (/all): editorial sources, AI relevant, with usable copy or an original post. */
+/** Public pool (/all): editorial sources, AI relevant, with usable copy. */
 export function isPoolEligible(input: {
   participationMode: string;
   relevance: string | null;
   title: string | null;
   summary: string | null;
-  originalPost?: boolean;
 }): boolean {
-  return input.participationMode === "editorial" && input.relevance === "pass" && !!input.title && (!!input.summary || input.originalPost === true);
+  return input.participationMode === "editorial" && input.relevance === "pass" && !!input.title && !!input.summary;
 }
 
 /**

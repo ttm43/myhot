@@ -50,15 +50,6 @@ export const SITE = {
   crawlerName: "MyHOTBot/1.0",
 } as const;
 
-/** X 帖子的全文规则。 */
-export const POLICY = {
-  /**
-   * X 帖子本身的文字和图片算不算全文：算的话，只在这篇允许站内全文时显示（信源允许全文、正文也取到了）；
-   * 不算的话总是显示，和标题、摘要一样。
-   */
-  xPostIsFullText: true,
-} as const;
-
 /** 条目卡片和详情页上的几处说法和显示。 */
 export const ITEM_COPY = {
   /** 模型写的那句理由叫什么：卡片、详情页、Markdown 导出和 MCP 的回答都用它。 */

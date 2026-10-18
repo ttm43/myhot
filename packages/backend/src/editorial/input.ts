@@ -17,7 +17,6 @@ export interface AnalyzeInputArticle {
   excerpt: string | null;
   /** pending: no body fetched yet; ok; unconfirmed: fetching failed; none. */
   bodyStatus?: string;
-  xPost: Record<string, any> | null;
   media: Array<Record<string, any>>;
   source: {
     name: string;
@@ -31,31 +30,21 @@ export interface AnalyzeInputArticle {
   };
 }
 
-/**
- * The post as the judging steps read it: an X Article it published joins its text, so every step sees
- * the article rather than a bare link.
- */
-export function withXArticle(xPost: Record<string, any> | null, article: { title?: string; text?: string } | null): Record<string, any> | null {
-  if (!xPost || !article?.text) return xPost;
-  const parts = [String(xPost.text ?? "").trim(), article.title ? `【X 长文】${article.title}` : "【X 长文】", article.text];
-  return { ...xPost, text: parts.filter(Boolean).join("\n\n") };
-}
-
 export async function loadAnalyzeInput(articleId: string): Promise<AnalyzeInputArticle | null> {
   const [row] = await sql<{
     id: string; revision: number; title: string; url: string; author: string | null; published_at: Date | null; discovered_at: Date;
-    body_text: string | null; excerpt: string | null; body_status: string; x_post: Record<string, any> | null; x_article: { title?: string; text?: string } | null;
+    body_text: string | null; excerpt: string | null; body_status: string;
     media: Array<Record<string, any>>; source_name: string; source_kind: string; tier: string; first_party: boolean; source_tags: string[]; owner_entity_id: string | null;
     config: Record<string, any>;
   }[]>`
-    SELECT a.id, a.revision, a.title, a.url, a.author, a.published_at, a.discovered_at, a.body_text, a.excerpt, a.body_status, a.x_post, a.x_article, a.media,
+    SELECT a.id, a.revision, a.title, a.url, a.author, a.published_at, a.discovered_at, a.body_text, a.excerpt, a.body_status, a.media,
            s.name AS source_name, s.kind AS source_kind, s.tier, s.first_party, s.tags AS source_tags, s.owner_entity_id, s.config
     FROM articles a JOIN sources s ON s.id = a.source_id
     WHERE a.id = ${articleId}`;
   if (!row) return null;
   return {
     id: row.id, revision: row.revision, title: row.title, url: row.url, author: row.author, publishedAt: row.published_at, discoveredAt: row.discovered_at,
-    bodyText: row.body_text, excerpt: row.excerpt, bodyStatus: row.body_status, xPost: withXArticle(row.x_post, row.x_article), media: row.media,
+    bodyText: row.body_text, excerpt: row.excerpt, bodyStatus: row.body_status, media: row.media,
     source: {
       name: row.source_name, kind: row.source_kind, tier: row.tier, firstParty: row.tier === "T1", tags: row.source_tags, ownerEntityId: row.owner_entity_id,
       fetchesBody: row.config?.fetchPublicContent === true || !!row.config?.detail || row.source_kind === "web_list",
@@ -80,15 +69,9 @@ export function buildMaterial(a: AnalyzeInputArticle): string {
   lines.push("<material>");
   if (a.publishedAt) lines.push(`发布时间：${beijingDate(a.publishedAt)} ${beijingTime(a.publishedAt)}（北京时间）`);
   if (a.author) lines.push(`作者：${a.author}`);
-  if (a.xPost) {
-    lines.push(`作者：${a.xPost.authorName ?? ""} (@${a.xPost.handle ?? ""})`);
-    lines.push(`帖子：\n${body(String(a.xPost.text ?? a.title))}`);
-    if (a.xPost.quoted?.text) lines.push(`引用的帖子（@${a.xPost.quoted.handle ?? ""}）：\n${body(String(a.xPost.quoted.text))}`);
-  } else {
-    lines.push(`标题：${collapseWhitespace(a.title)}`);
-    const original = a.bodyText ?? a.excerpt ?? "";
-    lines.push(original ? `正文：\n${body(original)}` : "正文：（无）");
-  }
+  lines.push(`标题：${collapseWhitespace(a.title)}`);
+  const original = a.bodyText ?? a.excerpt ?? "";
+  lines.push(original ? `正文：\n${body(original)}` : "正文：（无）");
   lines.push(`原文链接：${a.url}`);
   lines.push("</material>");
   return lines.join("\n");

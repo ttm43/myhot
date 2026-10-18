@@ -1,7 +1,7 @@
 // Event grouping. A report attaches to a fact, the same real-world occurrence, and
 // facts hang on a story, an occurrence with its direct developments. Recall (recall.ts): the same
 // title-and-summary embedding on both sides over the reports of the last 14 days (shared bigrams
-// without an embedding key), plus the same URL and the X post a post replies to or quotes.
+// without an embedding key), plus the same URL.
 // Identity: one four-way relation judgement over the candidate
 // facts with their representative reports fully described (relate.ts); a merge that is not obvious
 // from similarity is confirmed by a second vendor before it is written; a development attaches only
@@ -25,7 +25,7 @@ import { publishArticle, publishArticleTx } from "../publication/publish.ts";
 import { latestCompositeCondition } from "../publication/scope.ts";
 import { consolidate, liveStory, type Consolidation } from "./consolidate.ts";
 import { mergeStoryInto } from "./merge.ts";
-import { candidateViews, recallFacts, recallSelectedBackground, relatedPosts } from "./recall.ts";
+import { candidateViews, recallFacts, recallSelectedBackground, sameUrlFact } from "./recall.ts";
 import {
   BATCH_SYSTEM, BATCH_PROMPT_VERSION, BatchSchema, PAIR_SYSTEM, PairSchema, RELATE_PROMPT_VERSION, TIE_MIN_CONFIDENCE,
   batchUser, completeDecisions, firmlyTied, pairUser, reportText, sameOccurrence, storyForDevelopment, verdictsByFact,
@@ -46,7 +46,6 @@ interface ArticleRow {
   discovered_at: Date;
   grouped_at: Date | null;
   body_text: string | null;
-  x_post: { tweetId?: string; replyTo?: string | null; quoted?: { url?: string } | null } | null;
   source_id: string;
   source_name: string;
   first_party: boolean;
@@ -221,7 +220,7 @@ export async function groupArticle(articleId: string): Promise<GroupResult> {
 
 async function decide(articleId: string, revision: number, recheckSelection: boolean): Promise<GroupResult> {
   const [a] = await sql<ArticleRow[]>`
-    SELECT a.id, a.revision, a.title, a.url, a.published_at, a.discovered_at, a.grouped_at, a.body_text, a.x_post, a.backfill,
+    SELECT a.id, a.revision, a.title, a.url, a.published_at, a.discovered_at, a.grouped_at, a.body_text, a.backfill,
            s.id AS source_id, s.name AS source_name, (s.tier = 'T1') AS first_party, s.participation_mode
     FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.id = ${articleId}`;
   if (a && a.revision !== revision) throw new GroupingSupersededError("Grouping input changed before it was read");
@@ -282,13 +281,13 @@ async function decide(articleId: string, revision: number, recheckSelection: boo
   };
   const newTitle = String(frame?.title || title).slice(0, 60);
 
-  const { sameUrl, referenced } = await relatedPosts(a);
+  const sameUrl = await sameUrlFact(a);
   // The URL settles identity, but an unseen fact still needs its first reading-value decision.
   const selectedSameUrl = sameUrl && !composite && !kept && (await candidateViews([{
     factId: sameUrl.fact_id, storyId: sameUrl.story_id, factTitle: sameUrl.fact_title, score: 1,
   }]))[0]?.selected === true;
   const cands = selectedSameUrl ? [] : await candidateViews(await recallFacts(articleId,
-    reportText(title, an.summary_zh), RECALL_MIN_COSINE, RECALL_TOP_FACTS, [...referenced, ...(sameUrl ? [sameUrl] : [])]));
+    reportText(title, an.summary_zh), RECALL_MIN_COSINE, RECALL_TOP_FACTS, sameUrl ? [sameUrl] : []));
   const reading = selectedSameUrl ? [] : await recallSelectedBackground(articleId, reportText(title, an.summary_zh), RECALL_MIN_COSINE);
   let verdicts = new Map<number, Verdict>();
   let selection = NO_SELECTED_COVERAGE;

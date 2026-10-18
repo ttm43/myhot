@@ -25,7 +25,6 @@
 - `icp`：中国大陆网站的备案号，填了就显示在页脚。
 - `github`：源码仓库的地址（选填），填了就在侧栏和“我的”页底部显示“GitHub 开源”。
 - `rootIcons`：标准图标以外也放在网站根目录的图标，`site/brand/` 里的文件名（选填）。
-- `POLICY`：`xPostIsFullText` 决定 X 帖子本身的文字算不算全文（算的话，只在信源允许全文时显示）。
 - `ITEM_COPY`：模型写的那句理由叫什么（`reasonLabel`，默认“推荐理由”），读者在网页上看不看得到 AI 评分（`showScore`；只管显示，MCP 照样带分数）。
 - `RADAR`：首页「雷达」里排在最前的信源（`pinned`，填信源 id）。
 - `SOURCE_DEFAULTS`：后台新建信源时默认展不展示全文。
