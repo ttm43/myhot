@@ -6,9 +6,8 @@ import { sql } from "../db.ts";
 import { beijingDate } from "@aihot/contracts/time";
 import { sha256 } from "../lib/ids.ts";
 import { embeddingsAvailable, ensureEmbeddings } from "../providers/embeddings.ts";
-import { GROUP_BODY_CHARS, lexicalSimilarity, reportText, type CandidateView, type ReportView, type ReadingContext } from "./relate.ts";
-import { groupingEvidenceCondition, ownFactEvidenceCondition, selectedCondition } from "../publication/scope.ts";
-import { pickRepresentative, REPRESENTATIVE_COLUMNS, type RepresentativeIdentity, type RepresentativeRow } from "../publication/representative.ts";
+import { lexicalSimilarity, reportText, type CandidateView } from "./relate.ts";
+import { groupingEvidenceCondition } from "../publication/scope.ts";
 
 /** Reports discovered this recently are candidates (keyed on discovery, so an old page found today still meets its peers). */
 export const RECALL_DAYS = 14;
@@ -52,18 +51,6 @@ async function recallPool(): Promise<PoolRow[]> {
     JOIN articles a ON a.id = fa.article_id
     LEFT JOIN publications p ON p.article_id = a.id
     WHERE fa.role IN ('primary', 'report') AND ${groupingEvidenceCondition(sql`a.id`)} AND a.discovered_at > now() - make_interval(days => ${RECALL_DAYS})`;
-}
-
-type ReadingRow = ReportView & { article_id: string; revision: number };
-
-/** Already displayed reports without a fact supply reading context, never identity evidence. */
-async function selectedReadingPool(): Promise<ReadingRow[]> {
-  return sql<ReadingRow[]>`
-    SELECT p.article_id, p.revision, p.title, p.summary, s.name AS source, (s.tier = 'T1') AS "firstParty",
-      coalesce(p.published_at, p.discovered_at) AS at, an.output->>'scope' AS scope
-    FROM publications p JOIN sources s ON s.id = p.source_id LEFT JOIN analyses an ON an.id = p.analysis_id
-    WHERE p.fact_id IS NULL AND ${selectedCondition(new Date())}
-      AND p.discovered_at > now() - make_interval(days => ${RECALL_DAYS})`;
 }
 
 /** The public title and summary of reports (the analysis when a report has no publication yet). */
@@ -124,7 +111,7 @@ export function cosine32(a: Float32Array, b: Float32Array): number {
 /** The lexical fallback's bar: shared bigrams are not on the cosine scale, so it has its own. */
 const LEXICAL_MIN = 0.25;
 
-/** Both identity candidates and reading context use the same stored vectors (or the lexical fallback). */
+/** Similarity to the query by the stored vectors (or the lexical fallback). */
 async function similarReports(queryId: string, queryText: string, pool: Array<{ article_id: string; revision?: number }>, minScore: number): Promise<Map<string, number>> {
   const scores = new Map<string, number>();
   if (pool.length && !embeddingsAvailable()) {
@@ -179,21 +166,6 @@ export async function recallFacts(queryId: string, queryText: string, minScore: 
   return [...best.values()].sort((a, b) => b.score - a.score).slice(0, top);
 }
 
-/** A small separate context lets a single report compare with an earlier composite/standalone. */
-export async function recallSelectedBackground(queryId: string, queryText: string, minScore: number, top = 3): Promise<ReadingContext[]> {
-  const pool = (await selectedReadingPool()).filter(r => r.article_id !== queryId);
-  const scores = await similarReports(queryId, queryText, pool, minScore);
-  const picked = pool.filter(r => scores.has(r.article_id))
-    .sort((a, b) => scores.get(b.article_id)! - scores.get(a.article_id)!)
-    .slice(0, Math.min(top, 3));
-  if (!picked.length) return [];
-  // Read only the saved text of the few matching reports; never fetch or extract for this comparison.
-  const bodies = new Map((await sql<{ id: string; text: string | null }[]>`
-    SELECT id, left(body_text, ${GROUP_BODY_CHARS}) AS text FROM articles WHERE id = ANY(${picked.map(r => r.article_id)})`
-  ).map(r => [r.id, r.text]));
-  return picked.map(({ article_id, revision, ...report }) => ({ report, sourceText: bodies.get(article_id) ?? null }));
-}
-
 /**
  * What the judge sees of a candidate fact: its representative report (first-party first, else the
  * earliest), its size, and whether it started its story (rootFactOf).
@@ -201,10 +173,7 @@ export async function recallSelectedBackground(queryId: string, queryText: strin
 export async function candidateViews(recalled: Recalled[]): Promise<CandidateView[]> {
   if (recalled.length === 0) return [];
   const ids = recalled.map((r) => r.factId);
-  type SelectedRow = RepresentativeRow & RepresentativeIdentity & {
-    fact_id: number; title: string; summary: string | null; source: string; first_party: boolean; at: Date;
-  };
-  const [rows, selectedRows] = await Promise.all([sql<{
+  const rows = await sql<{
     fact_id: number; story_id: number; fact_title: string; subject: string | null; action: string | null; object: string | null; occurred_at: Date | null;
     title: string; summary: string | null; source: string; first_party: boolean; at: Date; members: number; root_fact_id: number;
   }[]>`
@@ -217,22 +186,11 @@ export async function candidateViews(recalled: Recalled[]): Promise<CandidateVie
     JOIN publications p ON p.article_id = fa.article_id
     JOIN sources s ON s.id = p.source_id
     WHERE fa.fact_id = ANY(${ids}) AND fa.role IN ('primary', 'report') AND ${groupingEvidenceCondition(sql`fa.article_id`)}
-    ORDER BY fa.fact_id, (fa.role = 'primary') DESC, p.timeline_at ASC`,
-    sql<SelectedRow[]>`
-      SELECT p.fact_id, p.article_id, p.title, p.summary, p.body_mode, p.score, p.timeline_at,
-        s.name AS source, (s.tier = 'T1') AS first_party, coalesce(p.published_at, p.discovered_at) AS at,
-        ${REPRESENTATIVE_COLUMNS}
-      FROM publications p JOIN sources s ON s.id = p.source_id JOIN facts f ON f.id = p.fact_id
-      WHERE p.fact_id = ANY(${ids}) AND ${selectedCondition(new Date())} AND ${ownFactEvidenceCondition()}`,
-  ]);
+    ORDER BY fa.fact_id, (fa.role = 'primary') DESC, p.timeline_at ASC`;
   const byFact = new Map(rows.map((r) => [Number(r.fact_id), r]));
   return recalled.flatMap((r) => {
     const row = byFact.get(r.factId);
     if (!row) return [];
-    // Identity uses the eligible reports above. For reading value show exactly the representative
-    // already visible in 精选; a merely scored or still-pending report is not prior reader coverage.
-    const selectedMembers = selectedRows.filter((p) => Number(p.fact_id) === r.factId);
-    const selected = selectedMembers.length ? pickRepresentative(selectedMembers) : null;
     return [{
       factId: r.factId,
       storyId: Number(row.story_id),
@@ -240,8 +198,6 @@ export async function candidateViews(recalled: Recalled[]): Promise<CandidateVie
       members: Number(row.members),
       storyRoot: Number(row.root_fact_id) === r.factId,
       score: r.score,
-      selected: selected !== null,
-      selectedReport: selected ? { title: selected.title, summary: selected.summary, source: selected.source, firstParty: selected.first_party, at: selected.at } : null,
       report: {
         title: row.title, source: row.source, firstParty: row.first_party, at: row.at, summary: row.summary,
         frame: { subject: row.subject, action: row.action, object: row.object, occurredAt: row.occurred_at ? beijingDate(row.occurred_at) : null },

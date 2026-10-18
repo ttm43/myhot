@@ -80,8 +80,7 @@ for (const entrance of ["publisher", "source-mode"] as const) test(`${entrance} 
   const judged = await make("already-judged");
   await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,title_zh,summary_zh)
     VALUES (${judged},1,'rule','pass','已判断的报道','既有精选已经覆盖全部要点')`;
-  await sql`UPDATE articles SET grouping_status='complete',grouped_at=now(),selection_adds_value=false,
-    selection_value_reason='既有精选已覆盖' WHERE id=${judged}`;
+  await sql`UPDATE articles SET grouping_status='complete',grouped_at=now() WHERE id=${judged}`;
   if (entrance === "publisher") {
     await source("T1", { publisherUrlPrefixes: [scope] });
     for (const [id, name] of [[fresh, "new"], [judged, "already-judged"]]) {
@@ -91,8 +90,8 @@ for (const entrance of ["publisher", "source-mode"] as const) test(`${entrance} 
     const [s] = await sql`SELECT updated_at FROM sources WHERE id=${signal}`;
     await updateSource(signal, { patch: { participation_mode: "editorial" }, version: s!.updated_at.toISOString() }, "test");
   }
-  const [preserved] = await sql`SELECT grouping_status,selection_adds_value FROM articles WHERE id=${judged}`;
-  assert.deepEqual({ ...preserved }, { grouping_status: "complete", selection_adds_value: false }, "current editorial judgement stays reusable");
+  const [preserved] = await sql`SELECT grouping_status FROM articles WHERE id=${judged}`;
+  assert.deepEqual({ ...preserved }, { grouping_status: "complete" }, "current editorial judgement stays reusable");
   await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,title_zh,summary_zh)
     VALUES (${fresh},1,'rule','pass','首次编辑判断','新的新闻候选摘要')`;
   await sql`INSERT INTO editorial_overrides(article_id,fields,reason,updated_by) VALUES (${fresh},'{"selected":true}','test selection','test')`;

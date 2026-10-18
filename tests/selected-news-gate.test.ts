@@ -43,7 +43,7 @@ test('an unresolved selection never leaks after the old deadline and completion 
     assert.ok((await read(path)).includes(id), `${path} hid otherwise readable content`);
   }
 
-  await sql`UPDATE articles SET grouping_status='complete',grouped_at=now(),grouping_error=NULL,selection_adds_value=true WHERE id=${id}`;
+  await sql`UPDATE articles SET grouping_status='complete',grouped_at=now(),grouping_error=NULL WHERE id=${id}`;
   await publishArticle(id);
   mock.timers.tick(5_100); // the public timeline's existing five-second grouped snapshot expires
   for (const path of selectedOutlets) assert.ok((await read(path)).includes(id), `${path} missed completed news`);

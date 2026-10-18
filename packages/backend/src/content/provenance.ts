@@ -8,11 +8,10 @@ import { emit } from "../modules.ts";
 import { hasItemPage } from "../publication/rules.ts";
 
 /**
- * An UPDATE articles SET fragment: the article's grouping and its "adds value" check are decided again
- * (new material, an editorial publisher, a source turned editorial).
+ * An UPDATE articles SET fragment: the article's grouping is decided again (new material, an editorial
+ * publisher, a source turned editorial).
  */
-export const groupingReset = () => sql`grouping_status = 'pending', grouped_at = NULL, grouping_receipt_id = NULL, grouping_error = NULL,
-  selection_adds_value = NULL, selection_value_reason = NULL`;
+export const groupingReset = () => sql`grouping_status = 'pending', grouped_at = NULL, grouping_receipt_id = NULL, grouping_error = NULL`;
 
 interface Publisher {
   id: string;

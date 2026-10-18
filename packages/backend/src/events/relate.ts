@@ -15,7 +15,7 @@ import { promptText, promptVersion } from "../editorial/prompts.ts";
 export const RELATE_PROMPT_VERSION = promptVersion("group-pair");
 export const BATCH_PROMPT_VERSION = promptVersion("group-batch");
 
-/** Saved original evidence per report, shared by rendering and selected-background retrieval. */
+/** Saved original evidence of the new report: what a digest covers is often only in its body. */
 export const GROUP_BODY_CHARS = 10_000;
 
 export const RELATIONS = ["SAME_OCCURRENCE", "SAME_STORY", "UNRELATED", "ROUNDUP"] as const;
@@ -27,14 +27,11 @@ export interface ReportView {
   firstParty: boolean;
   at: Date | null;
   summary: string | null;
-  /** Saved source evidence for the current value judgement; identity candidates stay concise. */
+  /** The new report's saved source text; candidates stay concise. */
   sourceText?: string | null;
   scope?: "single" | "composite" | "unknown";
   frame?: { subject?: string | null; action?: string | null; object?: string | null; occurredAt?: string | null } | null;
 }
-
-/** A previously selected report, with its stored source evidence; it has no candidate fact id. */
-export interface ReadingContext { report: ReportView; sourceText: string | null }
 
 export interface CandidateView {
   factId: number;
@@ -47,12 +44,7 @@ export interface CandidateView {
   /** Recall similarity with the query (cosine of the two embeddings, or the lexical fallback's overlap). */
   score: number;
   report: ReportView;
-  /** Only a report already visible in 精选 counts as coverage the reader has seen. */
-  selected?: boolean;
-  selectedReport?: ReportView | null;
 }
-
-export interface SelectionValue { addsValue: boolean; reason: string }
 
 export interface Verdict {
   relation: Relation;
@@ -60,10 +52,7 @@ export interface Verdict {
   note: string;
 }
 
-/**
- * The relation prompts (industry/prompts/group-*.md): a new report against candidate facts with its
- * reading value, and a pair.
- */
+/** The relation prompts (industry/prompts/group-*.md): a new report against candidate facts, and a pair. */
 export const BATCH_SYSTEM = promptText("group-batch");
 export const PAIR_SYSTEM = promptText("group-pair");
 
@@ -73,7 +62,6 @@ export const BatchSchema = z.object({
   query: z.string().max(400).catch(""),
   decisions: z
     .array(z.object({ id: z.string().regex(/^C[1-9]\d*$/), relation: RelationSchema, confidence: z.number().min(0).max(1), note: z.string().max(400).catch("") })),
-  selection: z.object({ addsValue: z.boolean(), reason: z.string().trim().min(1).max(400) }),
 });
 
 export const PairSchema = z.object({
@@ -88,18 +76,20 @@ function when(at: Date | null): string {
   return at ? `${beijingDate(at)} ${beijingTime(at)}` : "未知";
 }
 
-export function describeReport(r: ReportView, label: string, extra = "", summaryLimit = 360): string {
+export function describeReport(r: ReportView, label: string, extra = ""): string {
   const f = r.frame;
   return [
     `【${label}】${extra}`,
     `标题：${r.title}`,
     `来源：${r.source}${r.firstParty ? "（当事方/官方）" : ""}｜发布时间：${when(r.at)}`,
-    `摘要：${(r.summary ?? "").slice(0, summaryLimit) || "（无）"}`,
+    `摘要：${(r.summary ?? "").slice(0, 360) || "（无）"}`,
     r.scope && r.scope !== "unknown" ? `资料范围：${r.scope === "composite" ? "多个独立发生的综合稿" : "单一具体发生或议题"}` : null,
     f && (f.subject || f.action || f.object)
       ? `事实要素：主体=${f.subject || "?"}；动作=${f.action || "?"}；对象=${f.object || "?"}；日期=${f.occurredAt || "未知"}`
       : null,
-    r.sourceText ? `【原文证据】\n${r.sourceText.slice(0, GROUP_BODY_CHARS)}\n【原文证据结束】` : null,
+    r.sourceText ? `【原文证据】
+${r.sourceText.slice(0, GROUP_BODY_CHARS)}
+【原文证据结束】` : null,
   ]
     .filter(Boolean)
     .join("\n");
@@ -107,20 +97,11 @@ export function describeReport(r: ReportView, label: string, extra = "", summary
 
 export const candidateKey = (index: number) => `C${index + 1}`;
 
-export function batchUser(query: ReportView, cands: CandidateView[], queryLabel = "新报道", reading: ReadingContext[] = []): string {
+export function batchUser(query: ReportView, cands: CandidateView[]): string {
   const list = cands
-    .map((c, i) => [
-      describeReport(c.report, `候选 ${candidateKey(i)}`, `（该事实已有 ${c.members} 篇报道；事实标题：${c.factTitle}）`),
-      queryLabel === "新报道" ? c.selected && c.selectedReport
-        ? describeReport(c.selectedReport, "已公开精选", "（增量只与这篇已展示的内容比较）")
-        : "【尚无公开精选】该候选只用于身份判断。" : null,
-    ].filter(Boolean).join("\n"))
+    .map((c, i) => describeReport(c.report, `候选 ${candidateKey(i)}`, `（该事实已有 ${c.members} 篇报道；事实标题：${c.factTitle}）`))
     .join("\n\n");
-  const background = reading.map(({ report, sourceText }, i) => [
-    describeReport(report, `已公开精选阅读背景 R${i + 1}`, "（只比较信息覆盖，不是事实候选）", 2000),
-    sourceText ? `【该已选报道的原文证据】\n${sourceText.slice(0, GROUP_BODY_CHARS)}\n【原文证据结束】` : null,
-  ].filter(Boolean).join("\n")).join("\n\n");
-  return `${describeReport(query, queryLabel)}\n\n${list}${background ? `\n\n${background}` : ""}\n\n${queryLabel}与每个候选的关系是什么？${background ? "同时比较所有已公开精选内容，判断新增价值；无事实候选时 decisions=[]。" : ""}`;
+  return `${describeReport(query, "新报道")}\n\n${list}\n\n新报道与每个候选的关系是什么？`;
 }
 
 export function pairUser(a: ReportView, b: ReportView): string {

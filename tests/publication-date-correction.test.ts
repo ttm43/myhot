@@ -37,7 +37,7 @@ async function fixture(independent=false){
 }
 async function retained(id:string){
   const [a]=await sql`SELECT revision,content_hash,title,body_text,discovered_at,backfill,backfill_reason,processing_state,processing_attempts,processing_retry_at,
-    processing_queued_at,grouping_status,grouped_at,selection_adds_value FROM articles WHERE id=${id}`;
+    processing_queued_at,grouping_status,grouped_at FROM articles WHERE id=${id}`;
   const [p]=await sql`SELECT to_jsonb(p)-ARRAY['published_at','timeline_at','sort_at','revision','updated_at'] AS decision FROM publications p WHERE article_id=${id}`;
   return {a,publication:p!.decision,analyses:await sql`SELECT * FROM analyses WHERE article_id=${id}`,
     revisions:await sql`SELECT * FROM article_revisions WHERE article_id=${id}`,overrides:await sql`SELECT * FROM editorial_overrides WHERE article_id=${id}`,

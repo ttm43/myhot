@@ -40,7 +40,7 @@ test('independent selected sources retain identity and their own cards across pu
       VALUES (${id},1,'rule','pass','industry',${`${T} title ${n}`},'summary','reason',${[T]},${['openai']})`;
     if (options.selected ?? true) await sql`INSERT INTO editorial_overrides(article_id,fields,reason,updated_by) VALUES (${id},'{"selected":true,"score":81}','test selection','test')`;
     await sql`INSERT INTO fact_articles(fact_id,article_id,role) VALUES (${fact!.id},${id},'report')`;
-    await sql`UPDATE articles SET grouping_status=${options.pending ? 'pending' : 'complete'},selection_adds_value=true WHERE id=${id}`;
+    await sql`UPDATE articles SET grouping_status=${options.pending ? 'pending' : 'complete'} WHERE id=${id}`;
     await publishArticle(id,{now});
     return id;
   };

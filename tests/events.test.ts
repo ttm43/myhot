@@ -39,7 +39,7 @@ const provider = await stub(async (_hit, req) => {
   const ids = [...user.matchAll(/【候选 (C\d+)】/g)].map((m) => m[1]!);
   const answer = pair
     ? { a: "发布", b: "发布", relation: pairRelation ?? relation, difference: "", confidence: 0.95 }
-    : { query: "发布新模型", decisions: ids.map((id, index) => ({ id, relation: answerAll || index === 0 ? relation : "UNRELATED", confidence: 0.95, note: "" })), selection: { addsValue: true, reason: "fixture news" } };
+    : { query: "发布新模型", decisions: ids.map((id, index) => ({ id, relation: answerAll || index === 0 ? relation : "UNRELATED", confidence: 0.95, note: "" })) };
   return { id: "stub", choices: [{ message: { content: JSON.stringify(answer) } }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } };
 });
 for (const name of ["DEEPSEEK", "XIAOMI_MIMO"]) {

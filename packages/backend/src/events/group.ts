@@ -25,11 +25,11 @@ import { publishArticle, publishArticleTx } from "../publication/publish.ts";
 import { latestCompositeCondition } from "../publication/scope.ts";
 import { consolidate, liveStory, type Consolidation } from "./consolidate.ts";
 import { mergeStoryInto } from "./merge.ts";
-import { candidateViews, recallFacts, recallSelectedBackground, sameUrlFact } from "./recall.ts";
+import { candidateViews, recallFacts, sameUrlFact } from "./recall.ts";
 import {
   BATCH_SYSTEM, BATCH_PROMPT_VERSION, BatchSchema, PAIR_SYSTEM, PairSchema, RELATE_PROMPT_VERSION, TIE_MIN_CONFIDENCE,
   batchUser, completeDecisions, firmlyTied, pairUser, reportText, sameOccurrence, storyForDevelopment, verdictsByFact,
-  type CandidateView, type ReadingContext, type Relation, type ReportView, type SelectionValue, type Verdict,
+  type CandidateView, type Relation, type ReportView, type Verdict,
 } from "./relate.ts";
 
 const RECALL_MIN_COSINE = 0.6;
@@ -55,14 +55,12 @@ interface ArticleRow {
 
 // Judgement
 
-const NO_SELECTED_COVERAGE: SelectionValue = { addsValue: true, reason: "没有已公开精选的相关报道" };
-
-async function judgeBatch(articleId: string, query: ReportView, cands: CandidateView[], reading: ReadingContext[]): Promise<{ verdicts: Map<number, Verdict>; selection: SelectionValue; receiptId: number }> {
+export async function judgeBatch(articleId: string, query: ReportView, cands: CandidateView[]): Promise<{ verdicts: Map<number, Verdict>; receiptId: number }> {
   const res = await chatJson({
     model: await modelFor("group"), purpose: "group_article", subject: `article:${articleId}`, promptVersion: BATCH_PROMPT_VERSION,
-    system: BATCH_SYSTEM, user: batchUser(query, cands, "新报道", reading), schema: BatchSchema.refine(value => completeDecisions(value.decisions, cands.length), "Every candidate requires exactly one decision"), temperature: 0, maxTokens: 400 + 120 * cands.length,
+    system: BATCH_SYSTEM, user: batchUser(query, cands), schema: BatchSchema.refine(value => completeDecisions(value.decisions, cands.length), "Every candidate requires exactly one decision"), temperature: 0, maxTokens: 400 + 120 * cands.length,
   });
-  return { verdicts: verdictsByFact(res.data.decisions, cands), selection: cands.some(c => c.selected) || reading.length ? res.data.selection : NO_SELECTED_COVERAGE, receiptId: res.receiptId };
+  return { verdicts: verdictsByFact(res.data.decisions, cands), receiptId: res.receiptId };
 }
 
 /** The review model reads both reports on their own; a merge stands only when it agrees. */
@@ -164,10 +162,8 @@ async function lockCurrentRevision(db: Db, articleId: string, revision: number) 
   if (current?.revision !== revision) throw new GroupingSupersededError("Grouping input changed; the replacement revision has its own analysis");
 }
 
-async function markGrouped(articleId: string, revision: number, selection?: SelectionValue, db: Db = sql) {
-  const done = await db`UPDATE articles SET grouped_at = coalesce(grouped_at, now()), grouping_status = 'complete', grouping_receipt_id = NULL, grouping_error = NULL,
-    selection_adds_value = CASE WHEN ${!!selection} THEN ${selection?.addsValue ?? null} ELSE selection_adds_value END,
-    selection_value_reason = CASE WHEN ${!!selection} THEN ${selection?.reason ?? null} ELSE selection_value_reason END
+async function markGrouped(articleId: string, revision: number, db: Db = sql) {
+  const done = await db`UPDATE articles SET grouped_at = coalesce(grouped_at, now()), grouping_status = 'complete', grouping_receipt_id = NULL, grouping_error = NULL
     WHERE id = ${articleId} AND revision = ${revision}`;
   if (!done.count) throw new GroupingSupersededError("Grouping input changed; the replacement revision has its own analysis");
 }
@@ -189,8 +185,8 @@ export interface GroupResult {
 
 export async function groupArticle(articleId: string): Promise<GroupResult> {
   const input = await sql.begin(async tx => {
-    const [current] = await tx<{ revision: number; grouping_status: string; selection_adds_value: boolean | null }[]>`
-      SELECT revision, grouping_status, selection_adds_value FROM articles WHERE id = ${articleId} FOR UPDATE`;
+    const [current] = await tx<{ revision: number; grouping_status: string }[]>`
+      SELECT revision, grouping_status FROM articles WHERE id = ${articleId} FOR UPDATE`;
     if (!current) return null;
     await tx`UPDATE articles SET grouping_status = 'pending', grouped_at = NULL, grouping_error = NULL, grouping_receipt_id = NULL WHERE id = ${articleId}`;
     // An unfinished decision (new material, a failure, an explicit regroup) must withdraw its old public
@@ -202,7 +198,7 @@ export async function groupArticle(articleId: string): Promise<GroupResult> {
   if (!input) return { verdict: "skipped" };
   const revision = input.revision;
   try {
-    const result = await decide(articleId, revision, input.grouping_status !== 'complete' && input.selection_adds_value === null);
+    const result = await decide(articleId, revision);
     await markGrouped(articleId, revision);
     await publishArticle(articleId);
     return result;
@@ -218,7 +214,7 @@ export async function groupArticle(articleId: string): Promise<GroupResult> {
   }
 }
 
-async function decide(articleId: string, revision: number, recheckSelection: boolean): Promise<GroupResult> {
+async function decide(articleId: string, revision: number): Promise<GroupResult> {
   const [a] = await sql<ArticleRow[]>`
     SELECT a.id, a.revision, a.title, a.url, a.published_at, a.discovered_at, a.grouped_at, a.body_text, a.backfill,
            s.id AS source_id, s.name AS source_name, (s.tier = 'T1') AS first_party, s.participation_mode
@@ -231,7 +227,7 @@ async function decide(articleId: string, revision: number, recheckSelection: boo
   // Manual decisions win over any model decision: a manual membership, or "keep standalone".
   const manual = await manualDecision(sql, articleId);
   if (manual) {
-    await markGrouped(articleId, a.revision, { addsValue: true, reason: "人工确认的归属" });
+    await markGrouped(articleId, a.revision);
     return { verdict: "manual", factId: manual.factId };
   }
   const [an] = await sql<{ input_revision: number; relevance: string | null; title_zh: string | null; summary_zh: string | null; output: Record<string, any> | null; composite: boolean }[]>`
@@ -249,28 +245,26 @@ async function decide(articleId: string, revision: number, recheckSelection: boo
 
   // History founds no event (isHistorical); a regroup takes it out of any it joined.
   if (historical) {
-    await markGrouped(articleId, a.revision, { addsValue: true, reason: "历史资料按原文时间归档" });
+    await markGrouped(articleId, a.revision);
     return { verdict: "historical" };
   }
 
   // Explicitly insufficient material supplies no event identity. A missing (older) scope is separate.
   if (unsupported) {
-    await markGrouped(articleId, a.revision, { addsValue: false, reason: "材料不足以确认当前消息" });
+    await markGrouped(articleId, a.revision);
     return { verdict: "standalone" };
   }
 
+  // A revision keeps its established membership without another judgement.
   const kept = await currentMembership(articleId);
-  // A material revision clears its value decision, but keeps its established membership. Reuse
-  // that identity after judging the replacement material below; ordinary repeats and confirmed
-  // nulls from before the value check keep their existing value without buying another judgement.
-  if (kept && !recheckSelection) {
+  if (kept) {
     await markGrouped(articleId, a.revision);
     return { verdict: "kept", factId: kept.factId, storyId: kept.storyId };
   }
 
   const frame = (an?.output?.fact ?? null) as Record<string, any> | null;
   if (!an || an.relevance !== "pass") {
-    await markGrouped(articleId, a.revision, { addsValue: false, reason: "未通过内容分析" });
+    await markGrouped(articleId, a.revision);
     return { verdict: "standalone" };
   }
   const title = an.title_zh || a.title;
@@ -282,20 +276,15 @@ async function decide(articleId: string, revision: number, recheckSelection: boo
   const newTitle = String(frame?.title || title).slice(0, 60);
 
   const sameUrl = await sameUrlFact(a);
-  // The URL settles identity, but an unseen fact still needs its first reading-value decision.
-  const selectedSameUrl = sameUrl && !composite && !kept && (await candidateViews([{
-    factId: sameUrl.fact_id, storyId: sameUrl.story_id, factTitle: sameUrl.fact_title, score: 1,
-  }]))[0]?.selected === true;
-  const cands = selectedSameUrl ? [] : await candidateViews(await recallFacts(articleId,
+  // Another report of the same page settles a single report's identity without a judgement; a
+  // composite still looks for the facts it mentions.
+  const cands = sameUrl && !composite ? [] : await candidateViews(await recallFacts(articleId,
     reportText(title, an.summary_zh), RECALL_MIN_COSINE, RECALL_TOP_FACTS, sameUrl ? [sameUrl] : []));
-  const reading = selectedSameUrl ? [] : await recallSelectedBackground(articleId, reportText(title, an.summary_zh), RECALL_MIN_COSINE);
   let verdicts = new Map<number, Verdict>();
-  let selection = NO_SELECTED_COVERAGE;
   const receipts: number[] = [];
-  if (cands.length || reading.length) {
-    const judged = await judgeBatch(articleId, { ...query, sourceText: a.body_text }, cands, reading);
+  if (cands.length) {
+    const judged = await judgeBatch(articleId, { ...query, sourceText: a.body_text }, cands);
     verdicts = judged.verdicts;
-    selection = judged.selection;
     receipts.push(judged.receiptId);
   }
   if (composite) {
@@ -317,25 +306,11 @@ async function decide(articleId: string, revision: number, recheckSelection: boo
         }
       }
       await recordDecision(tx, articleId, null, null, "roundup", cands.map((c) => ({ id: c.factId, score: c.score, ...verdicts.get(c.factId) })), receiptId);
-      await markGrouped(articleId, a.revision, selection, tx);
+      await markGrouped(articleId, a.revision, tx);
       if (receiptId !== null) await completeReceipt(tx, receiptId);
       return null;
     });
     return late ? { verdict: "manual", factId: late.factId } : { verdict: "roundup" };
-  }
-  if (kept) {
-    // A sibling already selected for this same fact still permits representative replacement.
-    if (cands.some(c => c.factId === kept.factId && c.selected)) selection = { addsValue: true, reason: "同一新闻的代表报道候选" };
-    const late = await sql.begin(async tx => {
-      await lockCurrentRevision(tx, articleId, a.revision);
-      const manual = await manualDecision(tx, articleId);
-      await markGrouped(articleId, a.revision, manual ? { addsValue: true, reason: "人工确认的归属" } : selection, tx);
-      if (!manual) await recordDecision(tx, articleId, kept.factId, kept.storyId, "kept",
-        cands.map(c => ({ id: c.factId, score: c.score, ...verdicts.get(c.factId) })), receipts[0] ?? null);
-      for (const receiptId of receipts) await completeReceipt(tx, receiptId);
-      return manual;
-    });
-    return late ? { verdict: "manual", factId: late.factId } : { verdict: "kept", factId: kept.factId, storyId: kept.storyId };
   }
   let verdict: GroupResult["verdict"] = "new-story";
   let factId: number | null = null;
@@ -382,11 +357,6 @@ async function decide(articleId: string, revision: number, recheckSelection: boo
     id: c.factId, score: Math.round(c.score * 1000) / 1000, relation: verdicts.get(c.factId)?.relation, confidence: verdicts.get(c.factId)?.confidence,
   }));
   if (sameUrl) decisionCandidates.push({ id: sameUrl.fact_id, score: 1, relation: "SAME_OCCURRENCE", confidence: 1 });
-  // Only a fact already shown in selected has a representative slot to replace. A duplicate of
-  // an unselected fact must retain the value judgement, including a prior low-increment rejection.
-  if ((verdict === "same-fact" || verdict === "same-url") && (selectedSameUrl || cands.some(c => c.factId === factId && c.selected))) {
-    selection = { addsValue: true, reason: "同一新闻的代表报道候选" };
-  }
 
   // Written under the article's row lock after reading the manual state again: a detach or other
   // manual decision made while the model was answering wins (detachFromFact takes the same lock).
@@ -394,7 +364,7 @@ async function decide(articleId: string, revision: number, recheckSelection: boo
     await lockCurrentRevision(tx, articleId, a.revision);
     const late = await manualDecision(tx, articleId);
     if (late) {
-      await markGrouped(articleId, a.revision, { addsValue: true, reason: "人工确认的归属" }, tx);
+      await markGrouped(articleId, a.revision, tx);
       for (const id of receipts) await completeReceipt(tx, id);
       return { manual: late, factId: null, storyId: null };
     }
@@ -410,7 +380,7 @@ async function decide(articleId: string, revision: number, recheckSelection: boo
     await tx`INSERT INTO fact_articles (fact_id, article_id, role, evidence, created_at) VALUES (${fact}, ${articleId}, ${role}, ${evidence}, ${observedAt}) ON CONFLICT (fact_id, article_id) DO NOTHING`;
     await lockCurrentStory(tx, story);
     await recordDecision(tx, articleId, fact, story, verdict, decisionCandidates, receipts[0] ?? null);
-    await markGrouped(articleId, a.revision, selection, tx);
+    await markGrouped(articleId, a.revision, tx);
     for (const id of receipts) await completeReceipt(tx, id);
     return { manual: null, factId: fact, storyId: story };
   });

@@ -25,7 +25,7 @@ export async function detachFromFact(id: string, reason: string, actor: string) 
     const storyIds = [...new Set(storyRows.map((r) => r.story_id))];
     await tx`INSERT INTO grouping_overrides (article_id, reason, actor) VALUES (${id}, ${reason}, ${actor})
              ON CONFLICT (article_id) DO UPDATE SET reason = EXCLUDED.reason, actor = EXCLUDED.actor, created_at = now()`;
-    await tx`UPDATE articles SET grouped_at = now(), grouping_status = 'complete', grouping_receipt_id = NULL, grouping_error = NULL, selection_adds_value = true, selection_value_reason = NULL WHERE id = ${id}`;
+    await tx`UPDATE articles SET grouped_at = now(), grouping_status = 'complete', grouping_receipt_id = NULL, grouping_error = NULL WHERE id = ${id}`;
     return { facts: factIds, stories: storyIds };
   });
   await publishArticle(id);
@@ -62,7 +62,7 @@ export async function moveToFact(id: string, factPublicId: string, reason: strin
     await tx`INSERT INTO fact_articles (fact_id, article_id, role, evidence, manual, created_at)
              VALUES (${target.id}, ${id}, 'report', ${removed.find((r) => r.evidence)?.evidence ?? null}, true, ${article.at})`;
     await lockCurrentStory(tx, target.story_id);
-    await tx`UPDATE articles SET grouped_at = now(), grouping_status = 'complete', grouping_receipt_id = NULL, grouping_error = NULL, selection_adds_value = true, selection_value_reason = NULL WHERE id = ${id}`;
+    await tx`UPDATE articles SET grouped_at = now(), grouping_status = 'complete', grouping_receipt_id = NULL, grouping_error = NULL WHERE id = ${id}`;
     return { fact: Number(target.id), story: Number(target.story_id), facts, stories };
   });
   if (!moved) return null;

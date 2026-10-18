@@ -63,21 +63,21 @@ test("a material revision resets old processing failures without resetting uncha
   const [failed] = await sql`UPDATE articles SET processing_state='failed', processing_attempts=9,
     processing_retry_at=now()+interval '6 hours', processing_error='previous revision failed',
     processing_queued_at=now(), processing_attempt_tag='admin:current-evaluation',
-    grouping_status='complete', grouped_at=now(), selection_adds_value=false, selection_value_reason='old revision' WHERE id=${articleId}
+    grouping_status='complete', grouped_at=now() WHERE id=${articleId}
     RETURNING processing_state, processing_attempts, processing_retry_at, processing_error, processing_queued_at, processing_attempt_tag,
-      grouping_status, grouped_at, selection_adds_value, selection_value_reason`;
+      grouping_status, grouped_at`;
   await upsertMaterial(material);
   const [unchanged] = await sql`SELECT processing_state, processing_attempts, processing_retry_at, processing_error, processing_queued_at, processing_attempt_tag,
-    grouping_status, grouped_at, selection_adds_value, selection_value_reason
+    grouping_status, grouped_at
     FROM articles WHERE id=${articleId}`;
   assert.deepEqual({ ...unchanged }, { ...failed });
   assert.equal((await upsertMaterial({ ...material, bodyText: "The corrected full material", bodyStatus: "ok" })).revised, true);
   const [revised] = await sql`SELECT revision, processing_state, processing_attempts, processing_retry_at, processing_error, processing_queued_at, processing_attempt_tag,
-    grouping_status, grouped_at, selection_adds_value, selection_value_reason
+    grouping_status, grouped_at
     FROM articles WHERE id=${articleId}`;
   assert.deepEqual({ ...revised }, { revision: 2, processing_state: "new", processing_attempts: 0, processing_retry_at: null,
     processing_error: null, processing_queued_at: null, processing_attempt_tag: "admin:current-evaluation",
-    grouping_status: "pending", grouped_at: null, selection_adds_value: null, selection_value_reason: null });
+    grouping_status: "pending", grouped_at: null });
 });
 
 test("an imported article's first report records a baseline, not a revision", async () => {
