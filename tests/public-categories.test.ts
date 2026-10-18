@@ -27,9 +27,9 @@ before(async () => {
     const id = `${T}-${category}`;
     await sql`INSERT INTO articles (id, source_id, identity_key, url, title, discovered_at, timeline_at, published_at)
       VALUES (${id}, ${SOURCE}, ${id}, ${`https://example.org/${id}`}, ${title(category)}, ${at}, ${at}, ${at})`;
-    await sql`INSERT INTO publications (article_id, title, source_id, channel, url, discovered_at, timeline_at, published_at, sort_at,
+    await sql`INSERT INTO publications (article_id, title, source_id, url, discovered_at, timeline_at, published_at, sort_at,
         eligible, selected, visible_after, visibility, tags, category, search_text)
-      VALUES (${id}, ${title(category)}, ${SOURCE}, 'news', ${`https://example.org/${id}`}, ${at}, ${at}, ${at}, ${at},
+      VALUES (${id}, ${title(category)}, ${SOURCE}, ${`https://example.org/${id}`}, ${at}, ${at}, ${at}, ${at},
         true, true, ${at}, 'public', ${[T]}, ${category}, ${title(category)})`;
   }
   const address = await app.listen({ host: '127.0.0.1', port: 0 });

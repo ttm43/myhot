@@ -77,6 +77,10 @@ docker compose run --rm setup && docker compose up -d
 
 下面按时间从新到旧列出每次更新要注意的事。硬分叉之前 AIHOT 自己的更新说明已经删掉，需要时看 AIHOT 仓库。
 
+#### 去掉 `publications.channel`（2026 年 10 月 19 日）
+
+X 帖子去掉以后这一列都是 `news`，迁移 `0126`–`0128` 把它删掉：先给它默认值 `news`（这样不再写它的新版本在删列之前也能写入），再并发建一个不带它的类别索引 `publications_pool_category_timeline_v2_idx`，最后删列；删列会连带删掉它的取值约束和覆盖它的两个索引（`publications_pool_category_timeline_idx`、`publications_pool_channel_timeline_idx`）。筛选里只剩“全部”和“一手”：一手看的是信源分级（`T1`），本来就不读这一列，照旧可用。`?channel=news` 不再是有效参数：网页按没有筛选处理，`/api/site/*` 返回 400。后台“内容诊断”的发布记录不再有 `channel`。没有数据丢失（这一列没有别的值）。
+
 #### 精简后的清理（2026 年 10 月 18 日）
 
 精简留下的几样没人再写、也没人再读的数据和代码一并删掉。迁移只删列和改约束，不调用模型；删掉的列里的数据找不回来，要留的先用下方 [备份](#备份) 导出。

@@ -26,8 +26,8 @@ test("latest scope stays correlated to an outer x membership and candidate count
     if (index === 0) await sql`INSERT INTO analyses (article_id,input_revision,origin,output)
       VALUES (${id},2,'rule',${sql.json({ scope: 'single' })})`;
     if (index === 3) await sql`INSERT INTO analyses (article_id,input_revision,origin,output) VALUES (${id},1,'rule','{}')`;
-    await sql`INSERT INTO publications (article_id,title,source_id,channel,url,discovered_at,timeline_at,sort_at)
-      VALUES (${id},${id},${source},'news',${`https://example.org/${id}`},now(),now(),now())`;
+    await sql`INSERT INTO publications (article_id,title,source_id,url,discovered_at,timeline_at,sort_at)
+      VALUES (${id},${id},${source},${`https://example.org/${id}`},now(),now(),now())`;
     await sql`INSERT INTO fact_articles (fact_id,article_id,role) VALUES (${fact!.id},${id},'report')`;
   }
   // An unrelated latest row must not decide scope for every row of x.

@@ -22,8 +22,8 @@ async function item(sourceId: string, hours: number, url = `https://example.org/
   await sql`INSERT INTO articles (id, source_id, identity_key, url, title, excerpt, timeline_at, discovered_at)
     VALUES (${id}, ${sourceId}, ${id}, ${url}, ${`Item ${n}`}, ${extra.excerpt ?? null}, ${ago(hours)}, ${ago(hours)})`;
   if (extra.withdrawn) {
-    await sql`INSERT INTO publications (article_id, source_id, title, url, channel, timeline_at, discovered_at, sort_at, visibility, body_mode)
-      VALUES (${id}, ${sourceId}, ${`Item ${n}`}, ${url}, 'news', ${ago(hours)}, ${ago(hours)}, ${ago(hours)}, 'withdrawn', 'summary')`;
+    await sql`INSERT INTO publications (article_id, source_id, title, url, timeline_at, discovered_at, sort_at, visibility, body_mode)
+      VALUES (${id}, ${sourceId}, ${`Item ${n}`}, ${url}, ${ago(hours)}, ${ago(hours)}, ${ago(hours)}, 'withdrawn', 'summary')`;
   }
   return { id, url };
 }

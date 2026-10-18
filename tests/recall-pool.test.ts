@@ -39,8 +39,8 @@ test("recall preserves window, live-story, membership and latest-analysis eviden
       if (["latest-single", "latest-composite", "higher-revision"].includes(scenario)) {
         await sql`INSERT INTO analyses (article_id, input_revision, origin, title_zh, output)
           VALUES (${id}, 1, 'rule', ${title}, ${sql.json({ scope: scenario === "latest-single" ? "single" : "composite" })})`;
-        await sql`INSERT INTO publications (article_id, analysis_id, title, source_id, channel, url, discovered_at, timeline_at, sort_at)
-          SELECT a.id, (SELECT min(id) FROM analyses WHERE article_id = a.id), a.title, a.source_id, 'news', a.url,
+        await sql`INSERT INTO publications (article_id, analysis_id, title, source_id, url, discovered_at, timeline_at, sort_at)
+          SELECT a.id, (SELECT min(id) FROM analyses WHERE article_id = a.id), a.title, a.source_id, a.url,
             a.discovered_at, a.timeline_at, a.timeline_at FROM articles a WHERE a.id = ${id}`;
       }
     }

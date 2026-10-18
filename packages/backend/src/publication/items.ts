@@ -51,10 +51,10 @@ export const ITEM_FROM = sql`
   JOIN sources s ON s.id = p.source_id
   JOIN articles a ON a.id = p.article_id`;
 
+/** The feed's channel filter: 一手 is a T1 source (sources.tier), not a stored column. */
 export function channelCondition(channel: ChannelKey | null | undefined) {
   if (!channel || channel === "all") return sql``;
-  if (channel === "firstParty") return sql`AND p.source_id IN (SELECT id FROM sources WHERE tier = 'T1')`;
-  return sql`AND p.channel = ${channel}`;
+  return sql`AND p.source_id IN (SELECT id FROM sources WHERE tier = 'T1')`;
 }
 
 /** The website's filter: one of its own categories. */

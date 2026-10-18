@@ -16,9 +16,9 @@ before(async () => {
   await sql`INSERT INTO sources(id,name,kind,tier,participation_mode) VALUES(${id},'Shared search','rss','T1','editorial')`;
   await sql`INSERT INTO articles(id,source_id,identity_key,url,title,discovered_at,timeline_at)
     VALUES(${id},${id},${id},${`https://example.org/${id}`},${id},now(),now())`;
-  await sql`INSERT INTO publications(article_id,source_id,url,title,summary,search_text,tags,category,channel,
+  await sql`INSERT INTO publications(article_id,source_id,url,title,summary,search_text,tags,category,
     discovered_at,timeline_at,sort_at,eligible,selected,visible_after)
-    VALUES(${id},${id},${`https://example.org/${id}`},${id},'search example',${id},${[id]},'ai-models','news',
+    VALUES(${id},${id},${`https://example.org/${id}`},${id},'search example',${id},${[id]},'ai-models',
       now(),now(),now(),true,false,now())`;
   await sql`INSERT INTO pool_search(article_id,direct,body) VALUES(${id},${id},'')`;
 });

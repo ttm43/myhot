@@ -23,9 +23,9 @@ test("timeline grouping preserves evidence scope and filter-local anchors", asyn
     const [analysis] = await sql<{ id: number }[]>`INSERT INTO analyses (article_id, input_revision, origin, output)
       VALUES (${id}, 1, 'rule', ${sql.json(options.scope ? { scope: options.scope } : {})}) RETURNING id`;
     await sql`INSERT INTO publications (article_id, source_id, analysis_id, title, url, discovered_at, timeline_at, sort_at, visible_after,
-      selected, eligible, visibility, channel, category, tags, fact_id)
+      selected, eligible, visibility, category, tags, fact_id)
       VALUES (${id}, ${prefix}, ${analysis!.id}, ${id}, ${`https://example.org/${id}`}, ${time}, ${time}, ${time}, ${options.future ? new Date(+now + 1) : time},
-        ${options.selected ?? true}, true, ${options.visibility ?? "public"}, 'news', ${options.category ?? "ai-models"}, ${[prefix]}, ${options.standalone ? null : fact!.id})`;
+        ${options.selected ?? true}, true, ${options.visibility ?? "public"}, ${options.category ?? "ai-models"}, ${[prefix]}, ${options.standalone ? null : fact!.id})`;
     if (!options.missing && !options.standalone) await sql`INSERT INTO fact_articles (fact_id, article_id, role)
       VALUES (${fact!.id}, ${id}, ${options.role ?? "report"})`;
     return id;

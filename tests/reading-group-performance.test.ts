@@ -22,9 +22,9 @@ for(let f=0;f<2;f++) {
     const at = new Date(+now - (f===0 ? 10*86400000 : 3600000) + n*1000);
     await sql`INSERT INTO articles (id,source_id,identity_key,url,title,timeline_at,discovered_at)
       VALUES (${id},${n===2?officialSource!.id:source!.id},${id},${'https://example.org/'+id},${id},${at},${at})`;
-    await sql`INSERT INTO publications (article_id,source_id,title,url,channel,timeline_at,discovered_at,sort_at,story_id,fact_id,
+    await sql`INSERT INTO publications (article_id,source_id,title,url,timeline_at,discovered_at,sort_at,story_id,fact_id,
       selected,eligible,visible_after,tags,first_party,body_mode,score)
-      VALUES (${id},${n===2?officialSource!.id:source!.id},${id},${'https://example.org/'+id},'news',${at},${at},${at},${story!.id},${fact!.id},
+      VALUES (${id},${n===2?officialSource!.id:source!.id},${id},${'https://example.org/'+id},${at},${at},${at},${story!.id},${fact!.id},
       true,true,${at},${[key]},${n===2},'full',${90-n})`;
     await sql`INSERT INTO fact_articles (fact_id,article_id,role) VALUES (${fact!.id},${id},'report')`;
   }

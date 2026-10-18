@@ -28,12 +28,11 @@ export function isCategoryKey(value: unknown): value is CategoryKey {
   return typeof value === "string" && (CATEGORY_KEYS as readonly string[]).includes(value);
 }
 
-export const CHANNEL_KEYS = ["all", "news", "firstParty"] as const;
+export const CHANNEL_KEYS = ["all", "firstParty"] as const;
 export type ChannelKey = (typeof CHANNEL_KEYS)[number];
 
 export const CHANNEL_LABELS: Record<ChannelKey, string> = {
   all: "全部",
-  news: "资讯",
   firstParty: "一手",
 };
 

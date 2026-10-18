@@ -21,9 +21,9 @@ before(async () => {
     const at = kind === "dated" ? published : null;
     await sql`INSERT INTO articles (id, source_id, identity_key, url, title, discovered_at, timeline_at, published_at)
       VALUES (${id}, ${SOURCE}, ${id}, ${`https://example.org/${id}`}, ${`${T} ${kind}`}, ${discovered}, ${discovered}, ${at})`;
-    await sql`INSERT INTO publications (article_id, title, source_id, channel, url, discovered_at, timeline_at, published_at, sort_at,
+    await sql`INSERT INTO publications (article_id, title, source_id, url, discovered_at, timeline_at, published_at, sort_at,
         eligible, selected, visible_after, visibility, tags, summary)
-      VALUES (${id}, ${`${T} ${kind}`}, ${SOURCE}, 'news', ${`https://example.org/${id}`}, ${discovered}, ${discovered}, ${at}, ${discovered},
+      VALUES (${id}, ${`${T} ${kind}`}, ${SOURCE}, ${`https://example.org/${id}`}, ${discovered}, ${discovered}, ${at}, ${discovered},
         true, false, ${discovered}, 'public', ${[T]}, 'fixture summary')`;
   }
 });

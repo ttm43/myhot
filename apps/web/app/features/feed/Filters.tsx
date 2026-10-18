@@ -26,8 +26,8 @@ function hrefWith(base: string, params: URLSearchParams, patch: Record<string, s
 
 /**
  * The feed's one filter (精选 and 全部动态 alike): none, 一手, or a category. One choice at a time: picking
- * 一手 clears the category and picking a category clears 一手. Older 资讯 links still filter; the
- * choice then shows as none.
+ * 一手 clears the category and picking a category clears 一手. Older 资讯 and X links show the
+ * unfiltered feed.
  */
 function filterOptions(base: string, params: URLSearchParams, noneLabel: string) {
   return [

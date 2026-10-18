@@ -62,7 +62,6 @@ interface PublicationRow {
   score: number | null;
   body_mode: string;
   url: string;
-  channel: string;
   published_at: Date | null;
   discovered_at: Date;
   timeline_at: Date;
@@ -191,8 +190,6 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   // public decision. Preserve that confirmed state on rebuild.
   const selected = selectionCandidate && article.grouping_status === "complete";
   const reason = selected ? pickString(f.reason, analysis?.reason_zh ?? null) : null;
-  // The channel only ever told X posts apart; every report is news now.
-  const channel = "news";
   const bodyMode = bodyModeOf(source, article.body_status, !!article.body_text);
   const originalTitle = isChineseTitle && title === collapseWhitespace(article.title) ? null : collapseWhitespace(article.title);
 
@@ -220,7 +217,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     source_id: source.id, first_party: source.tier === "T1",
     visibility, eligible, selected, selection_candidate: selectionCandidate, title: title ?? collapseWhitespace(article.title), original_title: originalTitle, summary, reason,
     category, tags, score: round1(score), body_mode: bodyMode, story_id: membership?.story_id ?? null, fact_id: membership?.fact_id ?? null,
-    url: article.url, channel, published_at: article.published_at, discovered_at: article.discovered_at,
+    url: article.url, published_at: article.published_at, discovered_at: article.discovered_at,
     timeline_at: article.timeline_at, backfill: article.backfill, sort_at: sortAt, visible_after: visibleAfter,
   };
   const before = previous ? { ...previous, tags: [...previous.tags].sort(), score: previous.score === null ? null : Number(previous.score) } : null;
@@ -248,17 +245,17 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
 
   await tx`
     INSERT INTO publications (article_id, analysis_id, revision, visibility, eligible, selected, selection_candidate, title, original_title, summary,
-      reason, category, tags, score, source_id, channel, first_party, url, published_at, discovered_at, timeline_at, backfill,
+      reason, category, tags, score, source_id, first_party, url, published_at, discovered_at, timeline_at, backfill,
       selected_ready_at, visible_after, body_mode, story_id, fact_id, search_text, sort_at, updated_at)
     VALUES (${articleId}, ${analysis?.id ?? null}, ${revision}, ${visibility}, ${eligible}, ${selected}, ${selectionCandidate}, ${next.title},
-      ${originalTitle}, ${summary}, ${reason}, ${category}, ${tags}, ${next.score}, ${source.id}, ${channel}, ${source.tier === "T1"},
+      ${originalTitle}, ${summary}, ${reason}, ${category}, ${tags}, ${next.score}, ${source.id}, ${source.tier === "T1"},
       ${article.url}, ${article.published_at}, ${article.discovered_at}, ${article.timeline_at}, ${article.backfill},
       ${selectedReadyAt}, ${visibleAfter}, ${bodyMode}, ${next.story_id}, ${next.fact_id}, ${searchText}, ${sortAt}, now())
     ON CONFLICT (article_id) DO UPDATE SET
       analysis_id = EXCLUDED.analysis_id, revision = EXCLUDED.revision, visibility = EXCLUDED.visibility,
       eligible = EXCLUDED.eligible, selected = EXCLUDED.selected, selection_candidate = EXCLUDED.selection_candidate, title = EXCLUDED.title, original_title = EXCLUDED.original_title,
       summary = EXCLUDED.summary, reason = EXCLUDED.reason, category = EXCLUDED.category, tags = EXCLUDED.tags,
-      score = EXCLUDED.score, source_id = EXCLUDED.source_id, channel = EXCLUDED.channel, first_party = EXCLUDED.first_party,
+      score = EXCLUDED.score, source_id = EXCLUDED.source_id, first_party = EXCLUDED.first_party,
       url = EXCLUDED.url, published_at = EXCLUDED.published_at, discovered_at = EXCLUDED.discovered_at,
       timeline_at = EXCLUDED.timeline_at, backfill = EXCLUDED.backfill, selected_ready_at = EXCLUDED.selected_ready_at,
       visible_after = EXCLUDED.visible_after, body_mode = EXCLUDED.body_mode,
@@ -267,7 +264,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     WHERE (publications.analysis_id, publications.revision, publications.visibility, publications.eligible,
         publications.selected, publications.selection_candidate, publications.title, publications.original_title, publications.summary,
         publications.reason, publications.category, publications.tags, publications.score,
-        publications.source_id, publications.channel, publications.first_party, publications.url,
+        publications.source_id, publications.first_party, publications.url,
         publications.published_at, publications.discovered_at, publications.timeline_at, publications.backfill,
         publications.selected_ready_at, publications.visible_after, publications.body_mode,
         publications.story_id, publications.fact_id, publications.search_text,
@@ -275,7 +272,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
       IS DISTINCT FROM (EXCLUDED.analysis_id, EXCLUDED.revision, EXCLUDED.visibility, EXCLUDED.eligible,
         EXCLUDED.selected, EXCLUDED.selection_candidate, EXCLUDED.title, EXCLUDED.original_title, EXCLUDED.summary,
         EXCLUDED.reason, EXCLUDED.category, EXCLUDED.tags, EXCLUDED.score,
-        EXCLUDED.source_id, EXCLUDED.channel, EXCLUDED.first_party, EXCLUDED.url,
+        EXCLUDED.source_id, EXCLUDED.first_party, EXCLUDED.url,
         EXCLUDED.published_at, EXCLUDED.discovered_at, EXCLUDED.timeline_at, EXCLUDED.backfill,
         EXCLUDED.selected_ready_at, EXCLUDED.visible_after, EXCLUDED.body_mode,
         EXCLUDED.story_id, EXCLUDED.fact_id, EXCLUDED.search_text,

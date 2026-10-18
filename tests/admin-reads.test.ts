@@ -21,8 +21,8 @@ test("source pages retain order and count selected history regardless of public 
            now() - make_interval(days => n * 10), now() - make_interval(days => n * 10)
     FROM generate_series(0, 4) n`;
   await sql`
-    INSERT INTO publications (article_id, title, source_id, channel, url, discovered_at, timeline_at, sort_at, visibility, selected)
-    SELECT id, title, source_id, 'news', url, discovered_at, timeline_at, timeline_at, 'withdrawn', true
+    INSERT INTO publications (article_id, title, source_id, url, discovered_at, timeline_at, sort_at, visibility, selected)
+    SELECT id, title, source_id, url, discovered_at, timeline_at, timeline_at, 'withdrawn', true
     FROM articles WHERE source_id = 'page-001'`;
   const first = await listSources({ q: "Page" });
   assert.equal(first.rows.length, 100);

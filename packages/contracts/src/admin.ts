@@ -165,7 +165,6 @@ export interface AdminPublication {
   tags: string[];
   score: number | null;
   source_id: string;
-  channel: string;
   first_party: boolean;
   url: string;
   published_at: Timestamp | null;

@@ -27,8 +27,8 @@ test("fact and reading recall agree across cold, full and overflowing vector cac
   for (const [index, item] of items.entries()) {
     await sql`INSERT INTO articles (id, source_id, identity_key, url, title, body_text, discovered_at, timeline_at, published_at)
       VALUES (${item.id}, ${T}, ${item.id}, ${`https://example.org/${item.id}`}, ${item.id}, ${savedBackground}, now(), now(), now())`;
-    await sql`INSERT INTO publications (article_id, title, source_id, channel, url, discovered_at, timeline_at, sort_at, selected, visible_after, revision)
-      VALUES (${item.id}, ${item.id}, ${T}, 'news', ${`https://example.org/${item.id}`}, now(), now(), now(), ${index === 2}, now(), 1)`;
+    await sql`INSERT INTO publications (article_id, title, source_id, url, discovered_at, timeline_at, sort_at, selected, visible_after, revision)
+      VALUES (${item.id}, ${item.id}, ${T}, ${`https://example.org/${item.id}`}, now(), now(), now(), ${index === 2}, now(), 1)`;
     if (index < 2) {
       const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title)
         VALUES (${item.id}, ${story!.id}, ${item.text}) RETURNING id`;

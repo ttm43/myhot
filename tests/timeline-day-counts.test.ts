@@ -55,8 +55,8 @@ test("real grouped timeline pagination keeps whole-day counts across midnight", 
     const date = new Date(at);
     await sql`INSERT INTO articles(id,source_id,identity_key,url,title,discovered_at,timeline_at)
       VALUES(${id},${source},${id},'https://example.test/days',${id},${date},${date})`;
-    await sql`INSERT INTO publications(article_id,title,source_id,channel,url,discovered_at,timeline_at,sort_at,eligible,selected,visible_after,visibility,tags,fact_id,story_id)
-      VALUES(${id},${id},${source},'news','https://example.test/days',${date},${date},${date},true,true,${date},'public',${[T]},${fact},${story})`;
+    await sql`INSERT INTO publications(article_id,title,source_id,url,discovered_at,timeline_at,sort_at,eligible,selected,visible_after,visibility,tags,fact_id,story_id)
+      VALUES(${id},${id},${source},'https://example.test/days',${date},${date},${date},true,true,${date},'public',${[T]},${fact},${story})`;
     if (fact !== null) await sql`INSERT INTO fact_articles(fact_id,article_id,role) VALUES(${fact},${id},'report')`;
     return id;
   };

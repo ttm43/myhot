@@ -22,9 +22,9 @@ before(async () => {
     SELECT ${T} || '-' || lpad(n::text, 4, '0'), ${SOURCE}, ${T} || '-' || n, 'https://example.org/' || ${T} || '/' || n,
       ${T} || CASE WHEN n = 1 THEN ' needle' ELSE ' general' END, ${now}, ${now}, ${now}, '<p>licensed body</p>', 'en'
     FROM generate_series(1, 2108) n`;
-  await sql`INSERT INTO publications (article_id, title, source_id, channel, url, discovered_at, timeline_at, published_at, sort_at,
+  await sql`INSERT INTO publications (article_id, title, source_id, url, discovered_at, timeline_at, published_at, sort_at,
       eligible, selected, visible_after, visibility, search_text, tags, summary, body_mode)
-    SELECT a.id, a.title, a.source_id, 'news', a.url, a.discovered_at, a.timeline_at, a.published_at, a.timeline_at,
+    SELECT a.id, a.title, a.source_id, a.url, a.discovered_at, a.timeline_at, a.published_at, a.timeline_at,
       a.id <> ${id(2108)}, a.id = ${id(2108)}, ${new Date(+now - 1000)},
       CASE WHEN a.id = ${id(2106)} THEN 'withdrawn' ELSE 'public' END,
       ${T} || ' needle', ${[T]}, 'fixture summary', 'full' FROM articles a WHERE a.source_id = ${SOURCE}`;
