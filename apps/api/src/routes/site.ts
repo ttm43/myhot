@@ -1,5 +1,5 @@
 // First-party site API (/api/site/*). Not public, not versioned, never called /api/v2.
-// Reads through the same public read layer as v1; no cookies are read or set.
+// Reads through the same public read layer as MCP; no cookies are read or set.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { isCategoryKey, isChannelKey, type CategoryKey, type ChannelKey } from "@aihot/contracts/taxonomy";
 import { InvalidCursorError } from "@aihot/backend/lib/cursor";

@@ -188,7 +188,7 @@ export function isChineseBody(a: { language?: string | null; body_text?: string 
   return a.language === "zh" || (/[一-鿿]/.test(a.body_text?.slice(0, 400) ?? "") && a.language !== "en");
 }
 
-/** The complete Chinese translation an export (Markdown, full RSS) carries; a page also shows a partial one. */
+/** The complete Chinese translation the Markdown export carries; a page also shows a partial one. */
 export function exportTranslation(a: { language?: string | null; body_text?: string | null; tr_html?: string | null; tr_complete?: boolean | null }): string | null {
   return !isChineseBody(a) && a.tr_html && a.tr_complete ? a.tr_html : null;
 }

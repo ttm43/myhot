@@ -86,9 +86,8 @@ function queryEntityTag(q: string): string | null {
 }
 
 /**
- * The public APIs' q (v1 and MCP): every term matches the subject, title or summary, or the start of a
- * body whose full text may be shown, as the API documents it ("title / Chinese title / Chinese summary
- * / body"). Results stay in time order.
+ * MCP's q: every term matches the subject, title or summary, or the start of a body whose full text
+ * may be shown ("title / Chinese title / Chinese summary / body"). Results stay in time order.
  */
 export function publicMatchCondition(terms: string[]) {
   if (terms.length === 0) return sql``;

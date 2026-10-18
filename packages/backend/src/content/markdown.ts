@@ -33,7 +33,7 @@ turndown.addRule("table", {
   },
 });
 
-/** Export the same safe body as the web and RSS without flattening its structure. */
+/** Export the same safe body as the web page without flattening its structure. */
 export function bodyToMarkdown(html: string, baseUrl?: string): string {
   return turndown.turndown(sanitizeBody(html, baseUrl)).trim();
 }

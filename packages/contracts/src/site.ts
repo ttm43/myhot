@@ -1,5 +1,5 @@
 // First-party site API (/api/site/*). Not a public API: it may evolve with the website,
-// but it is served from the same public read layer as v1, RSS and MCP.
+// but it is served from the same public read layer as MCP.
 import type { CategoryKey, ChannelKey } from "./taxonomy.ts";
 
 export interface SourceRef {

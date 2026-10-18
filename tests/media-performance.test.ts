@@ -173,8 +173,8 @@ test("successive responsive candidates reuse the completed original download", a
 test("responsive URLs and web body candidates retain exact signatures and stable expiry", async () => {
   const { proxiedImageSet, proxyBodyImages, verifyProxyRequest } = await import("@aihot/backend/media/imgproxy");
   const now = Date.parse("2026-09-28T08:00:00Z");
-  const candidates = proxiedImageSet("https://example.org/image.png", "card", false, now)!;
-  assert.equal(candidates, proxiedImageSet("https://example.org/image.png", "card", false, now + 1000));
+  const candidates = proxiedImageSet("https://example.org/image.png", "card", now)!;
+  assert.equal(candidates, proxiedImageSet("https://example.org/image.png", "card", now + 1000));
   for (const candidate of candidates.split(", ")) {
     const [value, width] = candidate.split(" ");
     const u = new URL(value!, "http://localhost");
@@ -195,7 +195,6 @@ test("responsive URLs and web body candidates retain exact signatures and stable
   assert.match(web, /loading="lazy"/);
   assert.match(web, /width="800" height="400"/);
   assert.doesNotMatch(web, /sizes="auto\b/, "body images must use their loaded ratio even if publisher dimensions are wrong");
-  assert.doesNotMatch(proxyBodyImages(html, true), /srcset=/);
 });
 
 test("image HTTP responses keep earlier URLs valid, reject tampering before fetching and do not vary on Accept", async () => {
@@ -403,7 +402,7 @@ test("video pages mislabeled as images are excluded across ingestion and public 
   ];
   const stored = [...pages, ...pictures].map((url) => `<img src="${url.replaceAll("&", "&amp;")}" alt="Image" width="800" height="400">`).join("");
   const markdown = [...pages, ...pictures].map((url) => `![Image](${url})`).join("\n\n");
-  for (const html of [sanitizeBody(stored), markdownBody(markdown, "https://example.org/post"), proxyBodyImages(stored), proxyBodyImages(stored, true)]) {
+  for (const html of [sanitizeBody(stored), markdownBody(markdown, "https://example.org/post"), proxyBodyImages(stored)]) {
     assert.equal((html.match(/<img\b/g) ?? []).length, pictures.length, html);
     assert.doesNotMatch(decodeURIComponent(html), /https:\/\/(?:www\.|m\.)?youtube\.com\/(?:watch|shorts)/);
   }
@@ -418,7 +417,7 @@ test("video pages mislabeled as images are excluded across ingestion and public 
     assert.ok(proxiedImageSet(url, "body"));
   }
   const video = `<a href="${pages[0]!.replaceAll("&", "&amp;")}">Watch video</a><video src="https://example.org/video.mp4" poster="${pictures[1]}"></video>`;
-  for (const html of [sanitizeBody(video), proxyBodyImages(video), proxyBodyImages(video, true)]) {
+  for (const html of [sanitizeBody(video), proxyBodyImages(video)]) {
     assert.match(html, /<a href="https:\/\/www\.youtube\.com\/watch/);
     assert.match(html, /<video src="https:\/\/example\.org\/video\.mp4"/);
     assert.match(decodeURIComponent(html), /i\.ytimg\.com\/vi\/example\/hqdefault\.jpg/);

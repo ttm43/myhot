@@ -1,11 +1,11 @@
 // Signed image proxy URLs. The address format and signing key stay stable, so proxy URLs
-// already cached in full RSS and readers keep working: /api/img-proxy?u=&mode=&exp=&sig=
+// already cached by readers keep working: /api/img-proxy?u=&mode=&exp=&sig=
 // sig = hex(HMAC-SHA256(IMG_PROXY_SIGN_SECRET, `${u}|${mode}|${exp}`)), sent as its first 16 hex
 // digits (64 bits): the random digits cannot be compressed, and the full 64 made up about a tenth
 // of a compressed list page. A full-length signature from an older URL is still accepted.
 import { createHmac, timingSafeEqual } from "node:crypto";
 import * as cheerio from "cheerio";
-import { config, credential } from "../config.ts";
+import { credential } from "../config.ts";
 import { normalizeVideos } from "../content/video.ts";
 import { isNonArticleImage } from "../lib/image-url.ts";
 
@@ -29,24 +29,23 @@ export function signature(url: string, mode: string, exp: number | string): stri
 }
 
 /** Expiry rounded up to a day boundary at least `lifetime` (48 h) ahead, so URLs stay cacheable. */
-export function proxyExpiry(nowMs = Date.now(), lifetimeSeconds = LIFETIME_SECONDS): number {
-  return Math.ceil((nowMs / 1000 + lifetimeSeconds) / WINDOW_SECONDS) * WINDOW_SECONDS;
+export function proxyExpiry(nowMs = Date.now()): number {
+  return Math.ceil((nowMs / 1000 + LIFETIME_SECONDS) / WINDOW_SECONDS) * WINDOW_SECONDS;
 }
 
-export function proxiedImage(url: string | null | undefined, mode: ProxyMode, absolute = false, nowMs = Date.now(), lifetimeSeconds = LIFETIME_SECONDS): string | null {
+export function proxiedImage(url: string | null | undefined, mode: ProxyMode, nowMs = Date.now()): string | null {
   if (!url) return null;
   if (isNonArticleImage(url)) return null;
   if (url.startsWith("data:")) return url;
   if (!/^https?:\/\//i.test(url)) return null;
-  const exp = proxyExpiry(nowMs, lifetimeSeconds);
-  const path = `/api/img-proxy?u=${encodeURIComponent(url)}&mode=${mode}&exp=${exp}&sig=${signature(url, mode, exp).slice(0, SIG_HEX)}`;
-  return absolute ? `${config.siteUrl}${path}` : path;
+  const exp = proxyExpiry(nowMs);
+  return `/api/img-proxy?u=${encodeURIComponent(url)}&mode=${mode}&exp=${exp}&sig=${signature(url, mode, exp).slice(0, SIG_HEX)}`;
 }
 
 /** Browser source candidates, each independently signed with the same expiry boundary. */
-export function proxiedImageSet(url: string | null | undefined, kind: ResponsiveImageKind, absolute = false, nowMs = Date.now(), lifetimeSeconds = LIFETIME_SECONDS): string | null {
+export function proxiedImageSet(url: string | null | undefined, kind: ResponsiveImageKind, nowMs = Date.now()): string | null {
   if (!url || !/^https?:\/\//i.test(url) || isNonArticleImage(url)) return null;
-  return RESPONSIVE_MODES[kind].map((mode) => `${proxiedImage(url, mode, absolute, nowMs, lifetimeSeconds)} ${IMAGE_WIDTHS[mode]}w`).join(", ");
+  return RESPONSIVE_MODES[kind].map((mode) => `${proxiedImage(url, mode, nowMs)} ${IMAGE_WIDTHS[mode]}w`).join(", ");
 }
 
 export type VerifyResult = { ok: true; url: string; mode: string } | { ok: false; reason: "missing" | "expired" | "bad-signature" | "bad-url" };
@@ -65,11 +64,8 @@ export function verifyProxyRequest(params: { u?: string; mode?: string; exp?: st
   return { ok: true, url: u, mode: mode ?? "full" };
 }
 
-/**
- * Rewrites <img>/<video poster> sources in whitelisted body HTML to signed proxy URLs. Feed readers keep
- * items for days, so full RSS asks for a longer signature than a page.
- */
-export function proxyBodyImages(html: string, absolute = false, lifetimeSeconds = LIFETIME_SECONDS): string {
+/** Rewrites <img>/<video poster> sources in whitelisted body HTML to signed proxy URLs. */
+export function proxyBodyImages(html: string): string {
   const now = Date.now();
   const rewritten = html
     .replace(/<img\b([^>]*)>/gi, (tag: string, attrs: string) => {
@@ -77,12 +73,11 @@ export function proxyBodyImages(html: string, absolute = false, lifetimeSeconds 
       if (!src) return tag;
       if (isNonArticleImage(src[1]!, attrs.match(/\bwidth="([^"]+)"/i)?.[1], attrs.match(/\bheight="([^"]+)"/i)?.[1])) return "";
       const decoded = src[1]!.replace(/&amp;/g, "&");
-      const proxied = proxiedImage(decoded, "full", absolute, now, lifetimeSeconds);
+      const proxied = proxiedImage(decoded, "full", now);
       // Width descriptors change an image's natural CSS size. Only use them for a body image with
       // an explicit display width: unknown and small pictures must retain their intrinsic size.
-      // RSS keeps its existing single signed full image.
       const width = Number(attrs.match(/\bwidth="(\d+)"/i)?.[1] ?? 0);
-      const candidates = !absolute && width >= IMAGE_WIDTHS.thumb ? proxiedImageSet(decoded, "body", false, now, lifetimeSeconds) : null;
+      const candidates = width >= IMAGE_WIDTHS.thumb ? proxiedImageSet(decoded, "body", now) : null;
       // `sizes=auto` adds size containment in Chrome: stale publisher width/height metadata then
       // overrides the loaded image's real ratio. Let intrinsic dimensions win after loading.
       const responsive = candidates ? ` srcset="${candidates.replace(/&/g, "&amp;")}" sizes="(min-width: 1536px) 760px, (min-width: 1024px) calc(100vw - 524px), (min-width: 640px) 608px, calc(100vw - 32px)"` : "";
@@ -90,7 +85,7 @@ export function proxyBodyImages(html: string, absolute = false, lifetimeSeconds 
       return `<img${attrs.replace(src[0], source)}>`;
     })
     .replace(/<video\b([^>]*?)\sposter="([^"]+)"/gi, (_m, pre: string, src: string) => {
-      const proxied = proxiedImage(src.replace(/&amp;/g, "&"), "thumb", absolute, now, lifetimeSeconds);
+      const proxied = proxiedImage(src.replace(/&amp;/g, "&"), "thumb", now);
       return proxied ? `<video${pre} poster="${proxied.replace(/&/g, "&amp;")}"` : `<video${pre}`;
     });
   if (!/<video\b/i.test(rewritten)) return rewritten;

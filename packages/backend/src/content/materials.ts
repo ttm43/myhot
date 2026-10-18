@@ -64,7 +64,7 @@ export interface MaterialResult {
 }
 
 // Material first discovered more than this long after its source time is archived by source time,
-// stays out of "today" and is never pushed. Must not be wider than the 72 h the v1 contract states.
+// stays out of "today" and is never pushed.
 export const STALE_ON_DISCOVERY_MS = 48 * 3600 * 1000;
 // Source times more than an hour in the future are not trusted.
 export const FUTURE_TOLERANCE_MS = 3600 * 1000;

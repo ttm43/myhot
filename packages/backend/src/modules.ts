@@ -72,7 +72,7 @@ export interface ServerModule {
   name: string;
   /** Sources whose selected articles keep independent cards/seats without changing admission or event identity (publication/rules.ts, scope.ts). */
   independentSelectedSources?: readonly string[];
-  /** Its HTTP routes, and hooks on the app such as what to flush when it closes, registered before the engine's v1 fallbacks (apps/api/src/app.ts). */
+  /** Its HTTP routes, and hooks on the app such as what to flush when it closes, registered after the engine's routes (apps/api/src/app.ts). */
   http?: (app: FastifyInstance) => void;
   admin?: {
     /** Current jobs scheduled outside the worker, by their job_runs name (admin/runs.ts). */

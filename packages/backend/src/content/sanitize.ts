@@ -1,4 +1,4 @@
-// One body representation for the web page, Markdown export and full RSS: whitelisted HTML.
+// One body representation for the web page and the Markdown export: whitelisted HTML.
 // External HTML is never executed; images keep their original src and are signed at read time.
 import * as cheerio from "cheerio";
 import sanitizeHtml from "sanitize-html";

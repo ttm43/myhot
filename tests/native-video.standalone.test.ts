@@ -68,22 +68,20 @@ test("unsafe media cannot survive normalization and empty players keep only safe
   }
 });
 
-test("a rejected poster never leaves an empty web or RSS player or hides its fallback link", () => {
+test("a rejected poster never leaves an empty player or hides its fallback link", () => {
   const rejected = 'poster="https://www.youtube.com/watch?v=example"';
-  for (const absolute of [false, true]) {
-    assert.equal(proxyBodyImages(`<video ${rejected} width="1280" height="720"></video>`, absolute), "");
-    const fallback = proxyBodyImages(`<video ${rejected}><a href="https://example.org/watch">Watch elsewhere</a></video>`, absolute);
-    assert.doesNotMatch(fallback, /<video|poster=/);
-    assert.match(fallback, /<a href="https:\/\/example.org\/watch">Watch elsewhere<\/a>/);
-    const playable = cheerio.load(proxyBodyImages(`<video src="https://example.org/clip.mp4" ${rejected}></video>`, absolute));
-    assert.equal(playable("video").attr("src"), "https://example.org/clip.mp4");
-    assert.equal(playable("video").attr("poster"), undefined);
-    assert.ok(playable("video").is("[controls]"));
-    for (const content of ["", "fallback", '<a href="https://example.org/watch">fallback</a>']) {
-      const inline = proxyBodyImages(`<p>before<video ${rejected}>${content}</video>after</p>`, absolute);
-      assert.equal(stripTags(inline), content ? "before fallback after" : "before after");
-      assert.equal(proxyBodyImages(inline, absolute), inline);
-    }
+  assert.equal(proxyBodyImages(`<video ${rejected} width="1280" height="720"></video>`), "");
+  const fallback = proxyBodyImages(`<video ${rejected}><a href="https://example.org/watch">Watch elsewhere</a></video>`);
+  assert.doesNotMatch(fallback, /<video|poster=/);
+  assert.match(fallback, /<a href="https:\/\/example.org\/watch">Watch elsewhere<\/a>/);
+  const playable = cheerio.load(proxyBodyImages(`<video src="https://example.org/clip.mp4" ${rejected}></video>`));
+  assert.equal(playable("video").attr("src"), "https://example.org/clip.mp4");
+  assert.equal(playable("video").attr("poster"), undefined);
+  assert.ok(playable("video").is("[controls]"));
+  for (const content of ["", "fallback", '<a href="https://example.org/watch">fallback</a>']) {
+    const inline = proxyBodyImages(`<p>before<video ${rejected}>${content}</video>after</p>`);
+    assert.equal(stripTags(inline), content ? "before fallback after" : "before after");
+    assert.equal(proxyBodyImages(inline), inline);
   }
 });
 
@@ -102,13 +100,11 @@ test("translation, Markdown and public image outputs retain cleaned video candid
   assert.equal(restored("video").first().attr("src"), "https://publisher.example/clip.mp4?token=example&quality=high");
   assert.equal(restored("video").first().attr("poster"), "https://publisher.example/cover.jpg?token=poster&frame=1");
   assert.deepEqual(sources(restored), expectedSources);
-  for (const absolute of [false, true]) {
-    const output = cheerio.load(proxyBodyImages(html, absolute));
-    assert.equal(output("video").length, 2);
-    assert.deepEqual(sources(output), expectedSources);
-    assert.equal(output("video").first().attr("src"), "https://publisher.example/clip.mp4?token=example&quality=high");
-    assert.match(output("video").first().attr("poster")!, /\/api\/img-proxy\?/);
-    assert.equal(new URL(output("video").first().attr("poster")!, base).searchParams.get("u"), "https://publisher.example/cover.jpg?token=poster&frame=1");
-    assert.equal(output("video").first().attr("preload"), "none");
-  }
+  const output = cheerio.load(proxyBodyImages(html));
+  assert.equal(output("video").length, 2);
+  assert.deepEqual(sources(output), expectedSources);
+  assert.equal(output("video").first().attr("src"), "https://publisher.example/clip.mp4?token=example&quality=high");
+  assert.match(output("video").first().attr("poster")!, /\/api\/img-proxy\?/);
+  assert.equal(new URL(output("video").first().attr("poster")!, base).searchParams.get("u"), "https://publisher.example/cover.jpg?token=poster&frame=1");
+  assert.equal(output("video").first().attr("preload"), "none");
 });

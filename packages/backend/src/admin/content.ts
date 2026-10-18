@@ -158,8 +158,8 @@ async function overrideRow(id: string, tx: Tx) {
 }
 
 /**
- * Public / summary-only / withdrawn. Applies to the site, API, RSS, MCP, the sync ledger and the
- * search index through the one publication projection; ETags change with the content.
+ * Public / summary-only / withdrawn. Applies to the site, MCP and the search index through the one
+ * publication projection; ETags change with the content.
  */
 export async function setVisibility(id: string, input: { visibility: "public" | "summary-only" | "withdrawn"; reason: string; version: number }, actor: string) {
   z.object({ visibility: z.enum(["public", "summary-only", "withdrawn"]), reason: z.string().trim().min(1), version: z.number().int().nonnegative() }).parse(input);

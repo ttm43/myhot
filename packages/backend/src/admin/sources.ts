@@ -203,7 +203,7 @@ export async function updateSource(id: string, input: { patch: unknown; version:
   });
 }
 
-/** Source fields the public projection reads (publication/rules.ts and the v1 payload). */
+/** Source fields the public projection reads (publication/rules.ts and the MCP item payload). */
 const PUBLICATION_FIELDS: string[] = ["kind", "participation_mode", "site_fulltext", "tier", "name", "first_party", "owner_entity_id"];
 
 /** Replacing a working collector requires the fields its replacement needs to produce articles. */
