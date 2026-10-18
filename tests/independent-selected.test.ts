@@ -35,7 +35,8 @@ test('independent selected sources retain identity and their own cards across pu
   const add = async (source: string, ago: number, options: { selected?: boolean; pending?: boolean; adds?: boolean } = {}) => {
     const at = new Date(+now - ago);
     const {articleId:id} = await upsertMaterial({ sourceId:source,url:`https://example.org/${T}/${++n}`,title:`${T} ${n}`,
-      bodyText:'Original article',bodyStatus:'ok',via:'fetch',publishedAt:at,discoveredAt:at });
+      bodyText:'Original article',bodyStatus:'ok',via:'fetch',publishedAt:at,discoveredAt:at,
+      ...(source === xSource ? { xPost: { tweetId: `${Date.now()}${n}`, authorName: 'Shared author', handle: 'shared', text: 'Original article' } } : {}) });
     await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,reason_zh,score,selected,tags,subjects)
       VALUES (${id},1,'rule','pass','industry',${`${T} title ${n}`},'summary','reason',81,${options.selected ?? true},${[T]},${['openai']})`;
     await sql`INSERT INTO fact_articles(fact_id,article_id,role) VALUES (${fact!.id},${id},'report')`;
