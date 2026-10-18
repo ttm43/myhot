@@ -2,13 +2,11 @@
 // Reads through the same public read layer as v1; no cookies are read or set.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { isCategoryKey, isChannelKey, type CategoryKey, type ChannelKey } from "@aihot/contracts/taxonomy";
-import type { SearchSuggestions } from "@aihot/contracts/site";
 import { InvalidCursorError } from "@aihot/backend/lib/cursor";
 import { exportMarkdown, loadItemDetail } from "@aihot/backend/publication/detail";
 import { loadPool, SearchBusyError } from "@aihot/backend/publication/pool";
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { loadGroupReports } from "@aihot/backend/publication/groups";
-import { listTopicSummaries, loadTopicPage, topicBrowseLinks } from "@aihot/backend/publication/topics";
 import { looseQuery, sendJsonWithEtag, sendProblem } from "../http/respond.ts";
 
 type Handler = (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -87,22 +85,6 @@ export function registerSite(app: FastifyInstance) {
     const data = await loadGroupReports({ factPublicId: (req.params as { factId: string }).factId, ...parseFilters(looseQuery(req)) });
     if (!data) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "reading group unavailable" });
     return reply.header("Cache-Control", "no-store").send(data);
-  }));
-
-  app.get("/api/site/topics", siteHandler(async (req, reply) => {
-    return sendJsonWithEtag(req, reply, await listTopicSummaries(), { etagPrefix: "topics", cacheControl: "public, max-age=300, s-maxage=300" });
-  }));
-
-  app.get('/api/site/search/suggestions', siteHandler(async (req, reply) => {
-    const body: SearchSuggestions = { topics: topicBrowseLinks() };
-    return sendJsonWithEtag(req, reply, body, { etagPrefix: 'suggestions', cacheControl: 'public, max-age=30, s-maxage=30, must-revalidate' });
-  }));
-
-  app.get("/api/site/topics/:slug", siteHandler(async (req, reply) => {
-    const slug = (req.params as { slug: string }).slug;
-    const data = await loadTopicPage(slug, Number(looseQuery(req).page ?? 1));
-    if (!data) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "topic page not found", cacheControl: "public, max-age=60" });
-    return sendJsonWithEtag(req, reply, data, { etagPrefix: "topic", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
   // Markdown export: attachment, 404 when there is nothing to export (same predicate as the button).

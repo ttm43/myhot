@@ -1,5 +1,5 @@
 // Seeds a fresh site from the industry pack: the demo sources (industry/sources.json, only the ones not
-// there yet, so admin edits are never undone). Topics need no seeding: they are read from industry/topics.json.
+// there yet, so admin edits are never undone).
 // Re-runnable:  node --env-file=.env scripts/seed.ts
 import { readFileSync } from "node:fs";
 import path from "node:path";

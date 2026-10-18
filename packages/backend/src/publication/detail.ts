@@ -10,7 +10,6 @@ import { exportTranslation, isChineseBody, ITEM_COLUMNS, ITEM_FROM, seatHolders,
 import { evidenceCondition, listedCondition } from "./scope.ts";
 import { itemUrl, siteUrl } from "./links.ts";
 import { hasItemPage, publicSourceName } from "./rules.ts";
-import { topicLinks, topicMembership } from "./topics.ts";
 
 interface DetailRow extends ItemRow {
   body_html: string | null;
@@ -18,7 +17,6 @@ interface DetailRow extends ItemRow {
   body_status: string;
   tr_html: string | null;
   tr_complete: boolean | null;
-  topics: string[];
 }
 
 export type DetailResult =
@@ -41,8 +39,7 @@ function withOutline(html: string): { html: string; outline: OutlineEntry[] } {
 
 async function loadRow(id: string): Promise<DetailRow | null> {
   const [row] = await sql<DetailRow[]>`
-    SELECT ${ITEM_COLUMNS}, a.body_html, a.body_text, a.body_status, tr.body_html AS tr_html, tr.complete AS tr_complete,
-      ${topicMembership()} AS topics
+    SELECT ${ITEM_COLUMNS}, a.body_html, a.body_text, a.body_status, tr.body_html AS tr_html, tr.complete AS tr_complete
     ${ITEM_FROM}
     WHERE p.article_id = ${id}`;
   return row ?? null;
@@ -94,7 +91,6 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
       author: null,
       body: null,
       outline: [],
-      topics: [],
       markdownAvailable: false,
       group: null,
       hasTranslation: false,
@@ -147,7 +143,6 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
     author: row.author,
     body: reading.body,
     outline: reading.outline,
-    topics: topicLinks(row.topics),
     markdownAvailable: markdownAvailable(row),
     group,
     hasTranslation: reading.hasTranslation,

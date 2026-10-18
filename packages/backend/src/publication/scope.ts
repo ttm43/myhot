@@ -24,18 +24,13 @@ export function listedCondition(now: Date) {
   return sql`p.visibility = 'public' AND p.eligible AND ${releasedCondition(now)}`;
 }
 
-/** Story reports include older editorial material outside the pool, but never withdrawn or not yet released content. */
-export function storyReportCondition(now: Date) {
-  return sql`p.visibility = 'public' AND s.participation_mode = 'editorial' AND ${releasedCondition(now)}`;
-}
-
-/** Selected set as the website shows it (home timeline, reading groups, topics): every selected report. */
+/** Selected set as the website shows it (home timeline, reading groups): every selected report. */
 export function selectedCondition(now: Date) {
   return sql`p.visibility = 'public' AND p.selected AND p.visible_after <= ${now}`;
 }
 
 /**
- * The selected set as machines receive it (v1, RSS, the sync ledger): the representative of ordinary
+ * The selected set as machines receive it (MCP): the representative of ordinary
  * reports of each fact, plus any independently displayed selected articles (publish.ts settleSeats).
  */
 export function seatedCondition(now: Date) {

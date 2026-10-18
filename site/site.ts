@@ -12,8 +12,6 @@ export const SITE = {
   subject: "AI",
   /** 首页的完整标题（浏览器标签、搜索结果）。 */
   homeTitle: "MyHOT — AI 行业动态与每日精选",
-  /** 主题目录页（/topics）的标题。 */
-  topicsTitle: "AI 主题：公司与模型、技术方向、内容形态的最新动态",
   /** 一句话介绍：搜索引擎、分享卡片、PWA 清单会用。 */
   description: "从一批 AI 信源里挑出值得看的动态，把同一件事的多篇报道归到一起。",
   /** 一行小字：PWA 清单里的名字后面。 */
@@ -60,14 +58,6 @@ export const POLICY = {
    */
   xPostIsFullText: true,
 } as const;
-
-/** 导航（电脑侧栏、手机底栏、“我的”页）。 */
-export const NAV = {
-  /**
-   * 不放进导航的引擎入口，目前只支持主题（"/topics"）。页面照样能打开；原来回到它的返回按钮和链接改回精选。
-   */
-  hidden: [] as Array<"/topics">,
-};
 
 /** 条目卡片和详情页上的几处说法和显示。 */
 export const ITEM_COPY = {
@@ -131,7 +121,7 @@ export function withSubject(noun: string): string {
   return /[A-Za-z0-9]$/.test(SITE.subject) ? `${SITE.subject} ${noun}` : `${SITE.subject}${noun}`;
 }
 
-/** “按主题看 AI”“全部 AI 动态”这类说法：行业词接在中文后面，英文词前加空格，中文词不加；noun 照 withSubject 接上。 */
+/** “全部 AI 动态”这类说法：行业词接在中文后面，英文词前加空格，中文词不加；noun 照 withSubject 接上。 */
 export function subjectAfter(text: string, noun?: string): string {
   const gap = /^[A-Za-z0-9]/.test(SITE.subject) ? " " : "";
   return `${text}${gap}${noun ? withSubject(noun) : SITE.subject}`;

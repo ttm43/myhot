@@ -6,7 +6,6 @@
 // page's code: the page waits for its parts while its own code loads (site-modules.ts `loadParts`) and then
 // renders them like any import.
 import type { ComponentType, ReactNode } from "react";
-import type { TopicSummary } from "@aihot/contracts/site";
 import type { NavItem, Tab } from "./components/shell/nav";
 
 export interface AdminNavEntry {
@@ -18,20 +17,6 @@ export interface AdminNavEntry {
 }
 
 export type Part<T> = () => Promise<{ default: T }>;
-
-/** A module's part of a topic page (routes/topic.tsx), from what its server module's topics.page returned for it. */
-export interface TopicPagePart {
-  /** What it is called: after "最新动态与" in the page's title, and in the name of its structured-data list. */
-  name: string;
-  /** Whether it has anything on this page; without, the page leaves it out of its body and its head. */
-  shows: (data: unknown, topic: TopicSummary) => boolean;
-  /** Drawn between the page's header and its list. */
-  Block: ComponentType<{ data: unknown; topic: TopicSummary }>;
-  /** Its entries for the page's structured data, newest first; one with an event page links to it. */
-  entries: (data: unknown) => Array<{ title: string; href: string | null }>;
-  /** The headlines of its most important recent events: the search snippet leads with the first two. */
-  news: (data: unknown) => string[];
-}
 
 export interface WebModule {
   /** Its folder under modules/. */
@@ -63,9 +48,6 @@ export interface WebModule {
     /** After the page. */
     Bottom?: ComponentType;
   };
-  topicPage?: Part<TopicPagePart>;
-  /** Paths of the marks it serves that are drawn in white, for a dark tile (components/BrandMark.tsx). */
-  darkMarks?: string[];
 }
 
 export function defineWebModule(module: WebModule): WebModule {

@@ -122,7 +122,7 @@ async function summaryLists(f: Fixture) {
     if (summary) assert.ok(response.body.includes(f.summary!), `${path} 保留摘要`);
     noContent(response.body, f);
   }
-  // Topic pages and the other card lists share this projection.
+  // The other card lists share this projection.
   const [row] = await sql<ItemRow[]>`SELECT ${ITEM_COLUMNS} ${ITEM_FROM} WHERE p.article_id = ${f.id}`;
   assert.equal(toFeedItemSummary(row!).x, null);
 }

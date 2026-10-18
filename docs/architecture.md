@@ -41,7 +41,7 @@ flowchart LR
 | 位置 | 内容 |
 |---|---|
 | `site/` | 这个站自己的：站名文案、每一步的模型、品牌与 Logo、条款页、网站根目录的四个固定文件（`public/`，替换占位符后发布）、更新日志，以及启用哪些模块（`site/modules/`） |
-| `industry/` | 行业包：分类标签、主题、示范信源、提示词、门槛 |
+| `industry/` | 行业包：分类标签、搜索认得的公司、示范信源、提示词、门槛 |
 | `modules/` | 只属于这个站的功能，一个功能一个文件夹（见下文“模块”）；框架本身不带模块 |
 | `packages/backend/src/sources/` | 六种信源的读取器，抓取调度（`collect.ts`） |
 | `packages/backend/src/content/` | 资料入库、判重、正文提取和清洗 |
@@ -64,7 +64,7 @@ flowchart LR
 |---|---|
 | `module.ts` | 它的地址：页面、跳转、交给 api 处理的路径（类型见 `packages/contracts/src/modules.ts`） |
 | `server.ts` | 它接进后端的插口：接口、定时任务、队列、事件回调、后台页面的数据等（`packages/backend/src/modules.ts`，每个插口注明读它的文件） |
-| `web.tsx` | 它接进网页的插口：页面、导航项、主题页与后台的部件等（`apps/web/app/modules.ts`）；只在某一页出现的部件给出加载函数，随那一页的代码加载 |
+| `web.tsx` | 它接进网页的插口：页面、导航项、后台的部件等（`apps/web/app/modules.ts`）；只在某一页出现的部件给出加载函数，随那一页的代码加载 |
 | `migrations/` | 它自己的表，和 `database/migrations/` 一起按文件名排序执行 |
 | `tests/` | 它的测试，`npm test` 一起跑 |
 | 其他文件 | 它自己的图片等静态文件也放在模块文件夹里：在 `server.ts` 的 `http` 插口里注册路由，用 `apps/api/src/routes/static.ts` 的 `sendFile` 发出（类型、ETag、缓存头和 404 都由它处理，文件名自己校验），地址写进 `module.ts` 的 `apiPaths` |
@@ -85,7 +85,7 @@ flowchart LR
 
 | 地址 | 内容 |
 |---|---|
-| `/` `/all` `/topics` | 精选、全部动态、主题 |
+| `/` `/all` `/items/:id` | 精选、全部动态、文章页 |
 | `/api/mcp` | MCP 服务：最新、搜索两个工具，工具名前缀是 `site/site.ts` 的 `mcpPrefix` |
 | `/admin` | 后台 |
 

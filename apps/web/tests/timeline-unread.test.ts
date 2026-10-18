@@ -23,7 +23,7 @@ function detailOf(id: string, title: string): SiteItemDetail {
     ...summaryOf(id, title), x: null, originalTitle: title, links: { original: "https://example.org/article" }, discoveredAt: at,
     readingMode: "full", author: null,
     body: { zh: "<p>固定正文</p>", original: null, zhKind: "translation", complete: true },
-    outline: [], topics: [], markdownAvailable: true, group: null,
+    outline: [], markdownAvailable: true, group: null,
     hasTranslation: true, bodyLanguage: "zh",
   };
 }
@@ -47,7 +47,6 @@ const api = createServer((req, res) => {
   res.setHeader("Content-Type", "application/json");
   if (p === "/api/site/track") { res.statusCode = 204; return res.end(); }
   if (p === "/api/health") return res.end("{}");
-  if (p === "/api/site/topics") return res.end(JSON.stringify({ groups: [], topics: [] }));
   if (p === "/api/site/timeline") {
     const tag = url.searchParams.get("tag");
     const cursor = url.searchParams.get("cursor");

@@ -4,10 +4,8 @@
 // engine's own tests. Each socket names the engine file that reads it.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { WorkOptions } from "pg-boss";
-import type { Brand } from "@aihot/contracts/site";
 import type { Db } from "./db.ts";
 import type { QueueOptions } from "./jobs/queue.ts";
-import type { Topic, TopicMember } from "./publication/topics.ts";
 
 /** A cron schedule (Asia/Shanghai), recorded in job_runs like the engine's (apps/worker/src/schedules.ts). */
 export interface Scheduled {
@@ -69,18 +67,6 @@ export interface EngineHooks {
   exitServed: (exit: string, req: FastifyRequest) => void;
 }
 
-/** What a topic page asks a module's part of it (publication/topics.ts loadTopicPage). */
-export interface TopicPageAsk {
-  topic: Topic;
-  page: number;
-  /** The topic's members, newest first, as the topic index read them (it is kept a minute). */
-  members: readonly TopicMember[];
-  /** What its `index` computed with that index. */
-  index: unknown;
-  /** The page's time. */
-  now: Date;
-}
-
 export interface ServerModule {
   /** Its folder under modules/. */
   name: string;
@@ -102,26 +88,6 @@ export interface ServerModule {
   /** Its share of the daily retention run (operations/retention.ts): what it deleted or aggregated. */
   retention?: (now: Date) => Promise<Record<string, unknown>>;
   on?: Partial<EngineHooks>;
-  /** Topic pages (publication/topics.ts). */
-  topics?: {
-    /**
-     * Its part of a topic page, under its name in TopicPage.modules; its web module draws it. The page names
-     * reports only as they are now, so withdrawals and corrections apply although the index is a minute old.
-     */
-    page?: {
-      /** Computed from every member of the topic index when the index is read, and kept with it. */
-      index?: (members: readonly TopicMember[], now: Date) => Promise<unknown>;
-      /**
-       * The members it may name, read again with the page, and its part from them as they are now: one no
-       * longer selected is missing, `topics` is its current membership. Null when it has no part on the page.
-       * Work the part out inside `part`, from `current`: what `read` works out from `ask.members` is up to a
-       * minute old, so a withdrawn or corrected report would stay on the page until the index is read again.
-       */
-      read: (ask: TopicPageAsk) => { recheck: string[]; part: (current: ReadonlyMap<string, TopicMember>) => unknown } | null;
-    };
-    /** Company marks by topic slug, drawn over the engine's monograms. */
-    marks?: () => Promise<Record<string, Brand>>;
-  };
   /**
    * Source kinds it collects in its own way (admin/sources.ts), by kind: `resumed` runs in the transaction
    * that enables a paused source of that kind, before its row is written; `fetchNow` takes over the admin's

@@ -125,8 +125,6 @@ export interface SiteItemDetail extends ItemSummary {
   /** Whitelisted HTML of the language shown; the other one is null. */
   body: { zh: string | null; original: string | null; zhKind: "translation" | "original" | null; complete: boolean } | null;
   outline: OutlineEntry[];
-  /** The topics the report belongs to. */
-  topics: TopicLink[];
   markdownAvailable: boolean;
   group: GroupInfo | null;
   hasTranslation: boolean;
@@ -147,61 +145,3 @@ export interface GroupReportsResponse {
   reports: GroupReport[];
 }
 
-// Topics
-
-export type TopicGroupKey = "company" | "field" | "genre";
-
-export interface TopicGroup {
-  key: TopicGroupKey;
-  name: string;
-  blurb: string;
-}
-
-export interface TopicLink {
-  slug: string;
-  name: string;
-}
-
-/** A mark drawn beside a name: its logo, or a monogram when there is none. */
-export interface Brand {
-  /** Site-relative logo path, or null when only a monogram is available. */
-  src: string | null;
-  monogram: string;
-  /** Raster marks get a light backing plate in dark mode. */
-  raster: boolean;
-}
-
-export interface TopicSummary extends TopicLink {
-  group: TopicGroupKey;
-  definition: string;
-  /** Companies: their logo mark where the site has one, else their initial. */
-  brand: Brand | null;
-  /** Selected reports, one per fact (as v1 and RSS count the selected set). */
-  total: number;
-  /** Of those, in the last 30 days. */
-  recent: number;
-  /** Enough content to be listed and indexed. */
-  indexable: boolean;
-  /** The newest selected report. */
-  latest: { title: string; at: string } | null;
-}
-
-export interface TopicsResponse {
-  groups: TopicGroup[];
-  topics: TopicSummary[];
-}
-
-/** Phone search only needs links, not the topic pages. */
-export interface SearchSuggestions {
-  topics: Array<TopicLink & { group: TopicGroupKey }>;
-}
-
-export interface TopicPage {
-  topic: TopicSummary & { groupName: string; /** Every listed report, selected or not. */ poolTotal: number };
-  /** The site's modules' parts of the page, under their names; each module's web part draws its own. */
-  modules: Record<string, unknown>;
-  items: FeedItemSummary[];
-  page: number;
-  pageCount: number;
-  pageSize: number;
-}

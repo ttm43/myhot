@@ -77,10 +77,6 @@ test('independent selected sources retain identity and their own cards across pu
   }
   assert.equal((await get(`/api/site/items/${other}`)).json().sameEvent.id,official);
   for (const id of [rejected,pending,lowValue]) assert.equal((await get(`/api/site/items/${id}`)).json().selected,false);
-  for (const url of ['/api/site/topics/openai']) {
-    const body=(await get(url)).body;
-    for (const id of [firstOwn,laterOwn,official]) assert.ok(body.includes(id),`${url}: ${id}`);
-  }
   await setVisibility(laterOwn,{visibility:'withdrawn',reason:'test withdrawal',version:0},'test');
   const remaining=(await v1Items({mode:'selected',window:'24h',by:'timeline',category:null,q:T,limit:100,cursor:null})).items;
   assert.deepEqual(new Set(remaining.map((x:{id:string})=>x.id)),new Set([firstOwn,official]));

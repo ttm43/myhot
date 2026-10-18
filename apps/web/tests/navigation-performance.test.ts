@@ -3,7 +3,6 @@
 // - query variants mix content/SEO, or restores lose their anchor;
 // - intent no longer loads data, scroll-through touches download it, or a failed prefetch breaks the current page;
 // - visits renew deadlines, expired/errors stay cached, or refresh stops working;
-// - search downloads two whole pages, requests before opening, or never retries/updates suggestions.
 // Reader work failures fixed before changing enhancement and return-position code:
 // - offscreen code downloads/runs immediately, visible code stays plain, or raw copying changes;
 // - tiny/linked pictures become zoom buttons, or language changes keep old handlers;
@@ -17,14 +16,13 @@ import { startWebServer, type WebServer } from "./web-server.ts";
 
 const at = '2026-10-04T08:00:00.000Z';
 const item: FeedItemSummary = {id:'navigation-fixture',title:'性能检查文章',summary:'固定摘要',reason:'固定推荐理由',source:{name:'Fixture'},publishedAt:at,timelineAt:at,category:'ai-models',tags:[],score:80,selected:true,channel:'news',x:null};
-const detail: SiteItemDetail = {...item,x:null,originalTitle:'Fixture article',links:{original:'https://example.org/article'},discoveredAt:at,readingMode:'full',author:null,body:{zh:'<p>固定正文</p>',original:null,zhKind:'translation',complete:true},outline:[],topics:[],markdownAvailable:true,group:null,hasTranslation:true,bodyLanguage:'zh'};
+const detail: SiteItemDetail = {...item,x:null,originalTitle:'Fixture article',links:{original:'https://example.org/article'},discoveredAt:at,readingMode:'full',author:null,body:{zh:'<p>固定正文</p>',original:null,zhKind:'translation',complete:true},outline:[],markdownAvailable:true,group:null,hasTranslation:true,bodyLanguage:'zh'};
 const codeSource='import json\n\nwith open("data.json") as file:\n    data = json.load(file)\n\nfor record in data:\n    print(record["title"])\n';
 const readerBody=Array.from({length:30},(_,i)=>`<p>阅读段落 ${i}：先阅读文章，再查看后面的代码和图片。正文保持可读，图片和代码在需要时增强。</p>`).join('')
   +`<pre><code>${codeSource}</code></pre><pre><code>x = 1</code></pre>`
   +Array.from({length:12},(_,i)=>`<img src="/reader-image/${i}.svg" alt="正文配图 ${i}" width="640" height="360" loading="lazy">`).join('')
   +'<img src="/reader-image/tiny.svg" alt="小图标" width="16" height="16" loading="lazy"><a href="https://example.org"><img src="/reader-image/linked.svg" alt="链接图片" width="640" height="360" loading="lazy"></a>';
 const hits: string[] = [];
-let suggestionsVersion=1;
 let failing='';
 let ttl=60;
 let web:WebServer;
@@ -39,8 +37,6 @@ const api=createServer((req,res)=>{
   hits.push(req.url!);
   if(p===failing){res.statusCode=503;return res.end(JSON.stringify({code:'unavailable'}));}
   if(p==='/api/health')return res.end('{}');
-  if(p==='/api/site/search/suggestions')return res.end(JSON.stringify({topics:[{slug:'openai',name:'建议版本 '+suggestionsVersion,group:'company'}]}));
-  if(p==='/api/site/topics')return res.end(JSON.stringify({groups:[],topics:[{slug:'openai',name:'OpenAI',group:'company',definition:'Fixture',brand:null,total:0,recent:0,latest:null}]}));
   if(p==='/api/site/timeline'){
     res.setHeader('X-Accel-Expires','@'+(Math.floor(Date.now()/1000)+ttl));
     const category=url.searchParams.get('category');
@@ -186,29 +182,6 @@ test('SSR freshness spent in an upstream cache is not renewed by HTML hydration'
     await page.goBack();await expect(page.getByRole('link',{name:'性能检查文章',exact:true})).toBeVisible();
     assert.equal(hits.slice(start).filter(x=>x.startsWith('/api/site/timeline')).length,1);
   }finally{ttl=60;await context.close();}
-});
-
-test('phone suggestions load only on opening, use one small read, retry failures and update on reopening',async()=>{
-  const context=await safari.newContext({viewport:{width:390,height:844}});const page=await context.newPage();
-  try{
-    suggestionsVersion=1;await page.goto(origin+'/');
-    assert.equal(hits.filter(x=>x==='/api/site/search/suggestions').length,0);
-    let start=hits.length;
-    await page.getByRole('button',{name:'搜索',exact:true}).click();
-    await expect(page.getByRole('link',{name:'建议版本 1',exact:true})).toBeVisible();
-    assert.deepEqual(hits.slice(start),['/api/site/search/suggestions']);
-    await page.getByRole('button',{name:'取消',exact:true}).click();
-    suggestionsVersion=2;start=hits.length;
-    await page.getByRole('button',{name:'搜索',exact:true}).click();
-    await expect(page.getByRole('link',{name:'建议版本 2',exact:true})).toBeVisible();
-    assert.deepEqual(hits.slice(start),['/api/site/search/suggestions']);
-    await page.getByRole('button',{name:'取消',exact:true}).click();
-    failing='/api/site/search/suggestions';await page.getByRole('button',{name:'搜索',exact:true}).click();
-    await expect(page.getByRole('link',{name:'建议版本 2',exact:true})).not.toBeVisible();
-    await page.getByRole('button',{name:'取消',exact:true}).click();failing='';suggestionsVersion=3;
-    await page.getByRole('button',{name:'搜索',exact:true}).click();
-    await expect(page.getByRole('link',{name:'建议版本 3',exact:true})).toBeVisible();
-  }finally{failing='';await context.close();}
 });
 
 test('reader enhancements wait for visible code and update only the picture that loaded',async()=>{

@@ -16,7 +16,7 @@
 
 - `name`：站名。导航、标题、MCP、后台都用它。`organization.name` 是结构化数据里的网站运营者（给搜索引擎看），默认也是站名，改站名时一起改；`organization.founder` 是创始人（选填）。
 - `subject`：行业词。页面上“全部 AI 动态”会变成“全部法律动态”。
-- `homeTitle`、`topicsTitle`、`description`、`tagline`、`keywords`：首页和主题目录页的标题、一句话介绍、PWA 清单里名字后面的小字、给搜索引擎的关键词。
+- `homeTitle`、`description`、`tagline`、`keywords`：首页的标题、一句话介绍、PWA 清单里名字后面的小字、给搜索引擎的关键词。
 - `locale`：界面语言（网页的语言标记、分享卡片和结构化数据），`public/` 文件里的 `{{locale}}` 也换成它。
 - `since`：网站开始收录的年份（结构化数据里的时间范围，选填）。
 - `mcpPrefix`：MCP 工具名前缀，比如 `lawhot` 会得到 `lawhot_get_latest`。有人接入以后不要再改。
@@ -26,8 +26,6 @@
 - `github`：源码仓库的地址（选填），填了就在侧栏和“我的”页底部显示“GitHub 开源”。
 - `rootIcons`：标准图标以外也放在网站根目录的图标，`site/brand/` 里的文件名（选填）。
 - `POLICY`：`xPostIsFullText` 决定 X 帖子本身的文字算不算全文（算的话，只在信源允许全文时显示）。
-- `NAV`：`hidden` 写不放进导航的引擎入口，目前只支持主题（`"/topics"`）。电脑侧栏、手机底栏和“我的”页都不放；页面照样能打开，直接打开这些页面时所属标签为精选，原来回到它的返回按钮和链接改回精选，给搜索引擎的页面层级（面包屑）也不经过它。默认是空的，导航和原来一样。
-  其他入口暂不开放：它们的返回按钮和页面内入口也需要一起支持，避免只隐藏侧栏、别处仍引导读者过去。
 - `ITEM_COPY`：模型写的那句理由叫什么（`reasonLabel`，默认“推荐理由”），读者在网页上看不看得到 AI 评分（`showScore`；只管显示，MCP 照样带分数）。
 - `SOURCE_DEFAULTS`：后台新建信源时默认展不展示全文。
 - `ADMIN`：后台几处给管理员的提示（选填）。
@@ -36,16 +34,14 @@
 
 站点地址不写在这里，部署时用环境变量 `SITE_URL` 设置。
 
-## 2. 分类、标签和主题：`industry/taxonomy.ts`、`industry/topics.json`
+## 2. 分类、标签和公司：`industry/taxonomy.ts`、`industry/topics.json`
 
 - `CATEGORIES`：首页和“全部动态”的筛选类别。`key` 会出现在网址和接口里（`/all?category=`），上线后不要改；`label` 是显示名；`guide` 写这一类收什么、和相邻类别的边界在哪，结构化时给模型看（总的归类原则在 `prompts/structure.md`）。要让一类在 MCP 里并进另一类发布（网页上照样分开），写在 `site.ts` 的 `PUBLIC_CATEGORIES`。
 - `CATEGORY_TAGS`、`TOPIC_TAGS`、`ENTITY_TAGS`：模型打标签时只能从这里选。第一个标签必须是“分类标签”。`prompts/structure.md` 里还写着 AI 行业的标签规则（比如什么才算“模型发布”），换行业时一起改。
 - `TAG_SYNONYMS`：模型常写的近义词，统一成词表里的写法（比如“融资”记成“行业动态”）。换了词表，这里也换成新词表的近义词。
-- `ENTITIES`：行业里的主要公司或机构，用于“公司”类主题页。`aliases` 给结构化的模型看；`otherNames` 是公司自己的其他称呼（官方账号名、子品牌），把新闻的主体对到公司、判断标题有没有点名这家公司时也认它们。`IDENTITY_LEXICON`、`PUBLISHER_DOMAINS`、`IDENTITY_CONTEXT_ALIASES` 用来防止模型在标题摘要里写进原文没提到的公司：标题摘要里出现的公司，原文里也要出现过；`IDENTITY_CONTEXT_ALIASES` 列出原文里也算提到这家公司的写法（比如官方账号名）。别的行业没有这个需要可以清空。
+- `ENTITIES`：行业里的主要公司或机构。`aliases` 给结构化的模型看；`otherNames` 是公司自己的其他称呼（官方账号名、子品牌），把新闻的主体对到公司、判断标题有没有点名这家公司时也认它们。`IDENTITY_LEXICON`、`PUBLISHER_DOMAINS`、`IDENTITY_CONTEXT_ALIASES` 用来防止模型在标题摘要里写进原文没提到的公司：标题摘要里出现的公司，原文里也要出现过；`IDENTITY_CONTEXT_ALIASES` 列出原文里也算提到这家公司的写法（比如官方账号名）。别的行业没有这个需要可以清空。
 - `ITEM_TYPES`：内容类型，和评分提示词里的权重表对应，改了要一起改提示词。
-- `topics.json`：主题目录（`/topics`）。站点启动时读取，改完重新构建（`docker compose up -d --build`）才生效。分三组：`company`（公司与机构）、`field`（方向）、`genre`（内容形态）。`slug` 上线后不要改。
-  - `company` 主题用 `entityId`（`ENTITIES` 的 id）收以这家公司为主体的报道；一篇报道的主体有几家公司时，标题里点了它的名才算。可选：`aliases`（搜索框里只搜这个词，也能找出这家公司的报道）。
-  - `field` 和 `genre` 主题用 `tags` 收打了这些标签的报道。
+- `topics.json`：搜索认得的公司。站点启动时读取，改完重新构建（`docker compose up -d --build`）才生效。每家写 `slug`、`name`、`entityId`（`ENTITIES` 的 id），可选 `aliases`：搜索框里整个查询是 `slug`、`name`、`name` 里用 `/` 隔开的某一段或某个别名时，也找出以这家公司为主体的报道（比如搜“claude”也能找到 Anthropic 的新闻）。
 
 ## 3. 信源：`industry/sources.json`
 
@@ -76,7 +72,7 @@
 | `rules-domain.md` | 行业术语的翻译与保留规则（示例是 AI 术语：LLM 译作大语言模型、Token 保留英文……） |
 | `mend-wording.md` | 改用词：标题、摘要、推荐理由用了 `industry/wording.ts` 里列出的词时，让模型只改这些词 |
 | `summarize-*.md` | 其他内容的标题摘要写法 |
-| `structure.md` | 分类、标签、主体公司，判断是一条具体新闻还是讲多件事的综合稿，抽出新闻的事实（谁、做了什么、对什么，附原文出处和前提条件）。页面上的分类和标签、主题页、事件归组和日报都靠它 |
+| `structure.md` | 分类、标签、主体公司，判断是一条具体新闻还是讲多件事的综合稿，抽出新闻的事实（谁、做了什么、对什么，附原文出处和前提条件）。页面上的分类和标签、事件归组都靠它 |
 | `group-*.md` | 事件归组：两篇报道是同一次发生、同一事件的后续，还是两件事；同时判断报道相对精选里已有的内容有没有新信息，没有的不进精选 |
 | `translate-*.md` | 全文翻译 |
 
@@ -124,4 +120,4 @@ node scripts/smoke.ts --base http://localhost:3000   # 站点跑起来以后
 
 改写提示词、重新校准门槛不会让测试失败：测试按每一步实际渲染出的提示词认请求，门槛从 `industry/selection.ts` 读。`tests/` 里有些测试用的是示例行业的分类、标签和公司（比如 `ai-models`、“模型发布”、Anthropic）。改了 `industry/taxonomy.ts` 以后这些测试会失败，把例子换成你行业里的对应项即可，测的规则本身不用改。
 
-然后打开网站看一眼首页、全部动态和主题页，再去后台“信源”页看信源是不是都抓成功了。
+然后打开网站看一眼首页和全部动态，再去后台“信源”页看信源是不是都抓成功了。

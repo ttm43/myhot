@@ -1,11 +1,9 @@
 // Phone search: opens over the page from the bars' magnifier with the keyboard
 // already up — the field is focused inside the same tap, which iOS requires — and searches 全部动态
-// (/all?q=…). Below the field: this browser's recent searches, and topics to browse.
+// (/all?q=…). Below the field: this browser's recent searches.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Form, Link, useLocation, useNavigation } from "react-router";
-import type { SearchSuggestions } from "@aihot/contracts/site";
 import { IconClose, IconSearch } from "../../components/icons";
-import { inNav } from "../../components/shell/nav";
 import { addRecentSearch, clearRecentSearches, useRecentSearches } from "../../lib/local-state";
 import { useModal } from "../../components/ui/modal";
 
@@ -37,17 +35,6 @@ export function openSearch(query = "", trigger?: HTMLElement) {
   setOpen(true);
 }
 
-let suggestions: Promise<SearchSuggestions> | null = null;
-
-/** Share only an ongoing read; the HTTP cache owns freshness and failed reads can be retried. */
-function loadSuggestions() {
-  suggestions ??= fetch('/api/site/search/suggestions')
-    .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json() as Promise<SearchSuggestions>; })
-    .finally(() => { suggestions = null; });
-  return suggestions;
-}
-
-
 export function SearchOverlay() {
   const shown = useSyncExternalStore(subscribe, () => open, () => false);
   const panel = useRef<HTMLDivElement>(null);
@@ -57,7 +44,6 @@ export function SearchOverlay() {
   const recent = useRecentSearches();
   const navigation = useNavigation();
   const { key } = useLocation();
-  const [more, setMore] = useState<Awaited<ReturnType<typeof loadSuggestions>> | null>(null);
 
   useModal({ open: shown, panel, initialFocus: input, returnFocus: opener, onClose: close });
 
@@ -73,19 +59,13 @@ export function SearchOverlay() {
 
   useEffect(() => {
     if (!shown) return;
-    let active = true;
     setHasText(!!input.current?.value);
-    setMore(null);
-    void loadSuggestions().then(value => { if (active) setMore(value); }).catch(() => {});
     // At the desktop breakpoint this layer is hidden by CSS; it must stop holding the page still too.
     const desktop = window.matchMedia("(min-width: 961px)");
     const onResize = () => { if (desktop.matches) close(); };
     onResize();
     desktop.addEventListener("change", onResize);
-    return () => {
-      active = false;
-      desktop.removeEventListener("change", onResize);
-    };
+    return () => desktop.removeEventListener("change", onResize);
   }, [shown]);
 
   // Leaving for the results (or anywhere) closes the search.
@@ -101,7 +81,6 @@ export function SearchOverlay() {
     setOpen(false);
   }
 
-  const companies = (more?.topics ?? []).filter((t) => t.group === "company").slice(0, 6);
   const chip = "inline-flex h-11 max-w-full items-center rounded-full px-3.5 text-[14px] transition-colors";
   return (
     <div
@@ -182,25 +161,6 @@ export function SearchOverlay() {
               </div>
             </section>
           )}
-
-          {companies.length > 0 && (
-            <section className="pt-6">
-              <h2 className="text-[13px] font-semibold text-ink-3">按主题找</h2>
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                {companies.map((t) => (
-                  <Link viewTransition key={t.slug} to={`/topics/${t.slug}`} className={`${chip} bg-bg-sunk text-ink-2 ring-1 ring-inset ring-line-soft active:bg-bg-muted dark:bg-bg-muted/60`}>
-                    <span className="truncate">{t.name}</span>
-                  </Link>
-                ))}
-                {inNav("/topics") && (
-                  <Link viewTransition to="/topics" className={`${chip} gap-0.5 font-medium text-accent`}>
-                    全部 {more!.topics.length} 个主题
-                  </Link>
-                )}
-              </div>
-            </section>
-          )}
-
         </div>
       )}
     </div>

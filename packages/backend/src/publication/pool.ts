@@ -8,7 +8,7 @@ import {
   type ItemRow,
 } from "./items.ts";
 import { listedCondition } from "./scope.ts";
-import { TOPICS } from "./topics.ts";
+import { COMPANIES } from "./companies.ts";
 
 export const POOL_PAGE_SIZE = 40;
 export const POOL_MAX_PAGES = 50;
@@ -73,16 +73,16 @@ export function directMatchCondition(terms: string[]) {
 const normalizeAlias = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
 
 /**
- * The company a whole query names: a company topic's slug, full name,
- * each part of "OpenAI / ChatGPT" and its other names. Then the search also takes the articles about
+ * The company a whole query names: its slug, full name,
+ * each part of "OpenAI / ChatGPT" and its other names (companies.ts). Then the search also takes the articles about
  * that company (their subject tag), so "claude" finds Anthropic's news that never writes the word.
  * Only the whole query counts: "deepseek v4" stays a text search, not all of DeepSeek.
  */
 function queryEntityTag(q: string): string | null {
   const want = normalizeAlias(q);
   if (!want) return null;
-  const topic = TOPICS.find((t) => t.entityId && t.aliases.some((a) => normalizeAlias(a) === want));
-  return topic ? `entity:${topic.entityId}` : null;
+  const company = COMPANIES.find((c) => c.aliases.some((a) => normalizeAlias(a) === want));
+  return company ? `entity:${company.entityId}` : null;
 }
 
 /**

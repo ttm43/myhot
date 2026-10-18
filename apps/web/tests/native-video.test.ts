@@ -35,7 +35,7 @@ const api = createServer((req, res) => {
       id: "video-fixture", title: "原生视频检查", summary: "固定摘要", reason: "固定推荐理由", source: { name: "Fixture" },
       publishedAt: at, timelineAt: at, discoveredAt: at, category: "ai-models", tags: [], score: 80, selected: true,
       channel: "news", x: null, originalTitle: "Video fixture", links: { original: "https://example.org/article" },
-      readingMode: "full", author: null, outline: [], topics: [], 
+      readingMode: "full", author: null, outline: [], 
       markdownAvailable: true, group: null, hasTranslation: true, bodyLanguage: "zh",
       body: { zh: `<p>点击浏览器原生按钮播放视频。</p><video controls playsinline preload="none" width="320" height="320"><source src="${url.origin}/video/unsupported" type="video/not-supported"><source src="${url.origin}/video/clip.webm" type="video/webm"></video>`, original: null, zhKind: "translation", complete: true },
     };

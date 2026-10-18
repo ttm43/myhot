@@ -1,5 +1,5 @@
 // A page of reports grouped by Beijing day with the same rail and rows as the home timeline
-// (全部动态, topics, search results).
+// (全部动态, search results).
 import { IntentLink } from "../../components/ui/IntentLink";
 import { useMemo } from "react";
 import type { FeedItemSummary } from "@aihot/contracts/site";

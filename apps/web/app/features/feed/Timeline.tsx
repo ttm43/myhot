@@ -1,4 +1,4 @@
-// The day-grouped feed (精选 home, topics): a time rail with cards on desktop, rows under grey day bars on
+// The day-grouped feed (精选 home): a time rail with cards on desktop, rows under grey day bars on
 // phones. Keeps its place across back navigation and loads further pages. There is no "new items"
 // prompt: readers refresh for the latest head — on phones also by tapping the tab again.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";

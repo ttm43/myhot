@@ -13,7 +13,7 @@ afterEach(() => {
   else Reflect.deleteProperty(globalThis, "window");
 });
 
-function browser(path = "/topics/openai?page=2#latest", stored = new Map<string, string>()) {
+function browser(path = "/all?page=2#latest", stored = new Map<string, string>()) {
   const location = { href: `${ORIGIN}${path}`, reload: mock.fn() };
   const sessionStorage = {
     getItem: mock.fn((key: string) => stored.get(key) ?? null),
@@ -27,7 +27,7 @@ function browser(path = "/topics/openai?page=2#latest", stored = new Map<string,
 
 // React reports both route components and document metadata through the root error boundary.
 function errorInfo() {
-  return { componentStack: "at TopicRoute" };
+  return { componentStack: "at AllRoute" };
 }
 
 test("an old document render failure checks fresh health and reloads its exact URL once", async () => {
@@ -38,7 +38,7 @@ test("an old document render failure checks fresh health and reloads its exact U
   await onError(error, info);
   assert.equal(b.fetch.mock.calls.length, 1);
   assert.equal(b.location.reload.mock.calls.length, 1);
-  assert.equal(b.location.href, `${ORIGIN}/topics/openai?page=2#latest`);
+  assert.equal(b.location.href, `${ORIGIN}/all?page=2#latest`);
   assert.equal(b.stored.get(KEY), "release-A");
   assert.equal(b.log.mock.calls[0]!.arguments[0], error, "the original failure remains in the console");
   await onError(error, info);
@@ -78,7 +78,7 @@ test("route responses, admin and unversioned documents never probe health", asyn
     b.location.href = `${ORIGIN}${path}`;
     await onError(new Error("admin render failed"), errorInfo());
   }
-  b.location.href = `${ORIGIN}/topics/openai?page=2#latest`;
+  b.location.href = `${ORIGIN}/all?page=2#latest`;
   for (const release of [null, "", "dev"]) {
     await createRenderErrorHandler(release)(new Error("render failed"), errorInfo());
   }

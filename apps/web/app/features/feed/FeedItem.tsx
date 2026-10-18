@@ -21,7 +21,7 @@ export interface FeedItemProps {
   filters?: TimelineFilters;
   read?: boolean;
   onOpen?: (id: string) => void;
-  /** Show category and tags under the text (全部动态, topics, search). */
+  /** Show category and tags under the text (全部动态, search). */
   showTags?: boolean;
   /** The time the item sits at in its list; phones show it in the source line (desktop: on the rail). */
   at?: string;

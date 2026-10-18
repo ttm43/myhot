@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { SITE } from "@aihot/site";
 import { PhoneBar } from "../components/shell/PhoneBar";
-import { inNav } from "../components/shell/nav";
 import type { Screen } from "../components/shell/screens";
 import { edgeTtl } from "../lib/api.server";
 import { webModules } from "../site-modules";
@@ -10,7 +9,7 @@ import { pageMeta } from "../lib/seo";
 import { setFontPreference, useFontPreference } from "../lib/local-state";
 import { Select } from "../components/ui/Controls";
 import { ThemeSwitch } from "../components/shell/ThemeSwitch";
-import { IconChevronRight, IconGrid, IconMoon } from "../components/icons";
+import { IconChevronRight, IconMoon } from "../components/icons";
 
 export const handle: Screen = { tab: "me", name: "我的" };
 
@@ -27,11 +26,8 @@ export function meta() {
  */
 type Row = { to: string; label: string; icon: ReactNode; detail?: ReactNode };
 
-/** The modules' tools first, then the engine's. */
-const tools = (): Row[] => [
-  ...webModules().flatMap((m) => m.tools ?? []),
-  ...(inNav("/topics") ? [{ to: "/topics", label: "主题", icon: <IconGrid size={20} /> }] : []),
-];
+/** The modules' tools (the engine has none of its own). */
+const tools = (): Row[] => webModules().flatMap((m) => m.tools ?? []);
 
 function Group({ title, children }: { title?: string; children: ReactNode }) {
   return (

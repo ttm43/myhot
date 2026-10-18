@@ -226,7 +226,6 @@ test("summary-only detail keeps neutral metadata without a selected verdict", as
     assert.equal(item.selected, false);
     for (const field of ["score", "reason", "category", "body", "x"]) assert.equal(item[field], null, field);
     assert.deepEqual(item.tags, []);
-    assert.deepEqual(item.topics, []);
     assert.equal(item.markdownAvailable, false);
   }
 });

@@ -195,39 +195,3 @@ export function articleLd(input: { path: string; headline: string; description?:
     ...(input.basedOn ? { isBasedOn: input.basedOn } : {}),
   };
 }
-
-/** A topic page: the collection, when a report last reached it, and the lists its parts show. */
-export function topicLd(input: {
-  path: string;
-  name: string;
-  description: string;
-  dateModified: string | null;
-  lists: Array<{ name: string; entries: Array<{ title: string; href: string | null }> }>;
-}) {
-  const base = siteUrl();
-  const url = `${base}${input.path}`;
-  // Entries name their event page when they have one (event pages are indexable, most article pages are not).
-  const lists = input.lists.filter((l) => l.entries.length > 0).map((l) => ({
-    "@type": "ItemList",
-    name: `${input.name} · ${l.name}`,
-    numberOfItems: l.entries.length,
-    itemListElement: l.entries.map((e, i) => ({
-      "@type": "ListItem",
-      position: i + 1,
-      name: e.title,
-      ...(e.href?.startsWith("/story/") ? { url: `${base}${e.href}` } : {}),
-    })),
-  }));
-  return {
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    "@id": `${url}#collection`,
-    url,
-    name: input.name,
-    description: input.description,
-    inLanguage: SITE.locale,
-    isPartOf: { "@id": `${base}/#website` },
-    ...(input.dateModified ? { dateModified: input.dateModified } : {}),
-    ...(lists.length > 0 ? { mainEntity: lists.length === 1 ? lists[0] : lists } : {}),
-  };
-}

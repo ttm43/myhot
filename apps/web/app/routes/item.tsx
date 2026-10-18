@@ -422,17 +422,6 @@ function ItemView({ item }: { item: SiteItemDetail }) {
       ) : (
         verdict && <RailSection title={shownScore(item.score) !== null ? "AI 评分" : undefined}>{verdict}</RailSection>
       )}
-      {item.topics.length > 0 && (
-        <RailSection title="主题">
-          <div className="flex flex-wrap gap-1.5">
-            {item.topics.map((t) => (
-              <Link viewTransition key={t.slug} to={`/topics/${t.slug}`} className="chip">
-                {t.name}
-              </Link>
-            ))}
-          </div>
-        </RailSection>
-      )}
       {item.tags.length > 0 && (
         <RailSection title="标签">
           <div className="flex flex-wrap gap-1.5">
@@ -571,13 +560,8 @@ function ItemView({ item }: { item: SiteItemDetail }) {
             <span> · {hostOf(item.links.original)}</span>
           </p>
 
-          {(item.topics.length > 0 || item.tags.length > 0) && (
+          {item.tags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-1.5 lg:hidden">
-              {item.topics.map((t) => (
-                <Link viewTransition key={t.slug} to={`/topics/${t.slug}`} className="chip">
-                  {t.name}
-                </Link>
-              ))}
               {item.tags.slice(0, 6).map((t) => (
                 <Link key={t} to={`/all?tag=${encodeURIComponent(t)}`} className="chip">
                   #{t}
