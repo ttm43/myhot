@@ -6,13 +6,11 @@ import { z } from "zod";
 import type { AdminContentChain, AdminContentRow, AdminPublication, BeforeJson } from "@aihot/contracts/admin";
 import { ARTICLE_ID_PATTERN, CATEGORY_KEYS } from "@aihot/contracts/taxonomy";
 import { sql, type Tx } from "../db.ts";
-import { enqueue, QUEUES } from "../jobs/queue.ts";
 import { queueProcessing } from "../jobs/content.ts";
 import { identityKeyForUrl, normalizeUrl } from "../lib/url.ts";
 import { publishArticleTx } from "../publication/publish.ts";
 import { emit } from "../modules.ts";
 import { requestRegroup } from "../events/corrections.ts";
-import { computeHotRanking, storedHotRanking } from "../events/hot.ts";
 import { audit, auditHistory, Conflict } from "../audit.ts";
 import { sha256, stableJson } from "../lib/ids.ts";
 
@@ -149,15 +147,6 @@ export async function contentChain(id: string): Promise<Chain | null> {
   return { article, discoveries, revisions, analyses, publication: publication[0] ?? null, override: override[0] ?? null, membership, decisions, history };
 }
 
-/** Whether the current hot ranking shows the article: as an event's representative or among its reports. */
-async function inHotRanking(id: string, tx: Tx): Promise<boolean> {
-  const ranking = await storedHotRanking(tx);
-  if (!ranking?.entries.length) return false;
-  if (ranking.entries.some((e) => e.representativeItemId === id)) return true;
-  const [p] = await tx<{ story_id: number | null }[]>`SELECT story_id FROM publications WHERE article_id = ${id}`;
-  return !!p?.story_id && ranking.entries.some((e) => e.storyId === Number(p.story_id));
-}
-
 const STALE = "这条内容的人工设置已被修改，请刷新后再操作";
 
 async function overrideRow(id: string, tx: Tx) {
@@ -174,27 +163,19 @@ async function overrideRow(id: string, tx: Tx) {
  */
 export async function setVisibility(id: string, input: { visibility: "public" | "summary-only" | "withdrawn"; reason: string; version: number }, actor: string) {
   z.object({ visibility: z.enum(["public", "summary-only", "withdrawn"]), reason: z.string().trim().min(1), version: z.number().int().nonnegative() }).parse(input);
-  const { hot, published } = await sql.begin(async (tx) => {
+  return sql.begin(async (tx) => {
     const before = await overrideRow(id, tx);
     if (before.version !== input.version) throw new Conflict(STALE);
     await tx`
       INSERT INTO editorial_overrides (article_id, visibility, reason, version, updated_by) VALUES (${id}, ${input.visibility}, ${input.reason}, 1, ${actor})
       ON CONFLICT (article_id) DO UPDATE SET visibility = EXCLUDED.visibility, reason = EXCLUDED.reason, version = editorial_overrides.version + 1, updated_by = EXCLUDED.updated_by, updated_at = now()`;
     const published = await publishArticleTx(tx, id);
-    let hot = false;
     if (published?.reduced || (before.visibility ?? "public") !== input.visibility) {
-      hot = await inHotRanking(id, tx);
       await emit("articleChanged", { id, kind: "content", reduced: published?.reduced, reason: `visibility ${input.visibility}` }, tx);
-      const stories = await tx<{ story_id: number }[]>`
-        SELECT DISTINCT f.story_id FROM fact_articles fa JOIN facts f ON f.id = fa.fact_id WHERE fa.article_id = ${id} AND f.story_id IS NOT NULL`;
-      for (const s of stories) await enqueue(QUEUES.digest, { storyId: s.story_id }, { singletonKey: `story:${s.story_id}` }, tx);
     }
     await audit(actor, "content.visibility", `content:${id}`, input.reason, { visibility: before.visibility }, { visibility: input.visibility }, { db: tx });
-    return { hot, published };
+    return published;
   });
-  // Ranking reads committed publications; until this completes, its public reader checks live scope.
-  if (hot) await computeHotRanking();
-  return published;
 }
 
 const FieldsSchema = z
@@ -228,11 +209,6 @@ export async function overrideFields(id: string, input: { fields: unknown; clear
     const published = await publishArticleTx(tx, id);
     if (published?.changed) {
       await emit("articleChanged", { id, kind: "content", reduced: published.reduced, reason: "manual correction" }, tx);
-      const changedFields = new Set([...Object.keys(fields), ...(input.clear ?? [])]);
-      const [st] = await tx<{ story_id: number | null }[]>`SELECT story_id FROM publications WHERE article_id = ${id}`;
-      if (st?.story_id && [...changedFields].some(k => k !== "category" && k !== "tags")) {
-        await enqueue(QUEUES.digest, { storyId: st.story_id }, { singletonKey: `story:${st.story_id}` }, tx);
-      }
     }
     await audit(actor, "content.override", `content:${id}`, input.reason, before.fields, next, { db: tx });
     return published;

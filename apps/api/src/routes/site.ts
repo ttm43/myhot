@@ -7,11 +7,8 @@ import { InvalidCursorError } from "@aihot/backend/lib/cursor";
 import { exportMarkdown, loadItemDetail } from "@aihot/backend/publication/detail";
 import { loadPool, SearchBusyError } from "@aihot/backend/publication/pool";
 import { loadTimeline } from "@aihot/backend/publication/timeline";
-import { loadStoryFollowups } from "@aihot/backend/publication/followups";
 import { loadGroupReports } from "@aihot/backend/publication/groups";
-import { hotSearchLinks, loadHotStrip } from "@aihot/backend/publication/hot";
 import { listTopicSummaries, loadTopicPage, topicBrowseLinks } from "@aihot/backend/publication/topics";
-import { loadHot, loadStoryDetail, resolveStory } from "@aihot/backend/publication/stories";
 import { looseQuery, sendJsonWithEtag, sendProblem } from "../http/respond.ts";
 
 type Handler = (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -55,14 +52,10 @@ export function registerSite(app: FastifyInstance) {
     const q = looseQuery(req);
     const filters = parseFilters(q);
     const limit = Math.min(Math.max(Number(q.limit) || 20, 1), 40);
-    const unfiltered = filters.channel === "all" && !filters.category && !filters.tag && !q.cursor;
-    const [data, hot] = await Promise.all([
-      loadTimeline({ ...filters, cursor: q.cursor || null, limit }),
-      unfiltered ? loadHotStrip() : null,
-    ]);
+    const data = await loadTimeline({ ...filters, cursor: q.cursor || null, limit });
     // Any cache in front and the home page built from this answer share one absolute deadline.
     reply.header("X-Accel-Expires", `@${Math.floor(Date.now() / 1000) + 60}`);
-    return sendJsonWithEtag(req, reply, { ...data, hot }, { etagPrefix: "tl", cacheControl: "public, max-age=60, s-maxage=60" });
+    return sendJsonWithEtag(req, reply, data, { etagPrefix: "tl", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
   app.get("/api/site/pool", siteHandler(async (req, reply) => {
@@ -90,12 +83,6 @@ export function registerSite(app: FastifyInstance) {
     return sendJsonWithEtag(req, reply, result.item, { etagPrefix: "item-original", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
-  app.get("/api/site/stories/:publicId/followups", siteHandler(async (req, reply) => {
-    const result = await loadStoryFollowups((req.params as { publicId: string }).publicId);
-    if (!result) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "story not found" });
-    return reply.header("Cache-Control", "no-store").send(result);
-  }));
-
   app.get("/api/site/groups/:factId/reports", siteHandler(async (req, reply) => {
     const data = await loadGroupReports({ factPublicId: (req.params as { factId: string }).factId, ...parseFilters(looseQuery(req)) });
     if (!data) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "reading group unavailable" });
@@ -107,7 +94,7 @@ export function registerSite(app: FastifyInstance) {
   }));
 
   app.get('/api/site/search/suggestions', siteHandler(async (req, reply) => {
-    const body: SearchSuggestions = { topics: topicBrowseLinks(), hot: await hotSearchLinks() };
+    const body: SearchSuggestions = { topics: topicBrowseLinks() };
     return sendJsonWithEtag(req, reply, body, { etagPrefix: 'suggestions', cacheControl: 'public, max-age=30, s-maxage=30, must-revalidate' });
   }));
 
@@ -116,23 +103,6 @@ export function registerSite(app: FastifyInstance) {
     const data = await loadTopicPage(slug, Number(looseQuery(req).page ?? 1));
     if (!data) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "topic page not found", cacheControl: "public, max-age=60" });
     return sendJsonWithEtag(req, reply, data, { etagPrefix: "topic", cacheControl: "public, max-age=60, s-maxage=60" });
-  }));
-
-  app.get("/api/site/hot", siteHandler(async (req, reply) => {
-    const data = await loadHot();
-    return sendJsonWithEtag(req, reply, data, { etagPrefix: "hot", cacheControl: "public, max-age=30, s-maxage=30" });
-  }));
-
-  app.get("/api/site/stories/:publicId", siteHandler(async (req, reply) => {
-    const publicId = (req.params as { publicId: string }).publicId;
-    const found = await resolveStory(publicId);
-    if (found.kind === "merged") {
-      return reply.code(308).header("Location", `/api/site/stories/${found.target}`).header("Cache-Control", "public, max-age=300").send({ mergedInto: found.target });
-    }
-    if (found.kind === "not_found") return sendProblem(req, reply, { status: 404, code: "not_found", detail: "story not found", cacheControl: "public, max-age=60" });
-    const data = await loadStoryDetail(found.storyId);
-    if (!data) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "story not public", cacheControl: "public, max-age=60" });
-    return sendJsonWithEtag(req, reply, data, { etagPrefix: "story", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
   // Markdown export: attachment, 404 when there is nothing to export (same predicate as the button).

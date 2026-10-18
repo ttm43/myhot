@@ -1,5 +1,5 @@
 // Item detail and Markdown export, both behind the same visibility and licence rules.
-import type { OutlineEntry, SiteItemDetail, StoryRef } from "@aihot/contracts/site";
+import type { OutlineEntry, SiteItemDetail } from "@aihot/contracts/site";
 import { ITEM_COPY, SITE } from "@aihot/site";
 import { bodyToMarkdown } from "../content/markdown.ts";
 import { sql } from "../db.ts";
@@ -87,7 +87,6 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
       selected: false,
       score: null,
       category: null,
-      story: null,
       reason: null,
       tags: [],
       x: null,
@@ -95,7 +94,6 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
       author: null,
       body: null,
       outline: [],
-      relatedStories: [],
       topics: [],
       markdownAvailable: false,
       group: null,
@@ -104,12 +102,6 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
     };
     return { kind: "found", item, row };
   }
-
-  const related = await sql<StoryRef[]>`
-    SELECT DISTINCT st.public_id::text AS "publicId", st.title
-    FROM fact_articles fa JOIN facts f ON f.id = fa.fact_id JOIN stories st ON st.id = f.story_id
-    WHERE fa.article_id = ${id} AND fa.role <> 'mention' AND st.merged_into IS NULL
-    ORDER BY "publicId" LIMIT 6`;
 
   let x: SiteItemDetail["x"] = null;
   let reading: Pick<SiteItemDetail, "body" | "outline" | "hasTranslation" | "bodyLanguage"> = { body: null, outline: [], hasTranslation: false, bodyLanguage: "original" };
@@ -155,7 +147,6 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
     author: row.author,
     body: reading.body,
     outline: reading.outline,
-    relatedStories: related,
     topics: topicLinks(row.topics),
     markdownAvailable: markdownAvailable(row),
     group,

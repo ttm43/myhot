@@ -12,7 +12,7 @@ import { z } from "zod";
 import { beijingDate, beijingTime } from "@aihot/contracts/time";
 import { promptText, promptVersion } from "../editorial/prompts.ts";
 
-export const RELATE_PROMPT_VERSION = promptVersion("group-pair", "group-signal");
+export const RELATE_PROMPT_VERSION = promptVersion("group-pair");
 export const BATCH_PROMPT_VERSION = promptVersion("group-batch");
 
 /** Saved original evidence per report, shared by rendering and selected-background retrieval. */
@@ -62,11 +62,10 @@ export interface Verdict {
 
 /**
  * The relation prompts (industry/prompts/group-*.md): a new report against candidate facts with its
- * reading value, a pair, a signal post.
+ * reading value, and a pair.
  */
 export const BATCH_SYSTEM = promptText("group-batch");
 export const PAIR_SYSTEM = promptText("group-pair");
-export const SIGNAL_SYSTEM = promptText("group-signal");
 
 const RelationSchema = z.enum(RELATIONS);
 
@@ -83,10 +82,6 @@ export const PairSchema = z.object({
   relation: RelationSchema,
   difference: z.string().max(400).catch(""),
   confidence: z.number().min(0).max(1),
-});
-
-export const SignalSchema = z.object({
-  decisions: z.array(z.object({ id: z.string().regex(/^C[1-9]\d*$/), relation: RelationSchema, confidence: z.number().min(0).max(1) })),
 });
 
 function when(at: Date | null): string {
@@ -160,17 +155,6 @@ export function sameOccurrence(cands: CandidateView[], verdicts: Map<number, Ver
 /** The story a development joins: the most similar candidate that is its story's root occurrence. */
 export function storyForDevelopment(cands: CandidateView[], verdicts: Map<number, Verdict>): CandidateView | null {
   return cands.filter((c) => c.storyRoot && verdicts.get(c.factId)?.relation === "SAME_STORY").sort((a, b) => b.score - a.score)[0] ?? null;
-}
-
-/** A discussion post counts for a fact it reports, or one it clearly reacts to. */
-export function signalTarget(cands: CandidateView[], verdicts: Map<number, Verdict>, minReactionConfidence = 0.8): CandidateView | null {
-  return (
-    sameOccurrence(cands, verdicts)[0] ??
-    cands
-      .filter((c) => verdicts.get(c.factId)?.relation === "SAME_STORY" && verdicts.get(c.factId)!.confidence >= minReactionConfidence)
-      .sort((a, b) => b.score - a.score)[0] ??
-    null
-  );
 }
 
 /** How sure a relation must be before a report counts as evidence that two stories are one. */

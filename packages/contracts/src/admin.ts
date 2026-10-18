@@ -50,7 +50,7 @@ export const REPLACEABLE_SOURCE_KINDS = ["rss", "web_list", "json_list"] as cons
 export type ReplaceableSourceKind = typeof REPLACEABLE_SOURCE_KINDS[number];
 
 export interface AdminSourceUpdate {
-  patch: Partial<Pick<AdminSource, "name" | "enabled" | "interval_minutes" | "tier" | "participation_mode" | "signal_group_id" | "first_party" | "owner_entity_id" | "site_fulltext" | "tags">> & (
+  patch: Partial<Pick<AdminSource, "name" | "enabled" | "interval_minutes" | "tier" | "participation_mode" | "first_party" | "owner_entity_id" | "site_fulltext" | "tags">> & (
     { kind?: never; config?: Record<string, unknown> } | { kind: ReplaceableSourceKind; config: Record<string, unknown> }
   );
   version: string;
@@ -92,7 +92,6 @@ export interface AdminSource {
   owner_entity_id: string | null;
   tier: string;
   participation_mode: string;
-  signal_group_id: string | null;
   interval_minutes: number;
   site_fulltext: boolean;
   enabled: boolean;

@@ -53,7 +53,7 @@ const get = async (url: string) => {
 };
 
 test("one fact holds one selected seat on MCP", async () => {
-  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, first_report_at, latest_at) VALUES (${randomUUID()}, ${`S-${T}`}, now(), now()) RETURNING id`;
+  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title) VALUES (${randomUUID()}, ${`S-${T}`}) RETURNING id`;
   const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title) VALUES (${`seat-${T}`}, ${story!.id}, 'Acquisition') RETURNING id`;
 
   const first = await report(MEDIA, fact!.id);

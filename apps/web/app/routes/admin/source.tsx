@@ -20,7 +20,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export const meta: Route.MetaFunction = ({ loaderData }) => [{ title: `${loaderData?.source.name ?? "信源"} · ${SITE.name} 后台` }];
 
-type Draft = Pick<AdminSource, "name" | "kind" | "interval_minutes" | "tier" | "participation_mode" | "signal_group_id" | "first_party" | "owner_entity_id" | "site_fulltext"> & { tags: string; config: string };
+type Draft = Pick<AdminSource, "name" | "kind" | "interval_minutes" | "tier" | "participation_mode" | "first_party" | "owner_entity_id" | "site_fulltext"> & { tags: string; config: string };
 
 function draftOf(s: AdminSource): Draft {
   return {
@@ -29,7 +29,6 @@ function draftOf(s: AdminSource): Draft {
     interval_minutes: s.interval_minutes,
     tier: s.tier,
     participation_mode: s.participation_mode,
-    signal_group_id: s.signal_group_id,
     first_party: s.first_party,
     owner_entity_id: s.owner_entity_id,
     site_fulltext: s.site_fulltext,
@@ -67,7 +66,6 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
       tags: draft.tags.split(/[,，]/).map((t) => t.trim()).filter(Boolean),
       config,
       interval_minutes: Number(draft.interval_minutes),
-      signal_group_id: draft.signal_group_id || null,
       owner_entity_id: draft.owner_entity_id || null,
     };
     const before = draftOf(s) as Record<string, unknown>;
@@ -173,7 +171,7 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
               <Field label="采集间隔（分钟）">
                 <Input type="number" min={1} max={1440} value={draft.interval_minutes} onChange={(e) => setDraft({ ...draft, interval_minutes: Number(e.target.value) })} />
               </Field>
-              <Field label="参与方式" hint="氛围只作热点讨论证据，不单独成为内容">
+              <Field label="参与方式" hint="氛围只收下存着，不分析、不归组、不公开">
                 <Select value={draft.participation_mode} onChange={(e) => setDraft({ ...draft, participation_mode: e.target.value })}>
                   {Object.entries(MODE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </Select>
@@ -182,9 +180,6 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
                 <Select value={draft.tier} onChange={(e) => setDraft({ ...draft, tier: e.target.value })}>
                   {Object.entries(TIER_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </Select>
-              </Field>
-              <Field label="讨论分组 ID" hint="同一机构的多个账号共用，热度只算一次">
-                <Input value={draft.signal_group_id ?? ""} onChange={(e) => setDraft({ ...draft, signal_group_id: e.target.value })} />
               </Field>
               <Field label="运营主体 ID">
                 <Input value={draft.owner_entity_id ?? ""} onChange={(e) => setDraft({ ...draft, owner_entity_id: e.target.value })} />

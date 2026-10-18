@@ -38,8 +38,6 @@ export interface ItemRow {
   author_avatar_url?: string | null;
   author: string | null;
   language: string | null;
-  story_public_id: string | null;
-  story_title: string | null;
   zh_text: string | null;
   /** Chinese translation of the post an X post quotes. */
   quoted_zh: string | null;
@@ -52,7 +50,6 @@ export const ITEM_COLUMNS = sql`
   p.body_mode, p.fact_id, s.name AS source_name, s.participation_mode AS source_mode,
   a.x_post, a.author, a.language,
   CASE WHEN s.kind = 'x_search' AND ${sourceOwnsPost(sql`s.name`, sql`a.x_post->>'handle'`)} THEN s.icon_url END AS author_avatar_url,
-  st.public_id::text AS story_public_id, st.title AS story_title,
   CASE WHEN p.channel = 'x' THEN tr.body_text END AS zh_text, qt.text_zh AS quoted_zh`;
 
 /** MCP listings never render article bodies, X media or story metadata. */
@@ -68,7 +65,6 @@ export const ITEM_FROM = sql`
   FROM publications p
   JOIN sources s ON s.id = p.source_id
   JOIN articles a ON a.id = p.article_id
-  LEFT JOIN stories st ON st.id = p.story_id AND st.merged_into IS NULL
   LEFT JOIN translations tr ON tr.article_id = p.article_id AND tr.lang = 'zh' AND tr.revision >= a.revision
   LEFT JOIN quote_translations qt ON p.channel = 'x' AND qt.tweet_id = substring(a.x_post->'quoted'->>'url' from '/status/([0-9]+)')`;
 
@@ -165,7 +161,6 @@ export function toItemSummary(row: ItemRow): ItemSummary {
     score: row.score === null ? null : Math.round(Number(row.score)),
     selected: row.selected,
     channel: row.channel,
-    story: row.story_public_id ? { publicId: row.story_public_id, title: row.story_title ?? "" } : null,
   };
 }
 

@@ -9,7 +9,7 @@ import { after, before, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
 import { detachFromFact, requestRegroup } from "@aihot/backend/events/corrections";
 import { upsertMaterial } from "@aihot/backend/content/materials";
-import { consolidate, linkRelatedStories } from "@aihot/backend/events/consolidate";
+import { consolidate } from "@aihot/backend/events/consolidate";
 import { groupArticle } from "@aihot/backend/events/group";
 import { mergeStoryInto } from "@aihot/backend/events/merge";
 import { candidateViews } from "@aihot/backend/events/recall";
@@ -85,14 +85,12 @@ async function setScope(articleId: string, scope: "single" | "composite", fact: 
 before(async () => {
   await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, next_fetch_at) VALUES (${SOURCE}, 'Test events', 'rss', 'T1', 'editorial', '2100-01-01')`;
   // An existing fact with one report: the candidate every later report meets.
-  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, first_report_at, latest_at) VALUES (${randomUUID()}, ${FACT_TITLE}, now(), now()) RETURNING id`;
+  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title) VALUES (${randomUUID()}, ${FACT_TITLE}) RETURNING id`;
   storyId = story!.id;
   const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title) VALUES (${`f-${T}`}, ${storyId}, ${FACT_TITLE}) RETURNING id`;
   factId = fact!.id;
   const first = await report("first");
   await sql`INSERT INTO fact_articles (fact_id, article_id, role) VALUES (${factId}, ${first}, 'report')`;
-  await sql`INSERT INTO story_signals (story_id, article_id, participant_key, source_id, kind, observed_at)
-            VALUES (${storyId}, ${first}, ${`source:${SOURCE}`}, ${SOURCE}, 'editorial', now())`;
 });
 after(async () => {
   await provider.close();
@@ -126,8 +124,6 @@ test("a detach made while the model is deciding the report's fact stands", async
   assert.equal(result.verdict, "manual");
   const memberships = await sql`SELECT fact_id FROM fact_articles WHERE article_id = ${id}`;
   assert.equal(memberships.length, 0, "the report is not attached again");
-  const signals = await sql`SELECT story_id FROM story_signals WHERE article_id = ${id}`;
-  assert.equal(signals.length, 0, "no heat evidence is written back to the story");
   const [publication] = await sql<{ fact_id: number | null; story_id: number | null }[]>`SELECT fact_id, story_id FROM publications WHERE article_id = ${id}`;
   assert.deepEqual({ ...publication }, { fact_id: null, story_id: null }, "it is shown on its own");
 });
@@ -168,8 +164,6 @@ test("an explicit regroup drops the automatic membership and decides again", asy
   assert.deepEqual(decisions.map((d) => d.verdict), ["same-fact", "same-fact"], "an explicit regroup decides again");
   const memberships = await sql<{ fact_id: number }[]>`SELECT fact_id FROM fact_articles WHERE article_id = ${id}`;
   assert.equal(memberships.length, 1, "the report has exactly one membership after the regroup");
-  const signals = await sql<{ story_id: number }[]>`SELECT story_id FROM story_signals WHERE article_id = ${id}`;
-  assert.deepEqual(signals.map((s) => Number(s.story_id)), [storyId]);
 });
 
 test("a development attaches to the story's earliest fact that still holds reports", async () => {
@@ -177,7 +171,7 @@ test("a development attaches to the story's earliest fact that still holds repor
   hold.open();
   const text = randomText();
   // A story whose first fact was emptied (a regroup, a detach, or a merge carried it over).
-  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, first_report_at, latest_at) VALUES (${randomUUID()}, ${text}, now(), now()) RETURNING id`;
+  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title) VALUES (${randomUUID()}, ${text}) RETURNING id`;
   await sql`INSERT INTO facts (public_id, story_id, title) VALUES (${`fe-${T}`}, ${story!.id}, 'emptied')`;
   const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title) VALUES (${`fr-${T}`}, ${story!.id}, ${text}) RETURNING id`;
   const first = await report("root", text, text);
@@ -197,15 +191,14 @@ test("a development attaches to the story's earliest fact that still holds repor
 
 /** A story whose only fact holds one report with the given text. */
 async function storyWithRoot(text: string, suffix: string) {
-  const [story] = await sql<{ id: number; public_id: string }[]>`INSERT INTO stories (public_id, title, first_report_at, latest_at) VALUES (${randomUUID()}, ${text}, now(), now()) RETURNING id, public_id`;
+  const [story] = await sql<{ id: number; public_id: string }[]>`INSERT INTO stories (public_id, title) VALUES (${randomUUID()}, ${text}) RETURNING id, public_id`;
   const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title) VALUES (${`fs-${suffix}-${T}`}, ${story!.id}, ${text}) RETURNING id`;
   const article = await report(suffix, text, text);
   await sql`INSERT INTO fact_articles (fact_id, article_id, role) VALUES (${fact!.id}, ${article}, 'report')`;
   return { storyId: Number(story!.id), publicId: String(story!.public_id), factId: Number(fact!.id), articleId: article };
 }
 
-// Failure cases before changing the writer: a merge during judgement can strand either a signal or
-// a newly created fact; a signal-only detach can leave evidence because it has no fact membership.
+// A merge during judgement must not strand a newly created fact in the retired story.
 for (const relationToRoot of ["SAME_OCCURRENCE", "SAME_STORY"] as const) {
   test(`a ${relationToRoot} decision made before a merge is retried without writing into the retired story`, async () => {
     const text = randomText();
@@ -222,45 +215,23 @@ for (const relationToRoot of ["SAME_OCCURRENCE", "SAME_STORY"] as const) {
     try {
       await assert.rejects(pending, /changed.*retry/i);
       assert.equal((await sql`SELECT 1 FROM facts WHERE story_id = ${from.storyId}`).length, 0);
-      assert.equal((await sql`SELECT 1 FROM story_signals WHERE story_id = ${from.storyId}`).length, 0);
       const retried = await groupArticle(id);
       assert.equal(retried.storyId, into.storyId);
-      assert.equal((await sql`SELECT 1 FROM story_signals WHERE article_id = ${id} AND story_id = ${into.storyId}`).length, 1);
     } finally { relation = "SAME_OCCURRENCE"; }
   });
 }
 
-test("detaching a discussion post removes its signal even though it has no fact membership", async () => {
-  const root = await storyWithRoot(randomText(), "signal-detach-root");
-  await sql`UPDATE articles SET identity_key = 'x:999000111' WHERE id = ${root.articleId}`;
+test("a post of a non-editorial source is kept as collected and never grouped", async () => {
+  const text = randomText();
+  await storyWithRoot(text, "signal-root");
   const source = `${SOURCE}-discussion`;
-  await sql`INSERT INTO sources (id,name,kind,tier,participation_mode) VALUES (${source},'Discussion','x_search','T2','hot_signal')`;
-  const { articleId } = await upsertMaterial({ sourceId: source, url: "https://x.com/example/status/999000112", title: "Reaction",
-    publishedAt: new Date(), bodyText: "Reaction", bodyStatus: "ok", via: "fetch",
-    xPost: { tweetId: "999000112", handle: "example", authorName: "Example", text: "Reaction", replyTo: "999000111" } });
-  assert.equal((await groupArticle(articleId, { signalOnly: true })).storyId, root.storyId);
-  await detachFromFact(articleId, "unrelated reaction", "test-editor");
-  assert.equal((await sql`SELECT 1 FROM story_signals WHERE article_id = ${articleId}`).length, 0);
-  assert.equal((await groupArticle(articleId, { signalOnly: true })).verdict, "manual");
-});
-
-test("a manual detach during a discussion judgement wins just as it does for an editorial report", async () => {
-  // The post shares most of a story's wording: recalled, but not close enough to attach without a judgement.
-  const text = randomText() + randomText();
-  await storyWithRoot(text, "signal-race-root");
-  const reaction = text.slice(0, 26) + randomText().slice(0, 6);
-  const source = `${SOURCE}-discussion-race`;
-  await sql`INSERT INTO sources (id,name,kind,tier,participation_mode) VALUES (${source},'Discussion race','rss','T2','hot_signal')`;
-  const { articleId } = await upsertMaterial({ sourceId: source, url: `https://example.org/${source}`, title: reaction,
-    publishedAt: new Date(), bodyText: reaction, bodyStatus: "ok", via: "fetch" });
-  hold = gate(); asked = gate();
-  const pending = groupArticle(articleId, { signalOnly: true });
-  await Promise.race([asked.promise, pending.then(() => assert.fail("expected a signal judgement"))]);
-  try {
-    await detachFromFact(articleId, "unrelated reaction", "test-editor");
-  } finally { hold.open(); }
-  assert.equal((await pending).verdict, "manual");
-  assert.equal((await sql`SELECT 1 FROM story_signals WHERE article_id = ${articleId}`).length, 0);
+  await sql`INSERT INTO sources (id,name,kind,tier,participation_mode) VALUES (${source},'Discussion','rss','T2','hot_signal')`;
+  const { articleId } = await upsertMaterial({ sourceId: source, url: `https://example.org/${source}`, title: text,
+    publishedAt: new Date(), bodyText: text, bodyStatus: "ok", via: "fetch" });
+  const hits = provider.hits();
+  assert.deepEqual(await groupArticle(articleId), { verdict: "skipped" });
+  assert.equal(provider.hits(), hits, "no model call");
+  assert.equal((await sql`SELECT 1 FROM fact_articles WHERE article_id = ${articleId}`).length, 0);
 });
 
 // Facts store date-only input at Beijing midnight: a UTC conversion must not shift it a day back,
@@ -293,7 +264,6 @@ test("a composite first, with no candidates, stays standalone and cannot become 
   const second = await groupArticle(single);
   assert.equal(second.verdict, "new-story");
   assert.equal(provider.hits(), hits, "the composite is not recalled as a fact");
-  assert.equal((await sql`SELECT 1 FROM story_signals WHERE article_id = ${composite}`).length, 0);
 });
 
 test("a composite arriving after independent products only mentions them even when the model calls both the same occurrence", async () => {
@@ -310,7 +280,6 @@ test("a composite arriving after independent products only mentions them even wh
     assert.equal(provider.hits() - hits, 1, "one batch call, no pair review or consolidation");
     const memberships = await sql<{ fact_id: number; role: string }[]>`SELECT fact_id, role FROM fact_articles WHERE article_id = ${id} ORDER BY fact_id`;
     assert.deepEqual(memberships.map((r) => [Number(r.fact_id), r.role]), [[one.factId, "mention"], [two.factId, "mention"]]);
-    assert.equal((await sql`SELECT 1 FROM story_signals WHERE article_id = ${id}`).length, 0);
     assert.equal((await sql`SELECT 1 FROM stories WHERE id IN (${one.storyId}, ${two.storyId}) AND merged_into IS NOT NULL`).length, 0);
     const [p] = await sql`SELECT fact_id, story_id FROM publications WHERE article_id = ${id}`;
     assert.deepEqual({ ...p }, { fact_id: null, story_id: null });
@@ -367,7 +336,7 @@ test("a story's root is the fact reported first, not the one with the lowest num
   hold = gate();
   hold.open();
   const early = randomText(), late = randomText();
-  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, first_report_at, latest_at) VALUES (${randomUUID()}, ${early}, now(), now()) RETURNING id`;
+  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title) VALUES (${randomUUID()}, ${early}) RETURNING id`;
   // Created first (lower id), reported later: a fact carried over from a merged or imported story.
   const [later] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title) VALUES (${`ft-late-${T}`}, ${story!.id}, ${late}) RETURNING id`;
   const [first] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title) VALUES (${`ft-early-${T}`}, ${story!.id}, ${early}) RETURNING id`;
@@ -485,33 +454,4 @@ test("a story whose reports all moved away keeps its address: it redirects to wh
   assert.deepEqual(last.redirected, [old.storyId]);
   const [alias] = await sql<{ story_id: number }[]>`SELECT story_id FROM story_aliases WHERE public_id = ${old.publicId}`;
   assert.equal(Number(alias!.story_id), last.storyId, "the old public id answers with the story its last report went to");
-});
-
-test("stories that reports keep tying together without merging list each other as related", async () => {
-  hold = gate();
-  hold.open();
-  const text = randomText();
-  const one = await storyWithRoot(`${text}甲`, "related-one");
-  const two = await storyWithRoot(`${text}乙`, "related-two");
-  const links = async () =>
-    (await sql<{ story_id: number; other_id: number; relation: string }[]>`
-      SELECT story_id, other_id, relation FROM story_links WHERE story_id IN (${one.storyId}, ${two.storyId}) ORDER BY story_id`)
-      .map((l) => [Number(l.story_id), Number(l.other_id), l.relation]);
-  // Each report is a development of both stories; their roots are different events, so they stay apart.
-  relation = "SAME_STORY";
-  pairRelation = "UNRELATED";
-  answerAll = true;
-  try {
-    await groupArticle(await report("tie-one", text, text));
-    await linkRelatedStories();
-    assert.deepEqual(await links(), [], "one report is not enough");
-
-    await groupArticle(await report("tie-two", text, text));
-    await linkRelatedStories();
-    assert.deepEqual(await links(), [[one.storyId, two.storyId, "related"], [two.storyId, one.storyId, "related"]]);
-  } finally {
-    relation = "SAME_OCCURRENCE";
-    pairRelation = null;
-    answerAll = false;
-  }
 });

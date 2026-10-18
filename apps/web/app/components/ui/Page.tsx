@@ -1,6 +1,4 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router";
-import { IconChevronRight } from "../icons";
 
 /**
  * The reading template, one of the site's two page widths (the other is the full-width feeds and
@@ -58,16 +56,6 @@ export function AsideCard({ title, children, className = "" }: { title: ReactNod
       <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
-  );
-}
-
-/** "完整榜单 →" style link used in card headers. */
-export function MoreLink({ to, children }: { to: string; children: ReactNode }) {
-  return (
-    <Link viewTransition to={to} className="inline-flex items-center gap-0.5 whitespace-nowrap text-[12px] font-semibold text-accent hover:text-accent-ink">
-      {children}
-      <IconChevronRight size={13} />
-    </Link>
   );
 }
 

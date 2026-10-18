@@ -16,8 +16,7 @@ let starting: Promise<PgBoss> | null = null;
 export interface JobData {
   "content.analyze": { articleId: string; attemptTag?: string };
   "content.extract-body": { articleId: string };
-  "events.group": { articleId: string; signalOnly?: boolean };
-  "events.digest": { storyId: number };
+  "events.group": { articleId: string };
   "sources.fetch": { sourceId: string; force?: boolean };
   "sources.fetch-x": { key: string; sourceIds: string[] };
   "sources.mp": { sourceId: string; reason?: "schedule" | "manual" };
@@ -30,7 +29,6 @@ export const QUEUES = {
   analyze: "content.analyze",
   extractBody: "content.extract-body",
   group: "events.group",
-  digest: "events.digest",
   fetchSource: "sources.fetch",
   fetchXShard: "sources.fetch-x",
   mpCheck: "sources.mp",
@@ -45,7 +43,6 @@ const QUEUE_OPTIONS: Record<QueueName, QueueOptions> = {
   [QUEUES.analyze]: { policy: "short", retryLimit: 4, retryDelay: 30, retryBackoff: true, expireInSeconds: 600 },
   [QUEUES.extractBody]: { policy: "short", retryLimit: 2, retryDelay: 120, expireInSeconds: 300 },
   [QUEUES.group]: { policy: "short", retryLimit: 4, retryDelay: 20, retryBackoff: true, expireInSeconds: 600 },
-  [QUEUES.digest]: { policy: "short", retryLimit: 3, retryDelay: 60, retryBackoff: true, expireInSeconds: 900 },
   [QUEUES.fetchSource]: { policy: "short", retryLimit: 0, expireInSeconds: 600 },
   [QUEUES.fetchXShard]: { policy: "short", retryLimit: 0, expireInSeconds: 900 },
   [QUEUES.mpCheck]: { policy: "short", retryLimit: 3, retryDelay: 60, retryBackoff: true, expireInSeconds: 600 },

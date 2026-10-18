@@ -38,9 +38,6 @@ export function cached<T, A = void>(load: (arg: A) => Promise<T>, opts: { freshM
   };
 }
 
-/** Concurrent readers share one read; nothing is kept for later ones. */
-export const SHARED_ONLY = { freshMs: 0, maxStaleMs: 0 };
-
 /** One `cached` value per key, for at most `maxKeys` keys: the first key read is dropped first. */
 export function cachedByKey<K, T>(name: (key: K) => string, load: (key: K) => Promise<T>, opts: { freshMs: number; maxStaleMs: number; maxKeys: number }): (key: K) => Promise<T> {
   const entries = new Map<string, Cached<T, K>>();

@@ -17,7 +17,7 @@ import { startWebServer, type WebServer } from "./web-server.ts";
 
 const at = '2026-10-04T08:00:00.000Z';
 const item: FeedItemSummary = {id:'navigation-fixture',title:'性能检查文章',summary:'固定摘要',reason:'固定推荐理由',source:{name:'Fixture'},publishedAt:at,timelineAt:at,category:'ai-models',tags:[],score:80,selected:true,channel:'news',x:null};
-const detail: SiteItemDetail = {...item,x:null,originalTitle:'Fixture article',links:{original:'https://example.org/article'},discoveredAt:at,story:null,readingMode:'full',author:null,body:{zh:'<p>固定正文</p>',original:null,zhKind:'translation',complete:true},outline:[],relatedStories:[],topics:[],markdownAvailable:true,group:null,hasTranslation:true,bodyLanguage:'zh'};
+const detail: SiteItemDetail = {...item,x:null,originalTitle:'Fixture article',links:{original:'https://example.org/article'},discoveredAt:at,readingMode:'full',author:null,body:{zh:'<p>固定正文</p>',original:null,zhKind:'translation',complete:true},outline:[],topics:[],markdownAvailable:true,group:null,hasTranslation:true,bodyLanguage:'zh'};
 const codeSource='import json\n\nwith open("data.json") as file:\n    data = json.load(file)\n\nfor record in data:\n    print(record["title"])\n';
 const readerBody=Array.from({length:30},(_,i)=>`<p>阅读段落 ${i}：先阅读文章，再查看后面的代码和图片。正文保持可读，图片和代码在需要时增强。</p>`).join('')
   +`<pre><code>${codeSource}</code></pre><pre><code>x = 1</code></pre>`
@@ -39,18 +39,17 @@ const api=createServer((req,res)=>{
   hits.push(req.url!);
   if(p===failing){res.statusCode=503;return res.end(JSON.stringify({code:'unavailable'}));}
   if(p==='/api/health')return res.end('{}');
-  if(p==='/api/site/search/suggestions')return res.end(JSON.stringify({topics:[{slug:'openai',name:'OpenAI',group:'company'}],hot:[{rank:1,title:'建议版本 '+suggestionsVersion,to:'/story/fixture'}]}));
+  if(p==='/api/site/search/suggestions')return res.end(JSON.stringify({topics:[{slug:'openai',name:'建议版本 '+suggestionsVersion,group:'company'}]}));
   if(p==='/api/site/topics')return res.end(JSON.stringify({groups:[],topics:[{slug:'openai',name:'OpenAI',group:'company',definition:'Fixture',brand:null,total:0,recent:0,latest:null}]}));
-  if(p==='/api/site/hot')return res.end(JSON.stringify({computedAt:at,windowHours:48,entries:[{rank:1,story:{publicId:'fixture',title:'建议版本 '+suggestionsVersion},heat:10,trend:'flat',trendPct:0,badges:[],participantCount:0,sourceCount:0,sourceNames:[],participants:[],spark:[],summary:null,latest:null,cover:null}]}));
   if(p==='/api/site/timeline'){
     res.setHeader('X-Accel-Expires','@'+(Math.floor(Date.now()/1000)+ttl));
     const category=url.searchParams.get('category');
     const shown={...item,title:category?'分类 '+category:'性能检查文章'};
     if(url.searchParams.get('tag')==='long-reading'){
       const cards=Array.from({length:180},(_,i)=>({key:'long-'+i,anchorAt:i<60?at:'2026-10-03T08:00:00.000Z',item:{...item,id:'long-'+i,title:'长列表文章 '+i,summary:'用于核实深处阅读返回的固定摘要。'.repeat(3)},group:null}));
-      return res.end(JSON.stringify({filters:{channel:'all',category:null,tag:'long-reading'},cards,nextCursor:null,hot:null,dayCounts:{'2026-10-04':60,'2026-10-03':120}}));
+      return res.end(JSON.stringify({filters:{channel:'all',category:null,tag:'long-reading'},cards,nextCursor:null,dayCounts:{'2026-10-04':60,'2026-10-03':120}}));
     }
-    return res.end(JSON.stringify({filters:{channel:'all',category,tag:null},cards:[{key:shown.id,anchorAt:at,item:shown,group:null}],nextCursor:null,hot:null,dayCounts:{'2026-10-04':1}}));
+    return res.end(JSON.stringify({filters:{channel:'all',category,tag:null},cards:[{key:shown.id,anchorAt:at,item:shown,group:null}],nextCursor:null,dayCounts:{'2026-10-04':1}}));
   }
   if(p==='/api/site/pool'){
     const page=Number(url.searchParams.get('page')||1);
@@ -196,19 +195,19 @@ test('phone suggestions load only on opening, use one small read, retry failures
     assert.equal(hits.filter(x=>x==='/api/site/search/suggestions').length,0);
     let start=hits.length;
     await page.getByRole('button',{name:'搜索',exact:true}).click();
-    await expect(page.getByRole('link',{name:'1 建议版本 1',exact:true})).toBeVisible();
+    await expect(page.getByRole('link',{name:'建议版本 1',exact:true})).toBeVisible();
     assert.deepEqual(hits.slice(start),['/api/site/search/suggestions']);
     await page.getByRole('button',{name:'取消',exact:true}).click();
     suggestionsVersion=2;start=hits.length;
     await page.getByRole('button',{name:'搜索',exact:true}).click();
-    await expect(page.getByRole('link',{name:'1 建议版本 2',exact:true})).toBeVisible();
+    await expect(page.getByRole('link',{name:'建议版本 2',exact:true})).toBeVisible();
     assert.deepEqual(hits.slice(start),['/api/site/search/suggestions']);
     await page.getByRole('button',{name:'取消',exact:true}).click();
     failing='/api/site/search/suggestions';await page.getByRole('button',{name:'搜索',exact:true}).click();
-    await expect(page.getByRole('link',{name:'1 建议版本 2',exact:true})).not.toBeVisible();
+    await expect(page.getByRole('link',{name:'建议版本 2',exact:true})).not.toBeVisible();
     await page.getByRole('button',{name:'取消',exact:true}).click();failing='';suggestionsVersion=3;
     await page.getByRole('button',{name:'搜索',exact:true}).click();
-    await expect(page.getByRole('link',{name:'1 建议版本 3',exact:true})).toBeVisible();
+    await expect(page.getByRole('link',{name:'建议版本 3',exact:true})).toBeVisible();
   }finally{failing='';await context.close();}
 });
 

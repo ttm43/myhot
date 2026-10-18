@@ -4,4 +4,3 @@ import { config } from "../config.ts";
 // may send a different Host to the origin.
 export const siteUrl = (path: string): string => `${config.siteUrl}${path}`;
 export const itemUrl = (id: string): string => siteUrl(`/items/${id}`);
-export const storyUrl = (publicId: string): string => siteUrl(`/story/${publicId}`);

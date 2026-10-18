@@ -14,7 +14,6 @@ import { PillTabs } from "../components/ui/Tabs";
 import { ArticleLayout, RailSection } from "../components/ui/Page";
 import { Menu, MenuItem } from "../components/ui/Menu";
 import { GroupButton, GroupSources } from "../features/feed/ReadingGroup";
-import { StoryFollowups } from "../features/item/StoryFollowups";
 import { MediaGallery } from "../features/item/MediaGallery";
 import { QuotedPost } from "../features/item/QuotedPost";
 import { ArticleBody } from "../features/item/ArticleBody";
@@ -338,8 +337,6 @@ function ItemView({ item }: { item: SiteItemDetail }) {
   const showOutline = item.outline.length >= 3;
   const originalLabel = isX ? "在 X 查看原推" : "打开原文";
 
-  const related = item.relatedStories.filter((s) => s.publicId !== item.story?.publicId);
-
   const back = () => {
     if (window.history.state?.idx > 0) navigate(-1);
     else navigate(item.selected ? "/" : "/all");
@@ -589,22 +586,6 @@ function ItemView({ item }: { item: SiteItemDetail }) {
             </div>
           )}
 
-          {item.story && <StoryFollowups story={item.story} currentId={item.id} />}
-
-          {related.length > 0 && (
-            <section className="mt-8">
-              <h2 className="mb-2 text-[14px] font-semibold text-ink">相关事件</h2>
-              <ul className="divide-y divide-line-soft">
-                {related.map((s) => (
-                  <li key={s.publicId}>
-                    <Link viewTransition to={`/story/${s.publicId}`} className="block py-2.5 text-[14px] text-ink-2 hover:text-accent">
-                      {s.title}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
         </article>
       </ArticleLayout>
 

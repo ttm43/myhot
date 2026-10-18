@@ -19,8 +19,6 @@ export default [
   route("search-busy", "routes/search-busy.tsx", { id: "search-busy" }),
   route("items/:id", "routes/item.tsx"),
   route("items/:id/original", "routes/item-original.tsx", { id: "item-original" }),
-  route("hot", "routes/hot.tsx"),
-  route("story/:publicId", "routes/story.tsx"),
   route("topics", "routes/topics.tsx"),
   route("topics/:slug", "routes/topic.tsx", { id: "topic" }),
   route("topics/:slug/page/:page", "routes/topic.tsx", { id: "topic-page" }),

@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { after, test } from 'node:test';
 import { sql, closeDb } from '@aihot/backend/db';
 import { candidateViews, recallFacts, relatedPosts } from '@aihot/backend/events/recall';
-import { consolidate, linkRelatedStories } from '@aihot/backend/events/consolidate';
+import { consolidate } from '@aihot/backend/events/consolidate';
 const prompts: string[] = [];
 const provider = await stub((_hit,request) => {
   prompts.push(JSON.parse(request.body).messages[1].content);
@@ -19,7 +19,7 @@ after(async()=>{await provider.close(); await closeDb();});
 async function fixture() {
   const key=randomUUID();
   await sql`INSERT INTO sources(id,name,kind,tier,participation_mode) VALUES(${key},'Withdrawal fixture','rss','T1','editorial')`;
-  const [story]=await sql`INSERT INTO stories(public_id,title,first_report_at,latest_at) VALUES(${key},${key},now(),now()) RETURNING id`;
+  const [story]=await sql`INSERT INTO stories(public_id,title) VALUES(${key},${key}) RETURNING id`;
   const [fact]=await sql`INSERT INTO facts(public_id,story_id,title) VALUES(${key},${story.id},${key}) RETURNING id`;
   return {key,storyId:Number(story.id),factId:Number(fact.id)};
 }
@@ -79,21 +79,4 @@ test('later story comparison uses an active root report instead of its withdrawn
 test('an all-withdrawn story supplies no material for a new paid story comparison',async()=>{
   const a=await fixture(),b=await fixture(); await report(a,'withdrawn story','withdrawn'); await report(b,'active story','public');
   prompts.length=0; assert.deepEqual(await consolidate([a.storyId,b.storyId]),[]); assert.equal(prompts.length,0);
-});
-
-test('withdrawn bridge reports cannot create a new related link, while saved links remain',async()=>{
-  const a=await fixture(),b=await fixture(); await report(b,'other live event','public');
-  const reports=[];
-  for(const label of ['bridge one','bridge two']) {
-    const r=await report(a,label,'withdrawn'); reports.push(r);
-    await sql`INSERT INTO grouping_decisions(article_id,verdict,candidates) VALUES(${r.id},'new-story',${sql.json([{id:b.factId,relation:'SAME_STORY',confidence:1}])})`;
-  }
-  await linkRelatedStories();
-  const before=await sql`SELECT * FROM story_links WHERE story_id=${a.storyId} AND other_id=${b.storyId}`; assert.equal(before.length,0);
-  for(const r of reports) await sql`UPDATE publications SET visibility='public' WHERE article_id=${r.id}`;
-  await linkRelatedStories();
-  const restored=await sql`SELECT * FROM story_links WHERE story_id=${a.storyId} AND other_id=${b.storyId}`; assert.equal(restored.length,1);
-  for(const r of reports) await sql`UPDATE publications SET visibility='withdrawn' WHERE article_id=${r.id}`;
-  await linkRelatedStories();
-  const history=await sql`SELECT * FROM story_links WHERE story_id=${a.storyId} AND other_id=${b.storyId}`; assert.equal(history.length,1);
 });

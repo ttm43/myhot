@@ -51,7 +51,7 @@ test("retired schedules leave the current overview and execution queues while li
     assert.equal((await sql`SELECT id FROM pgboss.job WHERE name = ${name}`).length, 1);
   }
   // An engine timer may also finish during this test; its result must not affect the fixture checks.
-  await sql`INSERT INTO job_runs (job, status, finished_at) VALUES ('hot.rank', 'failed', now())`;
+  await sql`INSERT INTO job_runs (job, status, finished_at) VALUES ('content.sweep', 'failed', now())`;
   const overview = await runsOverview();
   const fixtureNames = new Set([...retired, "cron.kept", "cron.renamed.new"].map((name) => name.slice("cron.".length)));
   const jobs = overview.jobs.filter((j) => fixtureNames.has(j.job));

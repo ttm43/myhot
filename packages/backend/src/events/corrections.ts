@@ -7,15 +7,13 @@ import { sql, type Db, type Tx } from "../db.ts";
 import { enqueue, QUEUES } from "../jobs/queue.ts";
 import { groupingReset } from "../content/provenance.ts";
 import { publishArticle, publishArticleTx } from "../publication/publish.ts";
-import { recordSignal, resetAutomatic } from "./group.ts";
-import { composeStoryDigest } from "./digest.ts";
+import { lockCurrentStory, resetAutomatic } from "./group.ts";
 import { mergeStoryInto } from "./merge.ts";
 import { emit } from "../modules.ts";
 
 /**
  * Takes an article out of its fact; it is shown on its own again and stays that way (automatic
- * grouping, retries and later revisions do not re-attach it; an explicit regroup does). Its heat
- * evidence leaves the old story, whose digest is rewritten.
+ * grouping, retries and later revisions do not re-attach it; an explicit regroup does).
  */
 export async function detachFromFact(id: string, reason: string, actor: string) {
   const { facts, stories } = await sql.begin(async (tx) => {
@@ -24,8 +22,7 @@ export async function detachFromFact(id: string, reason: string, actor: string) 
     const removed = await tx<{ fact_id: number }[]>`DELETE FROM fact_articles WHERE article_id = ${id} RETURNING fact_id`;
     const factIds = removed.map((r) => r.fact_id);
     const storyRows = factIds.length ? await tx<{ story_id: number }[]>`SELECT DISTINCT story_id FROM facts WHERE id = ANY(${factIds}) AND story_id IS NOT NULL` : [];
-    const signals = await tx<{ story_id: number }[]>`DELETE FROM story_signals WHERE article_id = ${id} RETURNING story_id`;
-    const storyIds = [...new Set([...storyRows, ...signals].map((r) => r.story_id))];
+    const storyIds = [...new Set(storyRows.map((r) => r.story_id))];
     await tx`INSERT INTO grouping_overrides (article_id, reason, actor) VALUES (${id}, ${reason}, ${actor})
              ON CONFLICT (article_id) DO UPDATE SET reason = EXCLUDED.reason, actor = EXCLUDED.actor, created_at = now()`;
     await tx`UPDATE articles SET grouped_at = now(), grouping_status = 'complete', grouping_receipt_id = NULL, grouping_error = NULL, selection_adds_value = true, selection_value_reason = NULL WHERE id = ${id}`;
@@ -37,7 +34,6 @@ export async function detachFromFact(id: string, reason: string, actor: string) 
     const others = await sql<{ article_id: string }[]>`SELECT DISTINCT article_id FROM fact_articles WHERE fact_id = ANY(${facts})`;
     for (const o of others) await publishArticle(o.article_id);
   }
-  for (const storyId of stories) await enqueue(QUEUES.digest, { storyId }, { singletonKey: `story:${storyId}` });
   await audit(actor, "content.detach", `content:${id}`, reason, { facts, stories }, null);
   return { detached: facts.length };
 }
@@ -45,13 +41,13 @@ export async function detachFromFact(id: string, reason: string, actor: string) 
 /**
  * Puts an article into the fact an editor names, as one of its reports, and keeps it there: the
  * membership is manual, so automatic grouping, retries and later revisions leave it alone. The
- * article leaves the facts it was a report of (mentions stay); its heat evidence follows it to the
- * fact's story, and a story left without any report redirects there.
+ * article leaves the facts it was a report of (mentions stay), and a story left without any report
+ * merges into the fact's story.
  */
 export async function moveToFact(id: string, factPublicId: string, reason: string, actor: string) {
   const moved = await sql.begin(async (tx) => {
     // The grouping job writes under the same lock and reads this decision again before it does.
-    const [article] = await tx<{ source_id: string; at: Date }[]>`SELECT source_id, coalesce(published_at, discovered_at) AS at FROM articles WHERE id = ${id} FOR UPDATE`;
+    const [article] = await tx<{ at: Date }[]>`SELECT coalesce(published_at, discovered_at) AS at FROM articles WHERE id = ${id} FOR UPDATE`;
     if (!article) return null;
     const [target] = await tx<{ id: number; story_id: number }[]>`
       SELECT f.id, f.story_id FROM facts f JOIN stories st ON st.id = f.story_id WHERE f.public_id = ${factPublicId} AND st.merged_into IS NULL`;
@@ -65,9 +61,7 @@ export async function moveToFact(id: string, factPublicId: string, reason: strin
     await tx`DELETE FROM grouping_overrides WHERE article_id = ${id}`;
     await tx`INSERT INTO fact_articles (fact_id, article_id, role, evidence, manual, created_at)
              VALUES (${target.id}, ${id}, 'report', ${removed.find((r) => r.evidence)?.evidence ?? null}, true, ${article.at})`;
-    await tx`DELETE FROM story_signals WHERE article_id = ${id} AND story_id <> ${target.story_id}`;
-    const [source] = await tx<{ id: string; signal_group_id: string | null }[]>`SELECT id, signal_group_id FROM sources WHERE id = ${article.source_id}`;
-    await recordSignal(tx, target.story_id, id, source!, "editorial", article.at);
+    await lockCurrentStory(tx, target.story_id);
     await tx`UPDATE articles SET grouped_at = now(), grouping_status = 'complete', grouping_receipt_id = NULL, grouping_error = NULL, selection_adds_value = true, selection_value_reason = NULL WHERE id = ${id}`;
     return { fact: Number(target.id), story: Number(target.story_id), facts, stories };
   });
@@ -80,10 +74,8 @@ export async function moveToFact(id: string, factPublicId: string, reason: strin
   }
   for (const storyId of moved.stories) {
     const [left] = await sql`SELECT 1 FROM facts f JOIN fact_articles fa ON fa.fact_id = f.id WHERE f.story_id = ${storyId} AND fa.role IN ('primary', 'report') LIMIT 1`;
-    if (!left && (await mergeStoryInto(storyId, moved.story, `报道已全部移走，旧地址跳到报道所在事件（最后一篇 ${id}）`, actor))) continue;
-    await enqueue(QUEUES.digest, { storyId }, { singletonKey: `story:${storyId}` });
+    if (!left) await mergeStoryInto(storyId, moved.story, `报道已全部移走，旧事件并入报道所在事件（最后一篇 ${id}）`, actor);
   }
-  await enqueue(QUEUES.digest, { storyId: moved.story }, { singletonKey: `story:${moved.story}` });
   await audit(actor, "content.move", `content:${id}`, reason, { facts: moved.facts, stories: moved.stories }, { fact: moved.fact, story: moved.story });
   return { fact: moved.fact, story: moved.story, left: moved.facts.length };
 }
@@ -99,20 +91,8 @@ export async function mergeStories(fromId: number, intoId: number, reason: strin
 }
 
 /**
- * Writes one story's digest again from its current reports with the current prompt (after the digest
- * prompt changed). Unchanged prompt and reports reuse the paid answer; the model call happens here.
- */
-export async function rewriteStoryDigest(storyId: number, reason: string, actor: string) {
-  const [before] = await sql<{ digest: string | null; version: number }[]>`SELECT digest, version FROM stories WHERE id = ${storyId} AND merged_into IS NULL`;
-  if (!before) throw new Error("story not found");
-  const result = await composeStoryDigest(storyId, { rewrite: true });
-  await audit(actor, "story.rewrite-digest", `story:${storyId}`, reason, before, result);
-  return result;
-}
-
-/**
  * An explicit regroup: it replaces an earlier "keep standalone" decision and drops the automatic
- * membership and heat evidence now (manual memberships stay and still win), so until its grouping job
+ * membership now (manual memberships stay and still win), so until its grouping job
  * decides again the report stands on its own and is evidence for no other. The same request id
  * queues one job.
  */

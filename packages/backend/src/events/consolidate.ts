@@ -1,7 +1,6 @@
 // Story consolidation (group.ts calls it after a decision). Stories a report is firmly tied to may be
 // one story that grew two roots: their roots are compared directly and merge only when both models
-// see one story. Stories that stay apart though reports keep tying them list each other as related
-// events (linkRelatedStories, hourly).
+// see one story.
 import { modelFor } from "../editorial/models.ts";
 import { beijingDate } from "@aihot/contracts/time";
 import { sql } from "../db.ts";
@@ -9,10 +8,9 @@ import { chatJson } from "../providers/llm.ts";
 import { completeReceipt } from "../providers/receipts.ts";
 import { groupingEvidenceCondition } from "../publication/scope.ts";
 import { mergeStoryInto } from "./merge.ts";
-import { RECALL_DAYS, rootFactOf } from "./recall.ts";
-import { RELATED_MIN_REPORTS } from "./related.ts";
+import { rootFactOf } from "./recall.ts";
 import {
-  PAIR_SYSTEM, PairSchema, RELATE_PROMPT_VERSION, STORY_REVIEW_MIN_CONFIDENCE, TIE_MIN_CONFIDENCE, firmlyTied, pairUser,
+  PAIR_SYSTEM, PairSchema, RELATE_PROMPT_VERSION, STORY_REVIEW_MIN_CONFIDENCE, firmlyTied, pairUser,
   type Relation, type ReportView,
 } from "./relate.ts";
 
@@ -118,51 +116,4 @@ export async function consolidate(storyIds: number[]): Promise<Consolidation[]> 
     out.push({ ...base, merge, first: first.relation, second: second.relation, difference: first.difference || second.difference });
   }
   return out;
-}
-
-/**
- * A multi-topic digest is a report of the story's root fact (digests now only mention facts, so this
- * marks older stories; one that mentions the root does not count): the story is neither merged nor
- * linked.
- */
-const startedByRoundup = (story: ReturnType<typeof sql>) => sql`EXISTS (
-  SELECT 1 FROM fact_articles r JOIN grouping_decisions d ON d.article_id = r.article_id AND d.verdict = 'roundup'
-  WHERE r.fact_id = ${rootFactOf(story)} AND r.role <> 'mention' AND ${groupingEvidenceCondition(sql`r.article_id`)})`;
-
-/**
- * Stories that stay apart although reports tie them (a reaction, a development of a later fact, a
- * comparison) list each other as related events: at least two reports decided in the recall window,
- * each firmly tied to a fact of the other story, none of them a roundup, neither story started by
- * one. A single tie is too often a stray answer about one candidate among many. Links are only
- * added; public reads check saved bridge evidence after explicit changes, independently of the
- * recall window. A merged story drops out where links are read.
- */
-export async function linkRelatedStories(): Promise<{ added: number }> {
-  const [row] = await sql<{ added: number }[]>`
-    WITH latest AS (
-      SELECT DISTINCT ON (article_id) article_id, verdict, candidates FROM grouping_decisions
-      WHERE created_at > now() - make_interval(days => ${RECALL_DAYS}) ORDER BY article_id, id DESC),
-    ties AS (
-      SELECT DISTINCT l.article_id, own.story_id AS a, other.story_id AS b
-      FROM latest l
-      JOIN fact_articles fa ON fa.article_id = l.article_id AND fa.role IN ('primary', 'report') AND ${groupingEvidenceCondition(sql`fa.article_id`)}
-      JOIN facts own ON own.id = fa.fact_id
-      CROSS JOIN LATERAL jsonb_array_elements(l.candidates) c
-      JOIN facts other ON other.id = (c->>'id')::bigint
-      WHERE l.verdict IN ('same-fact', 'same-url', 'new-fact-in-story', 'new-story')
-        AND c->>'relation' IN ('SAME_OCCURRENCE', 'SAME_STORY') AND (c->>'confidence')::numeric >= ${TIE_MIN_CONFIDENCE}
-        AND other.story_id <> own.story_id),
-    pairs AS (
-      SELECT least(a, b) AS x, greatest(a, b) AS y FROM ties GROUP BY 1, 2 HAVING count(DISTINCT article_id) >= ${RELATED_MIN_REPORTS}),
-    linked AS (
-      SELECT p.x, p.y FROM pairs p
-      JOIN stories sx ON sx.id = p.x AND sx.merged_into IS NULL
-      JOIN stories sy ON sy.id = p.y AND sy.merged_into IS NULL
-      WHERE NOT ${startedByRoundup(sql`p.x`)} AND NOT ${startedByRoundup(sql`p.y`)}),
-    added AS (
-      INSERT INTO story_links (story_id, other_id, relation)
-      SELECT x, y, 'related' FROM linked UNION ALL SELECT y, x, 'related' FROM linked
-      ON CONFLICT (story_id, other_id) DO NOTHING RETURNING 1)
-    SELECT count(*)::int AS added FROM added`;
-  return { added: row?.added ?? 0 };
 }

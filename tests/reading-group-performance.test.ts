@@ -4,7 +4,6 @@ import { randomUUID } from 'node:crypto';
 import { after, test } from 'node:test';
 import { sql, closeDb } from '@aihot/backend/db';
 import { loadTimeline } from '@aihot/backend/publication/timeline';
-import { loadStoryFollowups } from '@aihot/backend/publication/followups';
 
 const key = `group${tag()}`;
 const storyPublicId = randomUUID();
@@ -45,8 +44,6 @@ test('selected news keeps each fact at its first appearance under its representa
   const firstNews=await loadTimeline({channel:'all',category:null,tag:key,now,limit:1});
   const secondNews=await loadTimeline({channel:'all',category:null,tag:key,now,limit:1,cursor:firstNews.nextCursor});
   assert.deepEqual([...firstNews.cards,...secondNews.cards].map(c=>c.item.id),timeline.cards.map(c=>c.item.id));
-  const followups=await loadStoryFollowups(storyPublicId,now);
-  assert.deepEqual(followups!.items.map(i=>i.representative.id),[`${key}-1-2`,`${key}-0-2`],'each fact by its representative, the latest first');
   await sql`UPDATE publications SET visibility='withdrawn' WHERE article_id=${key+'-1-2'}`;
-  assert.deepEqual((await loadStoryFollowups(storyPublicId,now))!.items.map(i=>i.representative.id),[`${key}-1-0`,`${key}-0-2`],'a withdrawn representative gives way');
+  assert.deepEqual((await loadTimeline({channel:'all',category:null,tag:key,now})).cards.map(c=>c.item.id),[`${key}-1-0`,`${key}-0-2`],'a withdrawn representative gives way');
 });

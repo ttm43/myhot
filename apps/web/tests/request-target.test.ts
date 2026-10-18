@@ -11,7 +11,7 @@ const api = createServer((req, res) => {
   upstreamPaths.push(req.url ?? "");
   res.setHeader("Content-Type", "application/json");
   if (req.url?.startsWith("/api/site/timeline")) return res.end(JSON.stringify({
-    cards: [], nextCursor: null, dayCounts: {}, hot: [], filters: { category: null, channel: null, tag: null },
+    cards: [], nextCursor: null, dayCounts: {}, filters: { category: null, channel: null, tag: null },
   }));
   res.writeHead(404);
   res.end("{}");

@@ -203,7 +203,7 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
                   </div>
                   {m.story_public_id && (
                     <div className="mt-0.5">
-                      事件 <a className="text-accent" href={`/story/${m.story_public_id}`} target="_blank" rel="noreferrer">{m.story_title}</a> <span className="font-mono text-[12px] text-ink-4">#{m.story_id}</span>
+                      事件 {m.story_title} <span className="font-mono text-[12px] text-ink-4">#{m.story_id}</span>
                     </div>
                   )}
                 </div>

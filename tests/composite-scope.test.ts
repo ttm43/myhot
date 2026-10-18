@@ -13,8 +13,8 @@ after(closeDb);
 test("latest scope stays correlated to an outer x membership and candidate counts", async () => {
   const source = `scope-${tag()}`;
   await sql`INSERT INTO sources (id,name,kind,tier,participation_mode) VALUES (${source}, 'Scope fixture', 'rss', 'T1', 'editorial')`;
-  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id,title,first_report_at,latest_at)
-    VALUES (${randomUUID()}, 'An event', now(), now()) RETURNING id`;
+  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id,title)
+    VALUES (${randomUUID()}, 'An event') RETURNING id`;
   const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id,story_id,title)
     VALUES (${randomUUID()}, ${story!.id}, 'An occurrence') RETURNING id`;
   const ids = ["single", "composite", "missing", "unknown"].map(s => `${source}-${s}`);

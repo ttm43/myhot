@@ -27,16 +27,13 @@ type Step = "extract" | "analyze";
 
 interface Route {
   step: Step;
-  /** Not an editorial source: no analysis; the post goes straight to event grouping as discussion evidence. */
-  signal: boolean;
   historical: boolean;
 }
 
 /**
  * The article's next step: its body first while none is confirmed and the source asks for full text,
  * when there is only a title or a feed summary (the analysis judges the whole article), or when an X
- * post links an X Article (fetched before judging; a discussion post only while it is news, as
- * history adds no heat).
+ * post links an X Article (fetched before judging). Non-editorial posts are kept as collected.
  */
 async function route(articleId: string, db: Db): Promise<Route | null> {
   const [row] = await db<{ body_status: string; participation_mode: string; kind: string; config: Record<string, unknown>; url: string; bare: boolean; backfill: boolean; published_at: Date | null; discovered_at: Date }[]>`
@@ -49,21 +46,20 @@ async function route(articleId: string, db: Db): Promise<Route | null> {
   const pending = row.body_status === "pending";
   const wantsBody = row.config.fetchPublicContent === true || !!row.config.detail || row.kind === "web_list";
   const needsPage = !signal && pageFetchable(row.url, row.kind) && (wantsBody || row.bare);
-  const needsXArticle = row.kind === "x_search" && (!signal || (row.participation_mode === "hot_signal" && !historical));
-  return { step: pending && (needsPage || needsXArticle) ? "extract" : "analyze", signal, historical };
+  const needsXArticle = row.kind === "x_search" && !signal;
+  return { step: pending && (needsPage || needsXArticle) ? "extract" : "analyze", historical };
 }
 
 /**
  * Queue order (pg-boss serves higher priority first): live work before history, so a new source's
- * first import or a backfill never holds up today's news; discussion evidence waits behind reports
- * in the serial grouping queue, history behind both.
+ * first import or a backfill never holds up today's news.
  */
-const PRIORITY = { live: 0, liveSignal: -1, history: -2 } as const;
+const PRIORITY = { live: 0, history: -2 } as const;
 
 /**
  * The one way to hand an article to processing. `attemptTag` makes an explicit re-evaluation a new
  * (paid) request; the same tag reuses its receipt. With `db`, the job commits with the caller's write.
- * Posts of non-editorial sources skip the analysis queue: they only need recording and grouping.
+ * Posts of non-editorial sources go through the analysis queue too, which only records them.
  */
 export async function queueProcessing(articleId: string, opts: { step?: Step; attemptTag?: string; db?: Db } = {}): Promise<string | null> {
   const db = opts.db ?? sql;
@@ -77,26 +73,21 @@ export async function queueProcessing(articleId: string, opts: { step?: Step; at
   // Extraction and the sweep only carry articleId; retain the current evaluation's paid identity.
   const attemptTag = queued.processing_attempt_tag ?? undefined;
   if (step === "extract") return enqueue(QUEUES.extractBody, { articleId }, { singletonKey: articleId, priority: r.historical ? PRIORITY.history : PRIORITY.live }, opts.db);
-  if (r.signal && !attemptTag) {
-    return enqueue(QUEUES.group, { articleId, signalOnly: true }, { singletonKey: articleId, priority: r.historical ? PRIORITY.history : PRIORITY.liveSignal }, opts.db);
-  }
   const tagged = !!attemptTag;
   return enqueue(QUEUES.analyze, tagged ? { articleId, attemptTag } : { articleId },
     { singletonKey: tagged ? `manual:analyze:${articleId}:${attemptTag}` : articleId, priority: r.historical ? PRIORITY.history : PRIORITY.live }, opts.db);
 }
 
 /**
- * A post of a non-editorial source: recorded (hot_signal material only feeds heat; isolated material
- * never reaches public surfaces). Returns whether it is discussion evidence to group.
+ * A post of a non-editorial source: recorded as it was collected, never analysed or grouped (hot_signal
+ * material is kept for showing raw; isolated material never reaches public surfaces).
  */
-export async function settleNonEditorial(articleId: string): Promise<{ group: boolean }> {
-  const [row] = await sql<{ participation_mode: string; backfill: boolean; published_at: Date | null; discovered_at: Date }[]>`
+async function settleNonEditorial(articleId: string): Promise<void> {
+  const [row] = await sql`
     UPDATE articles a SET processing_state = 'skipped', processing_attempts = 0, processing_retry_at = NULL, processing_queued_at = NULL
     FROM sources s WHERE s.id = a.source_id AND a.id = ${articleId} AND s.participation_mode <> 'editorial'
-    RETURNING s.participation_mode, a.backfill, a.published_at, a.discovered_at`;
-  if (!row) return { group: false };
-  await publishArticle(articleId);
-  return { group: row.participation_mode === "hot_signal" && !isHistorical(row) };
+    RETURNING a.id`;
+  if (row) await publishArticle(articleId);
 }
 
 async function processingInput(articleId: string) {
@@ -122,9 +113,7 @@ export async function processArticle(articleId: string, opts: { attemptTag?: str
 
 async function processRevision(articleId: string, row: NonNullable<Awaited<ReturnType<typeof processingInput>>>, opts: { attemptTag?: string }): Promise<{ state: string }> {
   if (row.participation_mode !== "editorial") {
-    // Normally queued straight for grouping (queueProcessing); an explicit re-evaluation lands here.
-    const { group } = await settleNonEditorial(articleId);
-    if (group) await enqueue(QUEUES.group, { articleId, signalOnly: true }, { singletonKey: articleId, priority: PRIORITY.liveSignal });
+    await settleNonEditorial(articleId);
     return { state: "skipped" };
   }
   try {

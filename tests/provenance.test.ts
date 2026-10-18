@@ -10,7 +10,7 @@ import { publisherOwnsUrl } from "@aihot/backend/content/provenance";
 import { publishArticle } from "@aihot/backend/publication/publish";
 import { loadPool } from "@aihot/backend/publication/pool";
 import { ingestItems } from "@aihot/backend/ingest/items";
-import { queueProcessing, settleNonEditorial } from "@aihot/backend/jobs/content";
+import { processArticle, queueProcessing } from "@aihot/backend/jobs/content";
 import { collectSource } from "@aihot/backend/sources/collect";
 import { createSource, updateSource } from "@aihot/backend/admin/sources";
 import { groupArticle } from "@aihot/backend/events/group";
@@ -24,7 +24,7 @@ async function source(tier: string, config = {}, firstParty = tier === "T1", opt
   return id;
 }
 
-const jobs = (articleId: string) => sql<{ name: string; data: { signalOnly?: boolean } }[]>`
+const jobs = (articleId: string) => sql<{ name: string }[]>`
   SELECT name, data FROM pgboss.job WHERE data->>'articleId' = ${articleId} AND name IN (${QUEUES.extractBody}, ${QUEUES.analyze}, ${QUEUES.group})`;
 
 test("the first external discovery uses a paused verified publisher, keeps the real discovery and queues extraction once", async () => {
@@ -49,8 +49,8 @@ test("a repeated signal discovery adopts a newly registered publisher and resume
   const url = `${scope}/release`;
   const first = await upsertMaterial({ sourceId: signal, url, title: "Original", bodyText: "Preserved body", via: "fetch", publishedAt: new Date() });
   await queueProcessing(first.articleId);
-  assert.deepEqual((await jobs(first.articleId)).map((j) => [j.name, j.data.signalOnly]), [[QUEUES.group, true]]);
-  assert.equal((await settleNonEditorial(first.articleId)).group, true);
+  assert.deepEqual((await jobs(first.articleId)).map((j) => j.name), [QUEUES.analyze]);
+  assert.equal((await processArticle(first.articleId)).state, "skipped", "a non-editorial post is only recorded");
   const [before] = await sql`SELECT * FROM articles WHERE id = ${first.articleId}`;
   const official = await source("T1", { publisherUrlPrefixes: [scope] }, true, { enabled: false });
   const input = { sourceId: signal, items: [{ url, title: "Changed signal headline" }] };
@@ -60,24 +60,23 @@ test("a repeated signal discovery adopts a newly registered publisher and resume
   for (const key of ["revision", "content_hash", "title", "body_text", "published_at", "discovered_at", "timeline_at"]) assert.deepEqual(a![key], before![key], key);
   assert.equal(a!.source_id, official);
   assert.equal(a!.processing_state, "new", "a previously settled signal still needs editorial judgement");
-  assert.deepEqual((await jobs(first.articleId)).map((j) => j.name).sort(), [QUEUES.analyze, QUEUES.group].sort());
-  assert.equal((await settleNonEditorial(first.articleId)).group, false, "the old signal job will stop after attribution changes");
+  assert.deepEqual((await jobs(first.articleId)).map((j) => j.name), [QUEUES.analyze]);
   assert.deepEqual((await sql`SELECT source_id, via FROM article_discoveries WHERE article_id = ${first.articleId} ORDER BY via`).map((d) => [d.source_id, d.via]), [[signal, "fetch"], [signal, "ingest"]]);
   const revised = await upsertMaterial({ sourceId: official, url, title: "Publisher edit", bodyText: "Actual publisher update", via: "fetch" });
   assert.equal(revised.revised, true, "subsequent material changes from the verified publisher still work");
 });
 
-// Failure modes: a completed heat-only decision is mistaken for news confirmation when a publisher
+// Failure modes: a completed non-editorial grouping is mistaken for news confirmation when a publisher
 // is adopted or a whole source becomes editorial; clearing it must not discard an existing editorial
 // judgement. A newly scored candidate must remain unselected until its news identity is confirmed.
-for (const entrance of ["publisher", "source-mode"] as const) test(`${entrance} promotion cannot reuse a signal-only grouping as news confirmation`, async () => {
+for (const entrance of ["publisher", "source-mode"] as const) test(`${entrance} promotion cannot reuse a non-editorial grouping as news confirmation`, async () => {
   const scope = `https://${tag()}.example/news`;
   const signal = await source("T1", {}, true, { mode: "hot_signal" });
   const make = async (name: string) => (await upsertMaterial({ sourceId: signal, url: `${scope}/${name}`,
     title: `Release ${name}`, bodyText: "Preserved original material", via: "fetch", publishedAt: new Date() })).articleId;
   const fresh = await make("new");
-  await settleNonEditorial(fresh);
-  assert.equal((await groupArticle(fresh, { signalOnly: true })).verdict, "signal-unmatched");
+  await processArticle(fresh);
+  assert.equal((await groupArticle(fresh)).verdict, "skipped");
   const judged = await make("already-judged");
   await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,title_zh,summary_zh,selected)
     VALUES (${judged},1,'rule','pass','已判断的报道','既有精选已经覆盖全部要点',true)`;
@@ -119,7 +118,7 @@ test("attribution reuses an existing current-revision editorial judgement even a
   await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, title_zh, summary_zh, score, selected)
     VALUES (${articleId}, 1, 'replay', 'pass', '发布', '摘要', 85, true)`;
   await sql`UPDATE sources SET participation_mode = 'hot_signal' WHERE id = ${media}`;
-  await settleNonEditorial(articleId);
+  await processArticle(articleId);
   await source("T1", { publisherUrlPrefixes: [scope] });
   const result = await upsertMaterial({ sourceId: media, url, title: "Changed discovery", via: "fetch" });
   assert.equal(result.processingNeeded, undefined);

@@ -2,7 +2,7 @@
 // with the feed filters they carry. The site's name and wording come from site/site.ts;
 //; its address from SITE_URL.
 import type { MetaDescriptor } from "react-router";
-import type { StoryDetail, TimelineFilters } from "@aihot/contracts/site";
+import type { TimelineFilters } from "@aihot/contracts/site";
 import { isCategoryKey, isChannelKey } from "@aihot/contracts/taxonomy";
 import { SITE, subjectAfter, withSubject } from "@aihot/site";
 
@@ -193,36 +193,6 @@ export function articleLd(input: { path: string; headline: string; description?:
     author: orgRef(),
     publisher: orgRef(),
     ...(input.basedOn ? { isBasedOn: input.basedOn } : {}),
-  };
-}
-
-/** The event page collects public reports; their publication times do not date the page itself. */
-export function storyLd(story: StoryDetail) {
-  const base = siteUrl();
-  const url = `${base}/story/${story.publicId}`;
-  const description = story.digest ?? story.summary ?? story.excerpt?.text;
-  const updated = [story.latestAt, story.digest ? story.digestUpdatedAt : null]
-    .filter((at): at is string => !!at).sort((a, b) => Date.parse(b) - Date.parse(a))[0];
-  const reports = [...story.timeline].sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-  return {
-    "@context": "https://schema.org",
-    "@type": "CollectionPage",
-    "@id": `${url}#collection`,
-    url,
-    name: story.title,
-    ...(description ? { description } : {}),
-    inLanguage: SITE.locale,
-    isPartOf: { "@id": `${base}/#website` },
-    ...(updated ? { dateModified: updated } : {}),
-    ...(reports.length ? {
-      mainEntity: {
-        "@type": "ItemList",
-        name: "报道时间线",
-        itemListOrder: "https://schema.org/ItemListOrderDescending",
-        numberOfItems: reports.length,
-        itemListElement: reports.map((report, index) => ({ "@type": "ListItem", position: index + 1, name: report.title })),
-      },
-    } : {}),
   };
 }
 

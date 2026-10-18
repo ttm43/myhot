@@ -21,9 +21,9 @@ function summaryOf(id: string, title: string, timelineAt = at): FeedItemSummary 
 function detailOf(id: string, title: string): SiteItemDetail {
   return {
     ...summaryOf(id, title), x: null, originalTitle: title, links: { original: "https://example.org/article" }, discoveredAt: at,
-    story: null, readingMode: "full", author: null,
+    readingMode: "full", author: null,
     body: { zh: "<p>固定正文</p>", original: null, zhKind: "translation", complete: true },
-    outline: [], relatedStories: [], topics: [], markdownAvailable: true, group: null,
+    outline: [], topics: [], markdownAvailable: true, group: null,
     hasTranslation: true, bodyLanguage: "zh",
   };
 }
@@ -48,26 +48,25 @@ const api = createServer((req, res) => {
   if (p === "/api/site/track") { res.statusCode = 204; return res.end(); }
   if (p === "/api/health") return res.end("{}");
   if (p === "/api/site/topics") return res.end(JSON.stringify({ groups: [], topics: [] }));
-  if (p === "/api/site/hot") return res.end(JSON.stringify({ computedAt: at, windowHours: 48, entries: [] }));
   if (p === "/api/site/timeline") {
     const tag = url.searchParams.get("tag");
     const cursor = url.searchParams.get("cursor");
     if (tag === "boundary") {
       boundaryRequests++;
       const n = cursor ? Number(cursor) : 1;
-      return res.end(JSON.stringify({ filters: { channel: "all", category: null, tag }, cards: [card(`boundary-${n}`, `批次 ${n}`)], nextCursor: n < 5 ? String(n + 1) : null, hot: null, dayCounts: { "2026-10-04": 5 } }));
+      return res.end(JSON.stringify({ filters: { channel: "all", category: null, tag }, cards: [card(`boundary-${n}`, `批次 ${n}`)], nextCursor: n < 5 ? String(n + 1) : null, dayCounts: { "2026-10-04": 5 } }));
     }
     if (tag === "group") {
-      return res.end(JSON.stringify({ filters: { channel: "all", category: null, tag: "group" }, cards: [groupCard, readGroupCard], nextCursor: null, hot: null, dayCounts: { "2026-10-04": 2 } }));
+      return res.end(JSON.stringify({ filters: { channel: "all", category: null, tag: "group" }, cards: [groupCard, readGroupCard], nextCursor: null, dayCounts: { "2026-10-04": 2 } }));
     }
     if (tag === "read") {
-      return res.end(JSON.stringify({ filters: { channel: "all", category: null, tag: "read" }, cards: [card("c1", "第一页文章甲")], nextCursor: null, hot: null, dayCounts: { "2026-10-04": 1 } }));
+      return res.end(JSON.stringify({ filters: { channel: "all", category: null, tag: "read" }, cards: [card("c1", "第一页文章甲")], nextCursor: null, dayCounts: { "2026-10-04": 1 } }));
     }
     if (cursor === "p2") {
       if (failNextPage) { res.statusCode = 503; return res.end(JSON.stringify({ code: "unavailable" })); }
-      return res.end(JSON.stringify({ filters: { channel: "all", category: null, tag: null }, cards: [card("c3", "第二页文章甲", earlier), card("c4", "第二页文章乙", earlier)], nextCursor: null, hot: null, dayCounts: { "2026-10-03": 2 } }));
+      return res.end(JSON.stringify({ filters: { channel: "all", category: null, tag: null }, cards: [card("c3", "第二页文章甲", earlier), card("c4", "第二页文章乙", earlier)], nextCursor: null, dayCounts: { "2026-10-03": 2 } }));
     }
-    return res.end(JSON.stringify({ filters: { channel: "all", category: null, tag: null }, cards: [card("c1", "第一页文章甲"), card("c2", "第一页文章乙")], nextCursor: "p2", hot: null, dayCounts: { "2026-10-04": 2 } }));
+    return res.end(JSON.stringify({ filters: { channel: "all", category: null, tag: null }, cards: [card("c1", "第一页文章甲"), card("c2", "第一页文章乙")], nextCursor: "p2", dayCounts: { "2026-10-04": 2 } }));
   }
   if (p.startsWith("/api/site/items/")) {
     const id = p.split("/").at(-1)!;

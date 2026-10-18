@@ -78,8 +78,8 @@ test("public routes read content only through the public read layer", () => {
 const OWNERS: Record<string, string> = {
   publications: "publication/", pool_search: "publication/",
   receipts: "providers/receipts.ts", receipt_attempts: "providers/receipts.ts",
-  facts: "events/", fact_articles: "events/", stories: "events/", story_signals: "events/", story_aliases: "events/", story_links: "events/",
-  story_digests: "events/", grouping_decisions: "events/", grouping_overrides: "events/",
+  facts: "events/", fact_articles: "events/", stories: "events/", story_aliases: "events/",
+  grouping_decisions: "events/", grouping_overrides: "events/",
   audit_log: "audit.ts",
 };
 

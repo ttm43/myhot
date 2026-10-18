@@ -44,7 +44,7 @@ async function report(source: string, opts: { selected: boolean; hoursAgo: numbe
 }
 
 test("a folded card's other sources are those of the fact its representative reports", async () => {
-  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, first_report_at, latest_at) VALUES (${randomUUID()}, ${`S-${T}`}, now(), now()) RETURNING id`;
+  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title) VALUES (${randomUUID()}, ${`S-${T}`}) RETURNING id`;
   const [leak] = await sql<{ id: number; public_id: string }[]>`INSERT INTO facts (public_id, story_id, title) VALUES (${`leak-${T}`}, ${story!.id}, '疑似泄露') RETURNING id, public_id`;
   const [launch] = await sql<{ id: number; public_id: string }[]>`INSERT INTO facts (public_id, story_id, title) VALUES (${`launch-${T}`}, ${story!.id}, '正式发布') RETURNING id, public_id`;
   // The leak came first and was not selected; the launch has an official and a media report.

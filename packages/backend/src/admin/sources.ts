@@ -123,7 +123,6 @@ const EDITABLE = z
     interval_minutes: z.number().int().min(1).max(1440),
     tier: z.enum(["T1", "T1_5", "T2", "EXCLUDE_MP"]),
     participation_mode: z.enum(["editorial", "hot_signal", "isolated"]),
-    signal_group_id: z.string().max(120).nullable(),
     first_party: z.boolean(),
     owner_entity_id: z.string().max(120).nullable(),
     site_fulltext: z.boolean(),
@@ -183,7 +182,7 @@ export async function updateSource(id: string, input: { patch: unknown; version:
       next_fetch_at = CASE WHEN ${patch.enabled ?? null}::boolean IS TRUE OR ${kindChanged} AND enabled THEN now() ELSE next_fetch_at END
       WHERE id = ${id} RETURNING *`;
     if (before.participation_mode !== "editorial" && patch.participation_mode === "editorial") {
-      // A heat-only decision cannot admit the first editorial judgement to selection. Previously
+      // A grouping completed while the source was not editorial cannot admit the first editorial judgement to selection. Previously
       // judged revisions remain reusable; this mode edit still does not buy analysis for old material.
       await tx`UPDATE articles a SET ${groupingReset()}
         WHERE a.source_id = ${id} AND NOT EXISTS (

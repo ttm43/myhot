@@ -66,7 +66,7 @@ async function report(r: Report): Promise<string> {
 
 async function story(title: string): Promise<{ id: number; publicId: string }> {
   const publicId = randomUUID();
-  const [s] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, first_report_at, latest_at) VALUES (${publicId}, ${title}, now(), now()) RETURNING id`;
+  const [s] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title) VALUES (${publicId}, ${title}) RETURNING id`;
   return { id: s!.id, publicId };
 }
 

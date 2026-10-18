@@ -119,7 +119,7 @@ test("an already released receipt wakes its failed grouping job once, with the o
   const id = await article("grouping");
   const [receipt] = await sql<{ id: number }[]>`INSERT INTO receipts (logical_key,service,purpose,subject,status)
     VALUES (${`embedding-${T}`},'dashscope','embedding',${`article:${id}`},'unknown') RETURNING id`;
-  const data = { articleId: id, signalOnly: true };
+  const data = { articleId: id };
   const jobId = await enqueue(QUEUES.group, data, { retryLimit: 0, singletonKey: id });
   const boss = await getBoss();
   const [initial] = await boss.fetch(QUEUES.group);

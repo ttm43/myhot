@@ -65,8 +65,8 @@ test("real grouped timeline pagination keeps whole-day counts across midnight", 
     const id = await add(String(index), anchor);
     groups.push({ anchor, key: `a${id}` });
   }
-  const [story] = await sql<{ id: number }[]>`INSERT INTO stories(public_id,title,first_report_at,latest_at)
-    VALUES(gen_random_uuid(),'Day story',${now},${now}) RETURNING id`;
+  const [story] = await sql<{ id: number }[]>`INSERT INTO stories(public_id,title)
+    VALUES(gen_random_uuid(),'Day story') RETURNING id`;
   for (const storyId of [null, story!.id]) {
     const [fact] = await sql<{ id: number }[]>`INSERT INTO facts(public_id,story_id,title)
       VALUES(${`day-${T}-${facts.length}`},${storyId},'Day fact') RETURNING id`;

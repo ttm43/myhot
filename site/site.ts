@@ -64,10 +64,9 @@ export const POLICY = {
 /** 导航（电脑侧栏、手机底栏、“我的”页）。 */
 export const NAV = {
   /**
-   * 不放进导航的引擎入口，目前只支持热点榜（"/hot"）和主题（"/topics"）。页面照样能打开；原来回到它的返回按钮和链接改回精选，
-   * 写 "/hot" 时首页也不放当前热点。
+   * 不放进导航的引擎入口，目前只支持主题（"/topics"）。页面照样能打开；原来回到它的返回按钮和链接改回精选。
    */
-  hidden: [] as Array<"/hot" | "/topics">,
+  hidden: [] as Array<"/topics">,
 };
 
 /** 条目卡片和详情页上的几处说法和显示。 */
@@ -88,15 +87,6 @@ export const ADMIN = {
 export const SOURCE_DEFAULTS = {
   /** 站内展示全文；false 时只显示摘要和原文链接。 */
   siteFulltext: false,
-};
-
-/**
- * 社区站的信源（填信源 id）：算热度时按发帖的账号计，一个账号算一个独立来源，而不是整个信源只算一个。
- * dev 是 dev.to 的文章流，hn 是 Hacker News 的帖子流。
- */
-export const COMMUNITY_FEEDS: { dev: string[]; hn: string[] } = {
-  dev: [],
-  hn: [],
 };
 
 /** 这个部署自己的几处安排（选填）。 */

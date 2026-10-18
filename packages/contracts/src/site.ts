@@ -31,11 +31,6 @@ export interface XPostView {
   media: MediaView[];
 }
 
-export interface StoryRef {
-  publicId: string;
-  title: string;
-}
-
 /** What every site answer about an article carries; a card and a page each add the X post in their own form. */
 export interface ItemSummary {
   id: string;
@@ -53,7 +48,6 @@ export interface ItemSummary {
   score: number | null;
   selected: boolean;
   channel: "news" | "x";
-  story: StoryRef | null;
 }
 
 /** The fields rendered by a site feed card; full original text lives in the item detail. */
@@ -88,17 +82,6 @@ export interface TimelineCard {
   group: GroupInfo | null;
 }
 
-export interface HotStripEntry {
-  rank: number;
-  title: string;
-  heat: number;
-  trend: "up" | "down" | "flat" | "new" | "unknown";
-  storyPublicId: string | null;
-  itemId: string | null;
-  participants: HotParticipant[];
-  participantCount: number;
-}
-
 export interface TimelineFilters {
   channel: ChannelKey;
   category: CategoryKey | null;
@@ -109,7 +92,6 @@ export interface TimelineResponse {
   filters: TimelineFilters;
   cards: TimelineCard[];
   nextCursor: string | null;
-  hot: HotStripEntry[] | null;
   dayCounts: Record<string, number>;
 }
 
@@ -143,7 +125,6 @@ export interface SiteItemDetail extends ItemSummary {
   /** Whitelisted HTML of the language shown; the other one is null. */
   body: { zh: string | null; original: string | null; zhKind: "translation" | "original" | null; complete: boolean } | null;
   outline: OutlineEntry[];
-  relatedStories: StoryRef[];
   /** The topics the report belongs to. */
   topics: TopicLink[];
   markdownAvailable: boolean;
@@ -165,109 +146,6 @@ export interface GroupReportsResponse {
   factId: string;
   reports: GroupReport[];
 }
-
-// Hot ranking and stories
-
-/** Home and hot-ranking faces show the same maximum number of editorial participants. */
-export const HOT_FACE_LIMIT = 6;
-
-export interface HotParticipant {
-  name: string;
-  kind: "editorial" | "signal";
-  /** Only visible faces carry images: the source's icon or its latest collected X avatar (proxied). */
-  iconUrl?: string | null;
-  iconSrcSet?: string;
-}
-
-
-export interface HotEntryView {
-  rank: number;
-  story: StoryRef;
-  heat: number;
-  trend: "up" | "down" | "flat" | "new" | "unknown";
-  trendPct: number | null;
-  badges: Array<"surge" | "new" | "rising">;
-  participantCount: number;
-  sourceCount: number;
-  sourceNames: string[];
-  participants: HotParticipant[];
-  /** Hourly heat over the 24 hours up to the ranking, oldest first; null where no comparable snapshot exists. */
-  spark: Array<number | null>;
-  /** A card excerpt of the story's AI digest, else its fact statement; full text is on the event page. */
-  summary: string | null;
-  /** The latest development, one line. */
-  latest: string | null;
-  /** A picture from the story's public reports (the representative first), for the leading cards. */
-  cover: { url: string; srcSet?: string; width: number | null; height: number | null } | null;
-}
-
-export interface HotResponse {
-  computedAt: string | null;
-  windowHours: number;
-  entries: HotEntryView[];
-}
-
-export interface HeatPoint {
-  hour: string;
-  heat: number;
-  participants: number;
-}
-
-export interface StoryReportView {
-  id: string;
-  title: string;
-  summary: string | null;
-  source: SourceRef & { firstParty: boolean };
-  publishedAt: string;
-  selected: boolean;
-}
-
-export interface StoryFactView {
-  factId: string;
-  title: string;
-  firstReportAt: string;
-  reportCount: number;
-  representative: StoryReportView;
-}
-
-export interface StoryDetail {
-  publicId: string;
-  title: string;
-  status: "active" | "watching" | "settled";
-  reportCount: number;
-  sourceCount: number;
-  firstReportAt: string | null;
-  latestAt: string | null;
-  digest: string | null;
-  digestUpdatedAt: string | null;
-  /** The story's own factual summary, when it has one. */
-  summary: string | null;
-  /** Without a digest or summary: the summary of the report the story started from. */
-  excerpt: { text: string; sourceName: string } | null;
-  latest: string | null;
-  /** The current public report supplying latest; never inferred from an independently generated digest. */
-  latestReport: { id: string } | null;
-  whyHot: {
-    participants48h: number;
-    newParticipants6h: number;
-    recentReports24h: number;
-    observationComplete: boolean;
-    rank: number | null;
-  };
-  developments: StoryFactView[];
-  officialReports: StoryReportView[];
-  timeline: StoryReportView[];
-  heat: HeatPoint[];
-  related: Array<StoryRef & { relation: "storyline" | "related" }>;
-  /** The topics its reports belong to, most reports first. */
-  topics: TopicLink[];
-}
-
-export interface StoryFollowup {
-  factId: string;
-  representative: { id: string; title: string; source: { name: string }; timelineAt: string };
-}
-export interface StoryFollowupsResponse { items: StoryFollowup[]; more: boolean }
 
 // Topics
 
@@ -313,10 +191,9 @@ export interface TopicsResponse {
   topics: TopicSummary[];
 }
 
-/** Phone search only needs links, not the topic pages or full hot ranking. */
+/** Phone search only needs links, not the topic pages. */
 export interface SearchSuggestions {
   topics: Array<TopicLink & { group: TopicGroupKey }>;
-  hot: Array<{ rank: number; title: string; to: string }>;
 }
 
 export interface TopicPage {

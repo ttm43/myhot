@@ -15,10 +15,10 @@ after(closeDb);
 test("recall preserves window, live-story, membership and latest-analysis evidence", async () => {
   await sql`INSERT INTO sources (id, name, kind, tier, participation_mode)
     VALUES (${T}, 'Recall fixture', 'rss', 'T1', 'editorial')`;
-  const [live] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, first_report_at, latest_at)
-    VALUES (${randomUUID()}, ${title}, now(), now()) RETURNING id`;
-  const [merged] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, first_report_at, latest_at, merged_into)
-    VALUES (${randomUUID()}, ${title}, now(), now(), ${live!.id}) RETURNING id`;
+  const [live] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title)
+    VALUES (${randomUUID()}, ${title}) RETURNING id`;
+  const [merged] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, merged_into)
+    VALUES (${randomUUID()}, ${title}, ${live!.id}) RETURNING id`;
   const expected: number[] = [];
   for (const [index, scenario] of ["single", "missing-analysis", "unknown-scope", "composite", "latest-single", "latest-composite", "higher-revision", "old-discovery", "boundary", "recent-discovery", "mention", "merged", "shared"].entries()) {
     const id = `${T}-${scenario}`;

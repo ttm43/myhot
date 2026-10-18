@@ -12,14 +12,9 @@ function Svg({ size = 18, children, ...rest }: P & { children: React.ReactNode }
 }
 
 export const IconBolt = (p: P) => (<Svg {...p}><path d="M13 2.5L4.5 13.5H11l-1 8L19.5 10.5H13z" /></Svg>);
-export const IconUsers = (p: P) => (<Svg {...p}><path d="M16 20v-1.5a3.5 3.5 0 00-3.5-3.5h-5A3.5 3.5 0 004 18.5V20" /><circle cx="10" cy="8" r="3.5" /><path d="M20 20v-1.5a3.5 3.5 0 00-2.5-3.35M15.5 4.65a3.5 3.5 0 010 6.7" /></Svg>);
-export const IconDoc = (p: P) => (<Svg {...p}><rect x="5" y="3.5" width="14" height="17" rx="2" /><path d="M8.5 8h7M8.5 12h7M8.5 16h4" /></Svg>);
 export const IconList = (p: P) => (<Svg {...p}><path d="M8 6h13M8 12h13M8 18h13" /><circle cx="3.5" cy="6" r="1" /><circle cx="3.5" cy="12" r="1" /><circle cx="3.5" cy="18" r="1" /></Svg>);
-export const IconFlame = (p: P) => (<Svg {...p}><path d="M12 22c4 0 7-2.7 7-7 0-3.6-2.4-6.2-4-8-.5 2-1.6 3.4-3 4 .3-3-1-6-4-8 0 4-4 6.5-4 11 0 4.3 3 8 8 8z" /></Svg>);
 export const IconGrid = (p: P) => (<Svg {...p}><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" /><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" /><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" /></Svg>);
 export const IconChart = (p: P) => (<Svg {...p}><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></Svg>);
-export const IconClock = (p: P) => (<Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Svg>);
-export const IconInfo = (p: P) => (<Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></Svg>);
 export const IconSearch = (p: P) => (<Svg {...p}><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></Svg>);
 /** The GitHub mark (filled, not stroked). */
 export const IconGithub = ({ size = 18, ...rest }: P) => (
@@ -52,8 +47,5 @@ export const IconFilter = (p: P) => (<Svg {...p}><path d="M4 7h9M17 7h3M4 17h3M1
 export const IconUser = (p: P) => (<Svg {...p}><circle cx="12" cy="8" r="3.8" /><path d="M4.8 20.2c.9-3.5 3.8-5.7 7.2-5.7s6.3 2.2 7.2 5.7" /></Svg>);
 export const IconClose = (p: P) => (<Svg {...p}><path d="M6 6l12 12M18 6L6 18" /></Svg>);
 export const IconArrowUp = (p: P) => (<Svg {...p}><path d="M12 19V5M6 11l6-6 6 6" /></Svg>);
-export const IconTrendUp = (p: P) => (<Svg {...p}><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></Svg>);
-export const IconTrendDown = (p: P) => (<Svg {...p}><path d="M3 7l6 6 4-4 8 8" /><path d="M15 17h6v-6" /></Svg>);
-export const IconMinus = (p: P) => (<Svg {...p}><path d="M5 12h14" /></Svg>);
 export const IconCheck = (p: P) => (<Svg {...p}><path d="M5 12.5l4.5 4.5L19 7.5" /></Svg>);
 export const IconCopy = (p: P) => (<Svg {...p}><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3" /></Svg>);

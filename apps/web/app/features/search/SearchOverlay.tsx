@@ -1,6 +1,6 @@
 // Phone search: opens over the page from the bars' magnifier with the keyboard
 // already up — the field is focused inside the same tap, which iOS requires — and searches 全部动态
-// (/all?q=…). Below the field: this browser's recent searches, topics to browse and what is hot now.
+// (/all?q=…). Below the field: this browser's recent searches, and topics to browse.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Form, Link, useLocation, useNavigation } from "react-router";
 import type { SearchSuggestions } from "@aihot/contracts/site";
@@ -47,7 +47,6 @@ function loadSuggestions() {
   return suggestions;
 }
 
-const RANK_COLOR = ["text-rank-1", "text-rank-2", "text-rank-3"];
 
 export function SearchOverlay() {
   const shown = useSyncExternalStore(subscribe, () => open, () => false);
@@ -202,21 +201,6 @@ export function SearchOverlay() {
             </section>
           )}
 
-          {(more?.hot.length ?? 0) > 0 && (
-            <section className="pt-6">
-              <h2 className="text-[13px] font-semibold text-ink-3">正在热议</h2>
-              <ol className="mt-1 divide-y divide-line-soft">
-                {more!.hot.map((h, i) => (
-                  <li key={h.to}>
-                    <Link viewTransition to={h.to} className="grid h-12 grid-cols-[18px_minmax(0,1fr)] items-center gap-x-3 active:opacity-60">
-                      <span className={`num text-center text-[15px] font-black ${RANK_COLOR[i] ?? "text-rank-rest"}`}>{h.rank}</span>
-                      <span className="truncate text-[15px] text-ink">{h.title}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ol>
-            </section>
-          )}
         </div>
       )}
     </div>

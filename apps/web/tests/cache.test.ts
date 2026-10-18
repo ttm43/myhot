@@ -18,9 +18,8 @@ const api = createServer((req, res) => {
     const filters = { channel: "all", category: url.searchParams.get("category"), tag: null };
     res.setHeader("X-Accel-Expires", `@${deadline}`);
     res.setHeader("Cache-Control", "public, max-age=30, s-maxage=30");
-    return res.end(JSON.stringify({ filters, cards: [], nextCursor: null, dayCounts: [], hot: null }));
+    return res.end(JSON.stringify({ filters, cards: [], nextCursor: null, dayCounts: [] }));
   }
-  if (url.pathname === "/api/site/hot") return res.end(JSON.stringify({ entries: [] }));
   if (url.pathname === "/api/site/echo-client") return res.end(JSON.stringify({ forwarded: req.headers["x-forwarded-for"], real: req.headers["x-real-ip"] }));
   if (url.pathname === "/api/site/download") {
     res.setHeader("Content-Type", "text/markdown; charset=utf-8");
@@ -28,10 +27,6 @@ const api = createServer((req, res) => {
     return res.end("# Article");
   }
   if (url.pathname === "/api/site/items/long-lived") return res.end(JSON.stringify({ id: "long-lived", title: "t" }));
-  if (url.pathname === "/api/site/stories/merged") {
-    res.statusCode = 308;
-    return res.end(JSON.stringify({ mergedInto: "surviving-story" }));
-  }
   res.statusCode = url.pathname.startsWith("/api/admin/") ? 401 : 404;
   res.end(JSON.stringify({ code: "not_found" }));
 });
@@ -98,7 +93,7 @@ test("missing routes cannot be hidden by a root-only request; errors and redirec
     assert.equal(res.headers.get("X-Accel-Expires"), "0");
     await res.text();
   }
-  for (const [pathname, target] of [["/story/merged.data?_routes=root", "/story/surviving-story"], ["/_.data?q=search&_routes=root", "/all?q=search"]]) {
+  for (const [pathname, target] of [["/_.data?q=search&_routes=root", "/all?q=search"]]) {
     const res = await fetch(origin + pathname);
     assert.equal(res.status, 202);
     assert.equal(res.headers.get("Cache-Control"), "private, no-store");
@@ -112,7 +107,7 @@ test("admin data and actions never become public cache entries", async () => {
   assert.equal(admin.headers.get("Cache-Control"), "private, no-store");
   assert.equal(admin.headers.get("X-Accel-Expires"), "0");
   assert.match(await admin.text(), /api\/auth\/login/);
-  const action = await fetch(`${origin}/hot.data`, { method: "POST" });
+  const action = await fetch(`${origin}/all.data`, { method: "POST" });
   assert.equal(action.status, 405);
   assert.equal(action.headers.get("Cache-Control"), "private, no-store");
   assert.equal(action.headers.get("X-Accel-Expires"), "0");

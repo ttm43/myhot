@@ -9,8 +9,6 @@ import { adaptIntervals, scheduleDueSources } from "@aihot/backend/sources/colle
 import { scheduleMpReconcile } from "@aihot/backend/sources/mp";
 import { dajialaConfigured } from "@aihot/backend/providers/dajiala";
 import { refreshSourceIcons } from "@aihot/backend/sources/icons";
-import { computeHotRanking, snapshotHeat } from "@aihot/backend/events/hot";
-import { linkRelatedStories } from "@aihot/backend/events/consolidate";
 import { dailyRetention } from "@aihot/backend/operations/retention";
 import { recoverStaleWork } from "@aihot/backend/operations/recover";
 
@@ -20,9 +18,6 @@ const ENGINE_SCHEDULES: Scheduled[] = [
   { name: "content.sweep", cron: "*/5 * * * *", run: sweepUnprocessed },
   // Full-text translations of newly selected items (model calls; off with MODEL_CALLS_ENABLED=false).
   { name: "content.translate", cron: "*/5 * * * *", run: () => translatePending() },
-  { name: "hot.rank", cron: "*/5 * * * *", run: () => computeHotRanking() },
-  { name: "hot.snapshot", cron: "2 * * * *", run: () => snapshotHeat() },
-  { name: "stories.links", cron: "12 * * * *", run: linkRelatedStories },
   // Old run history and derived caches.
   { name: "ops.retention", cron: "30 3 * * *", missed: "once", run: () => dailyRetention() },
   // Work a stopped process left half way becomes visible, and unknown paid requests get their one

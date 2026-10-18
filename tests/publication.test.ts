@@ -2,7 +2,6 @@
 // the hot board drops a withdrawn item at once, and item pages follow one rule.
 import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
 import * as cheerio from "cheerio";
 import { marked } from "marked";
 import { after, before, test } from "node:test";
@@ -13,8 +12,6 @@ import { updateSource } from "@aihot/backend/admin/sources";
 import { upsertMaterial } from "@aihot/backend/content/materials";
 import { stopBoss } from "@aihot/backend/jobs/queue";
 import { publishArticle, republishSource } from "@aihot/backend/publication/publish";
-import { computeHotRanking } from "@aihot/backend/events/hot";
-import { latestHotRanking } from "@aihot/backend/publication/hot";
 import { v1Items } from "@aihot/backend/publication/v1";
 import { buildApp } from "../apps/api/src/app.ts";
 
@@ -43,16 +40,6 @@ async function article(): Promise<string> {
   await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, reason_zh, score, selected)
             VALUES (${articleId}, 1, 'rule', 'pass', 'ai-models', ${`标题${n}-${T}`}, ${`SUMMARY-${n}-${T}`}, '理由', 90, true)`;
   return articleId;
-}
-
-async function storyFor(id: string, role: "report" | "mention" = "report"): Promise<string> {
-  const publicId = randomUUID();
-  const [story] = await sql<{ id: number }[]>`
-    INSERT INTO stories (public_id, title, first_report_at, latest_at) VALUES (${publicId}, ${`STORY-${T}`}, now(), now()) RETURNING id`;
-  const [fact] = await sql<{ id: number }[]>`
-    INSERT INTO facts (public_id, story_id, title) VALUES (${`fact-${publicId}`}, ${story!.id}, ${`FACT-${T}`}) RETURNING id`;
-  await sql`INSERT INTO fact_articles (fact_id, article_id, role) VALUES (${fact!.id}, ${id}, ${role})`;
-  return publicId;
 }
 
 const released = () => ({ releasedAt: new Date(Date.now() - 60_000) });
@@ -165,9 +152,7 @@ test("site reading sends one language while exports retain both, including after
 test("revoking a source's licence takes its articles off every exit", async () => {
   const id = await article();
   await publishArticle(id, released());
-  const story = await storyFor(id);
   assert.equal((await get(`/api/site/items/${id}`)).status, 200);
-  assert.equal((await get(`/api/site/stories/${story}`)).status, 200);
 
   const [source] = await sql<{ updated_at: Date }[]>`SELECT updated_at FROM sources WHERE id = ${SOURCE}`;
   const patch = { participation_mode: "isolated", site_fulltext: false };
@@ -179,56 +164,8 @@ test("revoking a source's licence takes its articles off every exit", async () =
   assert.ok(result.reduced >= 1);
   assert.equal((await get(`/api/site/items/${id}`)).status, 404);
   assert.equal((await get(`/items/${id}/markdown`)).status, 404);
-  assert.equal((await get(`/api/site/stories/${story}`)).status, 404, "the story drops an isolated source's last report");
 
   await sql`UPDATE sources SET participation_mode = 'editorial', site_fulltext = true WHERE id = ${SOURCE}`;
-});
-
-test("a withdrawal takes down only the stories citing it", async () => {
-  const id = await article();
-  await publishArticle(id, released());
-  const stories = [await storyFor(id), await storyFor(id, "mention")];
-  const other = await article();
-  await publishArticle(other, released());
-  const unrelated = await storyFor(other);
-  for (const [index, story] of stories.entries()) {
-    for (const prefix of ["/api/site/stories/"]) {
-      const response = await get(`${prefix}${story}`);
-      assert.equal(response.status, index === 0 ? 200 : 404, "mention-only links do not make a factual public event");
-      if (index === 0) assert.ok(response.body.includes(id));
-    }
-  }
-
-  await setVisibility(id, { visibility: "withdrawn", reason: "test", version: 0 }, "test");
-  for (const story of stories) {
-    assert.equal((await get(`/api/site/stories/${story}`)).status, 404);
-  }
-  assert.equal((await get(`/api/site/stories/${unrelated}`)).status, 200);
-});
-
-test("a withdrawn item leaves the hot board and the hot APIs at once, not at the next ranking", async () => {
-  const publicId = randomUUID();
-  const [story] = await sql<{ id: number }[]>`
-    INSERT INTO stories (public_id, title, first_report_at, latest_at) VALUES (${publicId}, ${`HOT-${T}`}, now() - interval '2 hours', now()) RETURNING id`;
-  const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title) VALUES (${`fact-${T}`}, ${story!.id}, ${`HOT-${T}`}) RETURNING id`;
-  // Two independent participants (heat counts sources, not reports).
-  const second = `${SOURCE}-hot-b`;
-  await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, next_fetch_at) VALUES (${second}, 'Test publication B', 'rss', 'T1', 'editorial', '2100-01-01')`;
-  for (const [i, id] of [await article(), await article()].entries()) {
-    if (i) await sql`UPDATE articles SET source_id = ${second} WHERE id = ${id}`;
-    await sql`INSERT INTO fact_articles (fact_id, article_id, role) VALUES (${fact!.id}, ${id}, 'report')`;
-    await sql`INSERT INTO story_signals (story_id, article_id, participant_key, source_id, kind, observed_at)
-              VALUES (${story!.id}, ${id}, ${`participant-${id}`}, ${i ? second : SOURCE}, 'editorial', now() - interval '1 hour')`;
-    await publishArticle(id, released());
-  }
-  await computeHotRanking();
-  const rep = (await latestHotRanking())!.entries.find((e) => e.storyId === story!.id)?.representativeItemId;
-  assert.ok(rep, "the story is on the board with a representative item");
-  // The hot board names the event the item stands for.
-  assert.ok((await get("/api/site/hot")).body.includes(publicId), "/api/site/hot shows the event before");
-
-  await setVisibility(rep!, { visibility: "withdrawn", reason: "test", version: 0 }, "test");
-  assert.ok(!(await get("/api/site/hot")).body.includes(publicId), "/api/site/hot still shows the event of the withdrawn item");
 });
 
 test("item pages follow one rule: unsummarised editorial items keep one, hot_signal items have none", async () => {
@@ -252,30 +189,6 @@ test("item pages follow one rule: unsummarised editorial items keep one, hot_sig
   assert.equal((await get(`/items/${plain}/markdown`)).status, 200);
   assert.equal((await get(`/api/site/items/${signal}`)).status, 404, "hot_signal material has no page");
   assert.equal((await get(`/items/${signal}/markdown`)).status, 404);
-
-  const publicId = randomUUID();
-  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, first_report_at, latest_at) VALUES (${publicId}, ${`事件-${T}`}, now(), now()) RETURNING id`;
-  const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title) VALUES (${`f-${T}`}, ${story!.id}, ${`事实-${T}`}) RETURNING id`;
-  await sql`INSERT INTO fact_articles (fact_id, article_id, role) VALUES (${fact!.id}, ${plain}, 'report'), (${fact!.id}, ${signal}, 'report')`;
-  const storyPage = await get(`/api/site/stories/${publicId}`);
-  assert.equal(storyPage.status, 200, "a story whose only page is unsummarised still has a page");
-  assert.ok(storyPage.body.includes(plain), "it lists the unsummarised editorial report");
-  assert.ok(!storyPage.body.includes(signal) && !storyPage.body.includes(`SIGNAL-SUMMARY-${T}`), "and not the hot_signal one");
-});
-
-test('event neighbors disappear when their last readable evidence is withdrawn', async () => {
-  const id = await article();
-  const neighborId = await article();
-  await publishArticle(id, released());
-  await publishArticle(neighborId, released());
-  const current = await storyFor(id);
-  const neighbor = await storyFor(neighborId);
-  await sql`INSERT INTO story_links (story_id, other_id, relation)
-    SELECT s.id, n.id, 'related' FROM stories s, stories n WHERE s.public_id = ${current} AND n.public_id = ${neighbor}`;
-  const exits = [`/api/site/stories/${current}`];
-  for (const url of exits) assert.ok((await get(url)).body.includes(neighbor), 'public neighbor is linked');
-  await sql`UPDATE publications SET visibility = 'withdrawn' WHERE article_id = ${neighborId}`;
-  for (const url of exits) assert.ok(!(await get(url)).body.includes(neighbor), `${url} must not advertise an unreadable neighbor`);
 });
 
 test("unchanged republishing preserves freshness, while URL-only changes still reach the projection", async () => {
@@ -297,15 +210,13 @@ test("unchanged republishing preserves freshness, while URL-only changes still r
   assert.equal(changed.revision, before.revision + 1);
 });
 
-// Restricting a selected item to a neutral summary must also remove its selected badge, score,
-// classification and story links from the detail.
+// Restricting a selected item to a neutral summary must also remove its selected badge, score and
+// classification from the detail.
 test("summary-only detail keeps neutral metadata without a selected verdict", async () => {
   const id = await article();
-  await storyFor(id);
   await publishArticle(id, released());
   const before = JSON.parse((await get(`/api/site/items/${id}`)).body);
   assert.equal(before.selected, true);
-  assert.ok(before.story);
   await setVisibility(id, { visibility: "summary-only", reason: "neutral summary", version: 0 }, "test");
   for (const suffix of ["", "/original"]) {
     const item = JSON.parse((await get(`/api/site/items/${id}${suffix}`)).body);
@@ -313,7 +224,7 @@ test("summary-only detail keeps neutral metadata without a selected verdict", as
     assert.equal(item.summary, before.summary);
     assert.equal(item.links.original, before.links.original);
     assert.equal(item.selected, false);
-    for (const field of ["score", "reason", "category", "story", "body", "x"]) assert.equal(item[field], null, field);
+    for (const field of ["score", "reason", "category", "body", "x"]) assert.equal(item[field], null, field);
     assert.deepEqual(item.tags, []);
     assert.deepEqual(item.topics, []);
     assert.equal(item.markdownAvailable, false);

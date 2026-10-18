@@ -20,8 +20,8 @@ after(async () => { await provider.close(); await closeDb(); });
 test("fact and reading recall agree across cold, full and overflowing vector caches", async (t) => {
   await sql`INSERT INTO sources (id, name, kind, tier, participation_mode)
     VALUES (${T}, 'Recall cache fixture', 'rss', 'T1', 'editorial')`;
-  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, first_report_at, latest_at)
-    VALUES (${randomUUID()}, ${T}, now(), now()) RETURNING id`;
+  const [story] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title)
+    VALUES (${randomUUID()}, ${T}) RETURNING id`;
   const facts: number[] = [];
   const items = ["first", "second", "background"].map(name => ({ id: `${T}-${name}`, text: `${T}-${name}。` }));
   for (const [index, item] of items.entries()) {

@@ -4,7 +4,7 @@
 flowchart LR
   S["信源<br/>RSS · 网页 · JSON · X · 公众号 · 外部推送"] --> C["采集<br/>判重 · 抓原文"]
   C --> J["判断与写作<br/>预筛 · 评分 · 标题摘要 · 结构化"]
-  J --> G["归组<br/>事件 · 热度 · 综述"]
+  J --> G["归组<br/>事实 · 事件"]
   J --> P["公开读取层<br/>publication/"]
   G --> P
   P --> O["网页 · MCP"]
@@ -15,7 +15,7 @@ flowchart LR
 | 进程 | 位置 | 做什么 |
 |---|---|---|
 | api | `apps/api/` | Fastify。网站自用接口（`/api/site/`）、MCP、后台接口、外部推送、图片代理 |
-| worker | `apps/worker/` | pg-boss 任务队列和定时任务：抓信源、调模型、归组、热度、清理 |
+| worker | `apps/worker/` | pg-boss 任务队列和定时任务：抓信源、调模型、归组、清理 |
 | web | `apps/web/` | React Router 服务端渲染的网页。只通过 HTTP 读 api，不碰数据库 |
 
 业务代码都在 `packages/backend/`，前后端共用的类型和常量在 `packages/contracts/`。这个站自己的名字、文案、品牌和页面在 `site/`，行业的分类、信源、提示词和门槛在 `industry/`，只属于这个站的功能在 `modules/`（见下文“模块”）。
@@ -46,7 +46,7 @@ flowchart LR
 | `packages/backend/src/sources/` | 六种信源的读取器，抓取调度（`collect.ts`） |
 | `packages/backend/src/content/` | 资料入库、判重、正文提取和清洗 |
 | `packages/backend/src/editorial/` | 判断与写作：`analyze.ts`（流程）、`prompts.ts`（读提示词）、`models.ts`（每一步用哪个模型） |
-| `packages/backend/src/events/` | 事件归组、热度、事件综述 |
+| `packages/backend/src/events/` | 事件归组、合并和人工更正 |
 | `packages/backend/src/publication/` | 公开读取层 |
 | `packages/backend/src/providers/` | 模型、向量、X、公众号、Jina 的调用，回执与预算 |
 | `packages/backend/src/operations/` | 恢复、清理、IndexNow |
@@ -83,11 +83,9 @@ flowchart LR
 
 ## 对外出口
 
-事件的 `related` 关联在建立时须有至少两篇报道支撑。关联历史保留；桥接报道明确撤回、失去公开事实报道资格、改为综合稿、移出原事实，或后续归组判断否定关系后，有效证据不足两篇就不公开展示，恢复足够证据后可重新展示。报道自然超出召回窗口、沿用归属的普通修订不使关联过期。没有可核对桥接判断的既有关联，不从记录缺失推断撤回；事件本身不可公开阅读时仍不推荐。`storyline` 的语义不随这项规则改变，所有公开出口共用读取规则。
-
 | 地址 | 内容 |
 |---|---|
-| `/` `/all` `/hot` `/topics` | 精选、全部动态、热门事件、主题 |
+| `/` `/all` `/topics` | 精选、全部动态、主题 |
 | `/api/mcp` | MCP 服务：最新、搜索两个工具，工具名前缀是 `site/site.ts` 的 `mcpPrefix` |
 | `/admin` | 后台 |
 

@@ -58,11 +58,6 @@ export function promptText(name: string, values: Record<string, string> = {}): s
   return fill(name, expand(name).text, values);
 }
 
-/** Wording given as text instead of a pack file, rendered like one; `label` names it in errors. */
-export function promptFromText(label: string, text: string, values: Record<string, string> = {}): string {
-  return fill(label, expandText(text, []).text, values);
-}
-
 /** `name@hash` over the files a prompt reads, so any edit shows up as a new version. */
 export function promptVersion(...names: string[]): string {
   const used = [...new Set(names.flatMap((n) => expand(n).used))].sort();
