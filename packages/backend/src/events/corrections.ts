@@ -41,7 +41,7 @@ export async function detachFromFact(id: string, reason: string, actor: string) 
 /**
  * Puts an article into the fact an editor names, as one of its reports, and keeps it there: the
  * membership is manual, so automatic grouping, retries and later revisions leave it alone. The
- * article leaves the facts it was a report of (mentions stay), and a story left without any report
+ * article leaves the facts it was a report of, and a story left without any report
  * merges into the fact's story.
  */
 export async function moveToFact(id: string, factPublicId: string, reason: string, actor: string) {
@@ -53,7 +53,7 @@ export async function moveToFact(id: string, factPublicId: string, reason: strin
       SELECT f.id, f.story_id FROM facts f JOIN stories st ON st.id = f.story_id WHERE f.public_id = ${factPublicId} AND st.merged_into IS NULL`;
     if (!target) throw new Conflict("目标事实不存在，或它所在的事件已被合并");
     const removed = await tx<{ fact_id: number; evidence: string | null }[]>`
-      DELETE FROM fact_articles WHERE article_id = ${id} AND (role IN ('primary', 'report') OR fact_id = ${target.id}) RETURNING fact_id, evidence`;
+      DELETE FROM fact_articles WHERE article_id = ${id} RETURNING fact_id, evidence`;
     const facts = removed.map((r) => Number(r.fact_id)).filter((factId) => factId !== Number(target.id));
     const stories = facts.length
       ? (await tx<{ story_id: number }[]>`SELECT DISTINCT story_id FROM facts WHERE id = ANY(${facts}) AND story_id IS NOT NULL AND story_id <> ${target.story_id}`).map((r) => Number(r.story_id))

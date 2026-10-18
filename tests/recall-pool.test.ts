@@ -20,7 +20,7 @@ test("recall preserves window, live-story, membership and latest-analysis eviden
   const [merged] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title, merged_into)
     VALUES (${randomUUID()}, ${title}, ${live!.id}) RETURNING id`;
   const expected: number[] = [];
-  for (const [index, scenario] of ["single", "missing-analysis", "unknown-scope", "composite", "latest-single", "latest-composite", "higher-revision", "old-discovery", "boundary", "recent-discovery", "mention", "merged", "shared"].entries()) {
+  for (const [index, scenario] of ["single", "missing-analysis", "unknown-scope", "composite", "latest-single", "latest-composite", "higher-revision", "old-discovery", "boundary", "recent-discovery", "merged", "shared"].entries()) {
     const id = `${T}-${scenario}`;
     await sql`INSERT INTO articles (id, source_id, identity_key, url, title, discovered_at, timeline_at, published_at)
       VALUES (${id}, ${T}, ${id}, ${`https://example.org/${id}`}, ${title},
@@ -31,7 +31,7 @@ test("recall preserves window, live-story, membership and latest-analysis eviden
     const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title)
       VALUES (${`${T}-fact-${index}`}, ${scenario === "merged" ? merged!.id : live!.id}, ${title}) RETURNING id`;
     await sql`INSERT INTO fact_articles (fact_id, article_id, role)
-      VALUES (${fact!.id}, ${id}, ${scenario === "mention" ? "mention" : index % 2 ? "primary" : "report"})`;
+      VALUES (${fact!.id}, ${id}, ${index % 2 ? "primary" : "report"})`;
     if (scenario !== "missing-analysis") {
       await sql`INSERT INTO analyses (article_id, input_revision, origin, title_zh, output)
         VALUES (${id}, ${scenario === "higher-revision" ? 2 : 1}, 'rule', ${title},
@@ -44,7 +44,7 @@ test("recall preserves window, live-story, membership and latest-analysis eviden
             a.discovered_at, a.timeline_at, a.timeline_at FROM articles a WHERE a.id = ${id}`;
       }
     }
-    if (!["composite", "latest-composite", "old-discovery", "boundary", "mention", "merged"].includes(scenario)) expected.push(fact!.id);
+    if (!["composite", "latest-composite", "old-discovery", "boundary", "merged"].includes(scenario)) expected.push(fact!.id);
     if (scenario === "shared") {
       const [second] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, story_id, title)
         VALUES (${`${T}-shared-fact`}, ${live!.id}, ${title}) RETURNING id`;

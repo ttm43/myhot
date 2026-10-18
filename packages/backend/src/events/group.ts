@@ -7,8 +7,8 @@
 // from similarity is confirmed by a second vendor before it is written; a development attaches only
 // to the fact that started its story, so stories do not grow by chaining. Manual corrections
 // (corrections.ts) are never overwritten; a revision keeps its membership unless an editor asks for a regroup or its
-// structure identifies it as composite. Composite material only mentions facts, never starts or
-// joins a fact/story and never supplies a root or bridge. When a
+// structure identifies it as composite. Composite material is a roundup: it is not judged, never
+// starts or joins a fact/story and never supplies a root or bridge. When a
 // report is firmly tied to two stories, their roots are compared directly and the stories merge
 // when both models see one story (consolidate.ts). A story a regrouped report leaves without reports
 // merges into where it went, so its id keeps answering. History (isHistorical) founds no event.
@@ -27,7 +27,7 @@ import { consolidate, liveStory, type Consolidation } from "./consolidate.ts";
 import { mergeStoryInto } from "./merge.ts";
 import { candidateViews, recallFacts, sameUrlFact } from "./recall.ts";
 import {
-  BATCH_SYSTEM, BATCH_PROMPT_VERSION, BatchSchema, PAIR_SYSTEM, PairSchema, RELATE_PROMPT_VERSION, TIE_MIN_CONFIDENCE,
+  BATCH_SYSTEM, BATCH_PROMPT_VERSION, BatchSchema, PAIR_SYSTEM, PairSchema, RELATE_PROMPT_VERSION,
   batchUser, completeDecisions, firmlyTied, pairUser, reportText, sameOccurrence, storyForDevelopment, verdictsByFact,
   type CandidateView, type Relation, type ReportView, type Verdict,
 } from "./relate.ts";
@@ -267,18 +267,29 @@ async function decide(articleId: string, revision: number): Promise<GroupResult>
     await markGrouped(articleId, a.revision);
     return { verdict: "standalone" };
   }
+  // A multi-topic digest joins no fact, so there is nothing to ask a model about.
+  if (composite) {
+    const late = await sql.begin(async (tx) => {
+      await lockCurrentRevision(tx, articleId, a.revision);
+      const manual = await manualDecision(tx, articleId);
+      if (manual) return manual;
+      await recordDecision(tx, articleId, null, null, "roundup", [], null);
+      await markGrouped(articleId, a.revision, tx);
+      return null;
+    });
+    return late ? { verdict: "manual", factId: late.factId } : { verdict: "roundup" };
+  }
   const title = an.title_zh || a.title;
   const query: ReportView = {
     title, source: a.source_name, firstParty: a.first_party, at: observedAt, summary: an.summary_zh,
-    scope: composite ? "composite" : an.output?.scope === "single" ? "single" : "unknown",
+    scope: an.output?.scope === "single" ? "single" : "unknown",
     frame: frame ? { subject: frame.subject, action: frame.action, object: frame.object, occurredAt: frame.occurredAt } : null,
   };
   const newTitle = String(frame?.title || title).slice(0, 60);
 
   const sameUrl = await sameUrlFact(a);
-  // Another report of the same page settles a single report's identity without a judgement; a
-  // composite still looks for the facts it mentions.
-  const cands = sameUrl && !composite ? [] : await candidateViews(await recallFacts(articleId,
+  // Another report of the same page settles its identity without a judgement.
+  const cands = sameUrl ? [] : await candidateViews(await recallFacts(articleId,
     reportText(title, an.summary_zh), RECALL_MIN_COSINE, RECALL_TOP_FACTS, sameUrl ? [sameUrl] : []));
   let verdicts = new Map<number, Verdict>();
   const receipts: number[] = [];
@@ -286,31 +297,6 @@ async function decide(articleId: string, revision: number): Promise<GroupResult>
     const judged = await judgeBatch(articleId, { ...query, sourceText: a.body_text }, cands);
     verdicts = judged.verdicts;
     receipts.push(judged.receiptId);
-  }
-  if (composite) {
-    // Use the existing batch judgement only to find mentions. Even a mistaken SAME_OCCURRENCE
-    // answer cannot give a composite a primary/report membership or trigger consolidation.
-    const receiptId = receipts[0] ?? null;
-    const late = await sql.begin(async (tx) => {
-      await lockCurrentRevision(tx, articleId, a.revision);
-      const manual = await manualDecision(tx, articleId);
-      if (manual) {
-        if (receiptId !== null) await completeReceipt(tx, receiptId);
-        return manual;
-      }
-      for (const c of cands) {
-        const v = verdicts.get(c.factId);
-        if (v && v.relation !== "UNRELATED" && v.confidence >= TIE_MIN_CONFIDENCE) {
-          await tx`INSERT INTO fact_articles (fact_id, article_id, role, created_at) VALUES (${c.factId}, ${articleId}, 'mention', ${observedAt})
-                   ON CONFLICT (fact_id, article_id) DO NOTHING`;
-        }
-      }
-      await recordDecision(tx, articleId, null, null, "roundup", cands.map((c) => ({ id: c.factId, score: c.score, ...verdicts.get(c.factId) })), receiptId);
-      await markGrouped(articleId, a.revision, tx);
-      if (receiptId !== null) await completeReceipt(tx, receiptId);
-      return null;
-    });
-    return late ? { verdict: "manual", factId: late.factId } : { verdict: "roundup" };
   }
   let verdict: GroupResult["verdict"] = "new-story";
   let factId: number | null = null;

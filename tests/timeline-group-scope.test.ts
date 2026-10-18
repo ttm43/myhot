@@ -1,4 +1,4 @@
-// Failure cases: a composite or mention folding into a fact; stale fact membership still folding;
+// Failure cases: a composite folding into a fact; stale fact membership still folding;
 // a future/withdrawn/unselected report affecting the anchor; filters choosing an anchor outside their
 // own set; a later report moving a fact; equal-time standalone cards changing cursor order.
 import { tag } from "./setup.ts";
@@ -15,7 +15,7 @@ test("timeline grouping preserves evidence scope and filter-local anchors", asyn
   const now = new Date(+at + 100_000);
   await sql`INSERT INTO sources (id, name, kind, tier) VALUES (${prefix}, ${prefix}, 'rss', 'T1')`;
   const [fact] = await sql<{ id: number }[]>`INSERT INTO facts (public_id, title) VALUES (${prefix}, ${prefix}) RETURNING id`;
-  const add = async (suffix: string, seconds: number, options: { role?: string; scope?: string; category?: string; visibility?: string; selected?: boolean; future?: boolean; missing?: boolean; standalone?: boolean } = {}) => {
+  const add = async (suffix: string, seconds: number, options: { scope?: string; category?: string; visibility?: string; selected?: boolean; future?: boolean; missing?: boolean; standalone?: boolean } = {}) => {
     const id = `${prefix}-${suffix}`;
     const time = new Date(+at + seconds * 1000);
     await sql`INSERT INTO articles (id, source_id, identity_key, url, title, discovered_at, timeline_at)
@@ -27,14 +27,13 @@ test("timeline grouping preserves evidence scope and filter-local anchors", asyn
       VALUES (${id}, ${prefix}, ${analysis!.id}, ${id}, ${`https://example.org/${id}`}, ${time}, ${time}, ${time}, ${options.future ? new Date(+now + 1) : time},
         ${options.selected ?? true}, true, ${options.visibility ?? "public"}, ${options.category ?? "ai-models"}, ${[prefix]}, ${options.standalone ? null : fact!.id})`;
     if (!options.missing && !options.standalone) await sql`INSERT INTO fact_articles (fact_id, article_id, role)
-      VALUES (${fact!.id}, ${id}, ${options.role ?? "report"})`;
+      VALUES (${fact!.id}, ${id}, 'report')`;
     return id;
   };
   await add("old-report", 0);
   await add("paper-report", 10, { category: "paper" });
   const standalone = [
     await add("composite", 20, { scope: "composite" }),
-    await add("mention", 30, { role: "mention" }),
     await add("removed", 40, { missing: true }),
     await add("standalone-a", 50, { standalone: true }),
     await add("standalone-z", 50, { standalone: true }),

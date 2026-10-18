@@ -33,10 +33,10 @@ for (const name of ["DEEPSEEK", "XIAOMI_MIMO"]) {
 const embeddings = await embeddingsStub();
 let factId: number;
 
-async function report(suffix: string, composite = false) {
+async function report(suffix: string) {
   const { articleId } = await upsertMaterial({ sourceId, url: `https://example.org/group-${T}/${suffix}`, title: `新模型发布${T}`, bodyText: "今日发布新模型和价格。", bodyStatus: "ok", via: "fetch", publishedAt: new Date() });
   await sql`INSERT INTO analyses (article_id,input_revision,origin,relevance,category,title_zh,summary_zh,output)
-    VALUES (${articleId},1,'rule','pass','ai-models',${`新模型发布${T} ${suffix}`},${`新模型发布和价格${T} ${suffix}`},${sql.json({ scope: composite ? "composite" : "single", fact: { title: "新模型发布", subject: "实验室", action: "发布", object: "模型" } })})`;
+    VALUES (${articleId},1,'rule','pass','ai-models',${`新模型发布${T} ${suffix}`},${`新模型发布和价格${T} ${suffix}`},${sql.json({ scope: "single", fact: { title: "新模型发布", subject: "实验室", action: "发布", object: "模型" } })})`;
   await sql`INSERT INTO editorial_overrides(article_id,fields,reason,updated_by) VALUES (${articleId},'{"selected":true,"score":80}','test selection','test')`;
   await sql`UPDATE articles SET processing_state='analyzed' WHERE id=${articleId}`;
   await publishArticle(articleId);
@@ -64,8 +64,8 @@ test("missing and invalid identity answers cannot silently assert unrelated", ()
   assert.throws(() => verdictsByFact([{ id: "C1", relation: "UNRELATED", confidence: 1 }, { id: "C1", relation: "UNRELATED", confidence: 1 }], cands), /candidate|候选/i);
 });
 
-for (const composite of [false, true]) test(`a ${composite ? "roundup" : "single report"} with an incomplete answer stays unresolved and can recover`, async () => {
-  const id = await report(composite ? "roundup" : "incomplete", composite);
+test("a report with an incomplete answer stays unresolved and can recover", async () => {
+  const id = await report("incomplete");
   response = "missing";
   await assert.rejects(groupArticle(id), /unusable output/);
   const [failed] = await sql`SELECT grouped_at,grouping_status,grouping_receipt_id FROM articles WHERE id=${id}`;
@@ -75,7 +75,7 @@ for (const composite of [false, true]) test(`a ${composite ? "roundup" : "single
   assert.equal((await sql`SELECT 1 FROM fact_articles WHERE article_id=${id}`).length, 0);
   response = "complete";
   const result = await groupArticle(id);
-  assert.equal(result.verdict, composite ? "roundup" : "same-fact");
+  assert.equal(result.verdict, "same-fact");
   const [done] = await sql`SELECT grouped_at,grouping_status,grouping_receipt_id,grouping_error FROM articles WHERE id=${id}`;
   assert.equal(done!.grouping_status, "complete");
   assert.ok(done!.grouped_at);
@@ -85,8 +85,8 @@ for (const composite of [false, true]) test(`a ${composite ? "roundup" : "single
 
 // The grouping decision and the paid result it consumes must commit together. Without this,
 // a failed completion can leave an article grouped while its paid response stays "received".
-for (const kind of ["report", "roundup"] as const) test(`receipt completion failure rolls back ${kind} grouping and recovery reuses the response`, async () => {
-  const id = await report(`receipt-atomic-${kind}`, kind === "roundup");
+test("receipt completion failure rolls back grouping and recovery reuses the response", async () => {
+  const id = await report("receipt-atomic-report");
   await sql.unsafe(`CREATE FUNCTION fail_grouping_receipt() RETURNS trigger LANGUAGE plpgsql AS $body$ BEGIN
     IF NEW.status = 'completed' AND NEW.purpose = 'group_article'
       THEN RAISE EXCEPTION 'grouping receipt commit interrupted';
@@ -114,7 +114,7 @@ for (const kind of ["report", "roundup"] as const) test(`receipt completion fail
   assert.ok(receipts.every((receipt) => receipt.status === "received"), "no receipt completes on a rolled-back decision");
 
   const result = await groupArticle(id);
-  assert.equal(result.verdict, kind === "roundup" ? "roundup" : "same-fact");
+  assert.equal(result.verdict, "same-fact");
   assert.equal(provider.hits(), after, "recovery must reuse the already paid response");
   const completed = await sql<{ status: string }[]>`
     SELECT status FROM receipts WHERE purpose IN ('group_article', 'group_review')

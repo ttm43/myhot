@@ -266,7 +266,7 @@ test("a composite first, with no candidates, stays standalone and cannot become 
   assert.equal(provider.hits(), hits, "the composite is not recalled as a fact");
 });
 
-test("a composite arriving after independent products only mentions them even when the model calls both the same occurrence", async () => {
+test("a composite arriving after independent products joins nothing, makes no call and merges nothing", async () => {
   hold = gate(); hold.open();
   const text = randomText();
   const one = await storyWithRoot(`${text}甲`, "composite-product-a");
@@ -277,9 +277,10 @@ test("a composite arriving after independent products only mentions them even wh
   try {
     const hits = provider.hits();
     assert.deepEqual(await groupArticle(id), { verdict: "roundup" });
-    assert.equal(provider.hits() - hits, 1, "one batch call, no pair review or consolidation");
-    const memberships = await sql<{ fact_id: number; role: string }[]>`SELECT fact_id, role FROM fact_articles WHERE article_id = ${id} ORDER BY fact_id`;
-    assert.deepEqual(memberships.map((r) => [Number(r.fact_id), r.role]), [[one.factId, "mention"], [two.factId, "mention"]]);
+    assert.equal(provider.hits(), hits, "a digest is not judged against candidates");
+    assert.equal((await sql`SELECT 1 FROM fact_articles WHERE article_id = ${id}`).length, 0);
+    const decisions = await sql`SELECT verdict, fact_id, candidates FROM grouping_decisions WHERE article_id = ${id}`;
+    assert.deepEqual(decisions.map((d) => [d.verdict, d.fact_id, d.candidates]), [["roundup", null, []]]);
     assert.equal((await sql`SELECT 1 FROM stories WHERE id IN (${one.storyId}, ${two.storyId}) AND merged_into IS NOT NULL`).length, 0);
     const [p] = await sql`SELECT fact_id, story_id FROM publications WHERE article_id = ${id}`;
     assert.deepEqual({ ...p }, { fact_id: null, story_id: null });
@@ -297,10 +298,10 @@ test("a newly identified composite loses automatic membership and cannot serve a
   assert.equal(provider.hits(), hits, "known composite is not root evidence even before repair");
   const result = await groupArticle(old.articleId);
   assert.equal(result.verdict, "roundup", "a normal grouping pass does not keep a newly identified composite");
-  const memberships = await sql<{ fact_id: number; role: string }[]>`SELECT fact_id, role FROM fact_articles WHERE article_id = ${old.articleId}`;
-  assert.deepEqual(memberships.map((r) => [Number(r.fact_id), r.role]), [[actual.factId, "mention"]]);
+  assert.equal(provider.hits(), hits, "regrouping a composite asks no model");
+  assert.equal((await sql`SELECT 1 FROM fact_articles WHERE article_id = ${old.articleId}`).length, 0);
   const [story] = await sql`SELECT merged_into FROM stories WHERE id = ${old.storyId}`;
-  assert.equal(story!.merged_into, null, "removing a composite does not redirect its empty story into one mentioned product");
+  assert.equal(story!.merged_into, null, "removing a composite does not redirect its empty story into another product");
 });
 
 test("composite classification never deletes an editor's explicit membership", async () => {

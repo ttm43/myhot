@@ -67,12 +67,12 @@ export function groupingEvidenceCondition(article: ReturnType<typeof sql>) {
 
 /** `fa` links report `p` to a fact as evidence: a primary or report membership, never a composite. */
 export function evidenceCondition() {
-  return sql`fa.role <> 'mention' AND NOT ${compositeCondition()}`;
+  return sql`NOT ${compositeCondition()}`;
 }
 
 /**
  * Report `p` is still evidence of its own fact (`publications.fact_id`, written at publish time): a
- * membership removed or turned into a mention since then no longer counts.
+ * membership removed since then no longer counts.
  */
 export function ownFactEvidenceCondition() {
   return sql`EXISTS (SELECT 1 FROM fact_articles fa WHERE fa.fact_id = p.fact_id AND fa.article_id = p.article_id AND ${evidenceCondition()})`;

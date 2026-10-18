@@ -27,7 +27,7 @@ async function story(title = "OpenAI 发布 Dots") {
     VALUES (${`f-${randomUUID()}`},${s!.id},${title},'OpenAI','发布','Dots','自主执行任务消耗额度') RETURNING id, public_id`;
   return { storyId: Number(s!.id), storyPublicId: s!.public_id as string, factId: Number(f!.id), factPublicId: f!.public_id as string };
 }
-async function report(sourceId: string, group: Awaited<ReturnType<typeof story>>, opts: { title: string; hours: number; selected?: boolean; score?: number; role?: string }) {
+async function report(sourceId: string, group: Awaited<ReturnType<typeof story>>, opts: { title: string; hours: number; selected?: boolean; score?: number }) {
   const id = `${key}-${randomUUID()}`;
   const date = at(opts.hours);
   await sql`INSERT INTO articles (id,source_id,identity_key,url,title,timeline_at,discovered_at,published_at)
@@ -39,7 +39,7 @@ async function report(sourceId: string, group: Awaited<ReturnType<typeof story>>
     story_id,fact_id,selected,eligible,visible_after,tags,body_mode,score)
     VALUES (${id},${a!.id},${sourceId},${opts.title},${opts.title},${`https://example.org/${id}`},true,${date},${date},${date},${date},
     ${group.storyId},${group.factId},${opts.selected ?? true},true,${date},${[key]},'full',${opts.score ?? 70})`;
-  await sql`INSERT INTO fact_articles (fact_id,article_id,role,evidence) VALUES (${group.factId},${id},${opts.role ?? 'report'},'Tasks consume usage.')`;
+  await sql`INSERT INTO fact_articles (fact_id,article_id,role,evidence) VALUES (${group.factId},${id},'report','Tasks consume usage.')`;
   return id;
 }
 
@@ -64,22 +64,19 @@ test("source tier and event ownership are separate; mentions of an entity do not
   assert.equal(representativePriority({ ...row, first_party: true } as typeof row), 3, "the first_party flag never elevates a source");
 });
 
-test("mentions cannot choose a timeline origin, anchor or representative", async () => {
+test("the fact's own reports choose its timeline origin, anchor and representative", async () => {
   const organization = await source("organization", "T1_5", "openai", "organization");
   const media = await source("media", "T2");
   const t1 = await source("t1", "T1");
   const g = await story();
   const official = await report(organization, g, { title: "Dots 正式发布", hours: 3, score: 65 });
   const latest = await report(media, g, { title: "Dots 后续更新", hours: 2, score: 90 });
-  const earlyMention = await report(t1, g, { title: "EARLY ROUNDUP", hours: 90, role: "mention" });
-  const lateMention = await report(t1, g, { title: "LATEST ROUNDUP", hours: 1, role: "mention" });
   await report(t1, g, { title: "未入选官网稿", hours: 4, selected: false, score: 30 });
   const q = { channel: "all" as const, category: null, tag: key, now };
   const timeline = await loadTimeline(q);
   const card = timeline.cards.find(c => c.key === `f${g.factId}`)!;
   assert.equal(card.item.id, official);
   assert.equal(card.anchorAt, at(3).toISOString());
-  assert.ok(timeline.cards.some(c => c.key === `a${earlyMention}`) && timeline.cards.some(c => c.key === `a${lateMention}`), "a stale mention projection stays an independent selected article");
   const group = await loadGroupReports({ factPublicId: g.factPublicId, channel: "all", category: null, tag: key }, now);
   assert.equal(group?.reports.length, 3, "only primary/report members are same-fact reports");
   const firstParty = await loadTimeline({ ...q, channel: "firstParty" });
@@ -87,14 +84,13 @@ test("mentions cannot choose a timeline origin, anchor or representative", async
 });
 
 // The detail's group badge and its expanded report list must count the same evidence, even while
-// an old projection still points to a fact after a report became a mention or composite.
+// an old projection still points to a fact after a report became a composite.
 test("item detail counts the same fact evidence as its expanded group", async () => {
   const s = await source("detail-count", "T1");
   const other = await source("detail-count-other", "T2");
   const g = await story();
   const main = await report(s, g, { title: "事件原始报道", hours: 3 });
   await report(other, g, { title: "事件补充报道", hours: 2 });
-  await report(other, g, { title: "只提及该事件", hours: 1, role: "mention" });
   const composite = await report(other, g, { title: "多个事件的综合稿", hours: 1 });
   await sql`UPDATE analyses SET output = output || '{"scope":"composite"}'::jsonb WHERE article_id = ${composite}`;
   const detail = await loadItemDetail(main, now);
