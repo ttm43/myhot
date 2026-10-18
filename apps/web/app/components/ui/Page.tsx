@@ -1,23 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * The reading template, one of the site's two page widths (the other is the full-width feeds and
- * boards): a main column and an aside (300px, 340px on wide screens) in a container that fills a 16:9
- * screen and centres on wider ones (--page-max-reading); long text keeps its own reading measure
- * inside the main column.
- * On phones the aside follows the main column.
- */
-export function ReadingLayout({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
-  return (
-    <div className="mx-auto grid max-w-[var(--page-max-reading)] gap-8 pb-14 pt-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-10 lg:pt-0 2xl:grid-cols-[minmax(0,1fr)_340px]">
-      <div className="min-w-0">{children}</div>
-      {aside && <aside className="min-w-0 space-y-4 lg:sticky lg:top-6 lg:self-start">{aside}</aside>}
-    </div>
-  );
-}
-
-/**
- * Long reads (articles, terms, privacy): no sheet, the text sits on the page in a column of at most
+ * Long reads (articles): no sheet, the text sits on the page in a column of at most
  * 760px, the width Chinese magazines and news sites use (680–730px at 16–17px, about 42 characters a
  * line). From 2xl a rail on each side (the piece's facts left, notes right) keeps the page filling a
  * 16:9 screen with the column in the middle; from lg only the right rail shows, beside the centred
@@ -45,16 +29,6 @@ export function RailSection({ title, children }: { title?: ReactNode; children: 
     <section className="border-t border-line pt-3.5">
       {title && <h2 className="text-[12px] font-semibold text-ink-3">{title}</h2>}
       <div className={title ? "mt-2.5" : undefined}>{children}</div>
-    </section>
-  );
-}
-
-/** A small titled card in a reading page's aside. */
-export function AsideCard({ title, children, className = "" }: { title: ReactNode; children: ReactNode; className?: string }) {
-  return (
-    <section className={`card p-5 ${className}`}>
-      <h2 className="text-[13px] font-semibold text-ink">{title}</h2>
-      <div className="mt-3">{children}</div>
     </section>
   );
 }
