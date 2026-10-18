@@ -56,8 +56,9 @@ async function fixture(options: {
   const { articleId: id } = await upsertMaterial({ sourceId: source, url, title: `Original title ${key}`, language: "en",
     bodyText: options.bodyStatus === "none" ? null : main, bodyHtml: options.bodyStatus === "none" ? null : `<p>${main}</p>`,
     bodyStatus: options.bodyStatus ?? "ok", xPost, via: "fetch", publishedAt: new Date() });
-  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, reason_zh, tags, score, selected)
-    VALUES (${id}, 1, 'rule', 'pass', 'ai-models', ${`标题-${key}`}, ${summary}, '推荐理由', ${[T, key]}, 90, true)`;
+  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, reason_zh, tags)
+    VALUES (${id}, 1, 'rule', 'pass', 'ai-models', ${`标题-${key}`}, ${summary}, '推荐理由', ${[T, key]})`;
+  await sql`INSERT INTO editorial_overrides (article_id, fields, reason, updated_by) VALUES (${id}, '{"selected":true,"score":90}', 'test selection', 'test')`;
   const story = randomUUID();
   const [savedStory] = await sql<{ id: number }[]>`INSERT INTO stories (public_id, title) VALUES (${story}, '许可测试事件') RETURNING id`;
   const fact = `fact-${key}`;

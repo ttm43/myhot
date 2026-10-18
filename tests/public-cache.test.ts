@@ -17,8 +17,9 @@ before(async () => {
     VALUES(${T},'Cache example','rss','T1','editorial',true)`;
   id = (await upsertMaterial({ sourceId:T, url:`https://example.com/${T}`,title:'公开缓存示例',
     bodyText:'允许公开的正文。'.repeat(50),bodyStatus:'ok',via:'fetch',publishedAt:new Date() })).articleId;
-  await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,score,selected)
-    VALUES(${id},1,'rule','pass','ai-models','公开缓存示例','公开缓存摘要',90,true)`;
+  await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh)
+    VALUES(${id},1,'rule','pass','ai-models','公开缓存示例','公开缓存摘要')`;
+  await sql`INSERT INTO editorial_overrides(article_id,fields,reason,updated_by) VALUES(${id},'{"selected":true,"score":90}','test selection','test')`;
   await publishArticle(id,{releasedAt:new Date(Date.now()-60000)});
 });
 after(async()=>{await app.close();await stopBoss();await closeDb();});

@@ -55,8 +55,8 @@ const article = async (marker: string, extra: Record<string, unknown> = {}) =>
   } as never)).articleId;
 const calls = (marker: string) => requests.filter((r) => r.marker === marker).map((r) => r.step);
 const row = async (id: string) =>
-  (await sql<{ selected: boolean; relevance: string; score: string | null; title_zh: string; reason_zh: string | null; category: string | null; tags: string[]; subjects: string[]; receipt_ids: string[]; output: Record<string, any> }[]>`
-    SELECT selected, relevance, score, title_zh, reason_zh, category, tags, subjects, receipt_ids, output FROM analyses WHERE article_id = ${id} ORDER BY id DESC LIMIT 1`)[0]!;
+  (await sql<{ relevance: string; title_zh: string; reason_zh: string | null; category: string | null; tags: string[]; subjects: string[]; receipt_ids: string[]; output: Record<string, any> }[]>`
+    SELECT relevance, title_zh, reason_zh, category, tags, subjects, receipt_ids, output FROM analyses WHERE article_id = ${id} ORDER BY id DESC LIMIT 1`)[0]!;
 
 test("a relevant item: the prefilter, the structure and the title/summary writing", async () => {
   const id = await article("CLEAR");
@@ -65,7 +65,6 @@ test("a relevant item: the prefilter, the structure and the title/summary writin
   assert.deepEqual(calls("CLEAR").sort(), ["prefilter", "structure", "summarize"]);
   const r = await row(id);
   assert.deepEqual([r.title_zh, r.reason_zh, r.category, r.receipt_ids.length], ["翻译标题 CLEAR", null, "ai-models", 3]);
-  assert.deepEqual([r.selected, r.score], [null, null], "the analysis judges no selection and no score");
   assert.deepEqual(r.tags, ["模型发布", "推理", "Anthropic"], "category and tags come from the same structural judgement, plus the verified subject tag");
   assert.deepEqual(r.subjects, ["anthropic"]);
   assert.deepEqual([r.output.writer, r.output.prefilter.label, r.output.fact.title], ["summarize", "PASS", "事实 CLEAR"]);

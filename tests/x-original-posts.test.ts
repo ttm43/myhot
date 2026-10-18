@@ -65,8 +65,9 @@ test("empty and link-only posts preserve originals without calling the writer", 
 
 test("rebuilding an image-only post replaces historical model replies across public outputs and preserves its image and address", async () => {
   const { id, url } = await post("historical-empty", "");
-  await sql`INSERT INTO analyses (article_id,input_revision,origin,relevance,title_zh,summary_zh,score,selected)
-    VALUES (${id},1,'model','pass','请补充正文','抱歉，没有推文文字内容可供翻译。',90,true)`;
+  await sql`INSERT INTO analyses (article_id,input_revision,origin,relevance,title_zh,summary_zh)
+    VALUES (${id},1,'model','pass','请补充正文','抱歉，没有推文文字内容可供翻译。')`;
+  await sql`INSERT INTO editorial_overrides (article_id,fields,reason,updated_by) VALUES (${id},'{"selected":true,"score":90}','test selection','test')`;
   const before = provider.hits();
   await publishArticle(id, released());
   assert.equal(provider.hits(), before, "a projection rebuild buys no model response");

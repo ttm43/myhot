@@ -4,8 +4,10 @@
 // a later no-op grouping erases a prior low-increment decision; a material revision silently approves
 // a rejected follow-up or cannot regain its slot after adding evidence. Older confirmed identities
 // must not be reevaluated merely because they predate the value field. Prompts use real samples.
-// A duplicate of a fact rejected for low increment must not gain a first selected seat merely by
-// sharing its identity or URL; better reporting of an unseen fact can still become its first pick.
+// A duplicate of a fact rejected for low increment must not be judged valuable merely by sharing
+// its identity or URL; better reporting of an unseen fact can still become its first pick.
+// Selection itself comes only from editorial overrides, which the value judgement never vetoes, so
+// these tests pin the recorded judgement; the publication's selected flag follows the override.
 import { embeddingsStub, stub, tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -48,8 +50,9 @@ const family = () => Array.from({ length: 24 }, (_, i) => String.fromCharCode(0x
 async function report(text: string, scope = "single", selected = true) {
   const { articleId } = await upsertMaterial({ sourceId, url: `https://example.org/value/${randomUUID()}`, title: text,
     bodyText: text, bodyStatus: "ok", via: "fetch", publishedAt: new Date() });
-  await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,title_zh,summary_zh,category,score,selected,output)
-    VALUES(${articleId},1,'rule','pass',${text},${text},'ai-products',80,${selected},${sql.json({ scope, fact: scope === "composite" ? null : { title: text, subject: text, action: "发布", object: text } })})`;
+  await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,title_zh,summary_zh,category,output)
+    VALUES(${articleId},1,'rule','pass',${text},${text},'ai-products',${sql.json({ scope, fact: scope === "composite" ? null : { title: text, subject: text, action: "发布", object: text } })})`;
+  if (selected) await sql`INSERT INTO editorial_overrides(article_id,fields,reason,updated_by) VALUES(${articleId},'{"selected":true,"score":80}','test selection','test')`;
   await publishArticle(articleId);
   return articleId;
 }
@@ -85,14 +88,15 @@ test("same-fact reports remain eligible to replace the representative despite no
   assert.equal(row.selected, true);
 });
 
-for (const sameUrl of [false, true]) test(`a ${sameUrl ? "same-url" : "same-fact"} copy cannot revive a low-increment fact without new value`, async () => {
+for (const sameUrl of [false, true]) test(`a ${sameUrl ? "same-url" : "same-fact"} copy is still judged without new value`, async () => {
   const text = family();
   await root(text);
   relation = "SAME_STORY";
   selection = { addsValue: false, reason: "旧能力已被首发报道覆盖" };
-  const rejected = await report(text + "再次讲解");
+  // Not selected by any override: its fact offers no selected coverage the copy could stand behind.
+  const rejected = await report(text + "再次讲解", "single", false);
   const previous = await groupArticle(rejected);
-  assert.equal((await state(rejected)).selected, false);
+  assert.equal((await state(rejected)).selection_adds_value, false);
   const id = await report(text + "再次讲解");
   if (sameUrl) await sql`UPDATE articles SET url=(SELECT url FROM articles WHERE id=${rejected}) WHERE id=${id}`;
   relation = "SAME_OCCURRENCE";
@@ -101,7 +105,7 @@ for (const sameUrl of [false, true]) test(`a ${sameUrl ? "same-url" : "same-fact
   try {
     const result = await groupArticle(id);
     assert.deepEqual([result.verdict,result.factId], [sameUrl ? "same-url" : "same-fact",previous.factId]);
-    assert.deepEqual([(await state(id)).selection_adds_value,(await state(id)).selected], [false,false]);
+    assert.equal((await state(id)).selection_adds_value, false);
     assert.ok(provider.hits() > calls, "an unseen target fact still compares with previously selected coverage");
   } finally { sameOccurrenceTitle = null; }
 });
@@ -120,7 +124,7 @@ for (const alreadySelected of [false, true]) test(`a same-url report can ${alrea
   assert.equal(provider.hits(), calls + (alreadySelected ? 0 : 1));
 });
 
-test("a low-increment follow-up stays a distinct fact in all content without a selected slot", async () => {
+test("a low-increment follow-up stays a distinct fact and records its low increment", async () => {
   const text = family();
   const first = await root(text);
   relation = "SAME_STORY";
@@ -130,7 +134,7 @@ test("a low-increment follow-up stays a distinct fact in all content without a s
   assert.equal(result.storyId, first.result.storyId);
   assert.notEqual(result.factId, first.result.factId);
   const row = await state(id);
-  assert.deepEqual([row.selection_adds_value,row.selected,row.eligible], [false,false,true]);
+  assert.deepEqual([row.selection_adds_value,row.eligible], [false,true]);
   assert.equal((await groupArticle(id)).verdict, "kept");
   assert.equal((await state(id)).selection_adds_value, false, "a no-op retry preserves its value decision");
 });
@@ -147,8 +151,8 @@ test("a material revision rechecks value in the same batch while keeping its con
     const revised = text + (addsValue ? "独立测得新的评测结果" : "调整措辞后的讲解");
     await upsertMaterial({ sourceId, url: article!.url, title: revised, bodyText: revised,
       bodyStatus: "ok", via: "fetch", publishedAt: article!.published_at });
-    await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,title_zh,summary_zh,category,score,selected,output)
-      VALUES(${id},${revision},'rule','pass',${revised},${revised},'ai-products',80,true,
+    await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,title_zh,summary_zh,category,output)
+      VALUES(${id},${revision},'rule','pass',${revised},${revised},'ai-products',
         ${sql.json({ scope: "single", fact: { title: revised, subject: text, action: "介绍", object: text } })})`;
     assert.deepEqual([(await state(id)).grouping_status,(await state(id)).selected], ["pending",false]);
     selection = { addsValue, reason: addsValue ? "补充了新测量结果" : "仅措辞变化" };
@@ -157,7 +161,7 @@ test("a material revision rechecks value in the same batch while keeping its con
     const result = await groupArticle(id);
     assert.equal(provider.hits(), calls + 1, "one existing batch judges the replacement revision");
     assert.deepEqual([result.verdict,result.factId,result.storyId], ["kept",original.factId,original.storyId]);
-    assert.deepEqual([(await state(id)).selection_adds_value,(await state(id)).selected], [addsValue,addsValue]);
+    assert.deepEqual([(await state(id)).selection_adds_value,(await state(id)).selected], [addsValue,true]);
     await groupArticle(id);
     assert.equal(provider.hits(), calls + 1, "a completed revision keeps its value without another call");
   }
@@ -189,7 +193,7 @@ test("an independent evaluation remains selected as a new fact", async () => {
   assert.ok(users.at(-1)!.includes(sourceEvidence), "the query's saved source evidence must reach the value judgement");
 });
 
-test("a roundup can lose its selected slot while retaining only mention links", async () => {
+test("a roundup without new value retains only mention links", async () => {
   const text = family();
   const first = await root(text);
   relation = "ROUNDUP";
@@ -198,7 +202,7 @@ test("a roundup can lose its selected slot while retaining only mention links", 
   assert.equal((await groupArticle(id)).verdict, "roundup");
   assert.deepEqual((await sql`SELECT role FROM fact_articles WHERE article_id=${id} AND fact_id=${first.result.factId!}`).map(r => r.role), ["mention"]);
   const row = await state(id);
-  assert.deepEqual([row.selection_adds_value,row.selected,row.eligible,row.fact_id], [false,false,true,null]);
+  assert.deepEqual([row.selection_adds_value,row.eligible,row.fact_id], [false,true,null]);
 });
 
 // Failure modes: a selected composite has no fact, so its later single-item retelling misses prior
@@ -218,7 +222,7 @@ for (const addsValue of [false, true]) test(`a selected composite supplies readi
   const id = await report(text + (addsValue ? "独立新评测" : "单项再次讲解"));
   const calls = provider.hits();
   const result = await groupArticle(id);
-  assert.equal((await state(id)).selected, addsValue);
+  assert.equal((await state(id)).selection_adds_value, addsValue);
   assert.equal(provider.hits(), calls + 1, "reading coverage is judged in the existing batch with zero fact candidates");
   assert.ok(users.at(-1)!.includes(text + "综合首发"));
   assert.ok(users.at(-1)!.includes("末项功能支持输出透明图层"), "the end of a public composite summary remains readable");
@@ -242,7 +246,7 @@ test("reading-only context excludes unselected, nonpublic and old reports", asyn
     const calls = provider.hits();
     await groupArticle(id);
     assert.equal(provider.hits(), calls, unavailable);
-    assert.equal((await state(id)).selected, true, unavailable);
+    assert.equal((await state(id)).selection_adds_value, true, unavailable);
   }
 });
 

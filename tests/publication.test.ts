@@ -37,8 +37,9 @@ async function article(): Promise<string> {
   const { articleId } = await upsertMaterial({
     sourceId: SOURCE, url: `https://example.com/${T}-${n}`, title: `Test ${n}`, bodyText: BODY, bodyHtml: `<p>${BODY}</p>`, bodyStatus: "ok", via: "fetch", publishedAt: new Date(),
   });
-  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, reason_zh, score, selected)
-            VALUES (${articleId}, 1, 'rule', 'pass', 'ai-models', ${`标题${n}-${T}`}, ${`SUMMARY-${n}-${T}`}, '理由', 90, true)`;
+  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, reason_zh)
+            VALUES (${articleId}, 1, 'rule', 'pass', 'ai-models', ${`标题${n}-${T}`}, ${`SUMMARY-${n}-${T}`}, '理由')`;
+  await sql`INSERT INTO editorial_overrides (article_id, fields, reason, updated_by) VALUES (${articleId}, '{"selected":true,"score":90}', 'test selection', 'test')`;
   return articleId;
 }
 
@@ -48,30 +49,29 @@ async function get(url: string, headers: Record<string, string> = {}) {
   return { status: res.statusCode, body: res.body, etag: res.headers.etag as string | undefined };
 }
 
-// Failure modes: a revoked score falls back to the erroneous model score, zero is treated as
-// missing, republishing loses a correction, invalid scores or stale edits alter public state,
-// or removing a correction cannot restore the saved model result without paying again.
+// Failure modes: a revoked score survives in a public projection, zero is treated as missing,
+// republishing loses a correction, invalid scores or stale edits alter public state, or a cleared
+// score leaves the previous value behind.
 test("manual score corrections, including no score, survive every public projection and rebuild", async () => {
   const id = await article();
   await sql`UPDATE articles SET grouping_status = 'complete' WHERE id = ${id}`;
   await publishArticle(id, released());
   assert.equal(JSON.parse((await get(`/api/site/items/${id}`)).body).score, 90);
   for (const score of [-1, 101, "0", Number.NaN]) {
-    await assert.rejects(overrideFields(id, { fields: { score }, reason: "invalid score", version: 0 }, "test"));
+    await assert.rejects(overrideFields(id, { fields: { score }, reason: "invalid score", version: 1 }, "test"));
   }
-  await overrideFields(id, { fields: { score: null, selected: false }, reason: "unsupported launch revoked", version: 0 }, "test");
+  await overrideFields(id, { fields: { score: null, selected: false }, reason: "unsupported launch revoked", version: 1 }, "test");
   await publishArticle(id);
   const detail = JSON.parse((await get(`/api/site/items/${id}`)).body);
   assert.equal(detail.score, null);
   assert.equal(detail.selected, false);
   const items = (await v1Items({ mode: "all", window: "24h", by: "timeline", category: null, q: detail.title, limit: 10, cursor: null })).items;
   assert.equal(items.find((i) => i.id === id)?.score, null);
-  assert.equal(Number((await sql`SELECT score FROM analyses WHERE article_id = ${id}`)[0]!.score), 90, "the paid result stays intact");
-  await assert.rejects(overrideFields(id, { fields: { score: 99 }, reason: "stale correction", version: 0 }, "test"));
-  await overrideFields(id, { fields: { score: 0 }, reason: "verified zero score", version: 1 }, "test");
+  await assert.rejects(overrideFields(id, { fields: { score: 99 }, reason: "stale correction", version: 1 }, "test"));
+  await overrideFields(id, { fields: { score: 0 }, reason: "verified zero score", version: 2 }, "test");
   assert.equal(JSON.parse((await get(`/api/site/items/${id}`)).body).score, 0);
-  await overrideFields(id, { fields: {}, clear: ["score"], reason: "restore saved scoring", version: 2 }, "test");
-  assert.equal(JSON.parse((await get(`/api/site/items/${id}`)).body).score, 90);
+  await overrideFields(id, { fields: {}, clear: ["score"], reason: "clear the score", version: 3 }, "test");
+  assert.equal(JSON.parse((await get(`/api/site/items/${id}`)).body).score, null);
 });
 
 // Export failures to guard before changing conversion: flattened table relationships, invented
@@ -135,7 +135,7 @@ test("site reading and the export carry the article as written, until it is with
   assert.equal(page.outline[0].text, 'Original heading');
   const md = (await get(`/items/${id}/markdown`)).body;
   assert.ok(md.includes('Original full body'));
-  await setVisibility(id, { visibility: 'withdrawn', reason: 'test', version: 0 }, 'test');
+  await setVisibility(id, { visibility: 'withdrawn', reason: 'test', version: 1 }, 'test');
   assert.equal((await get(`/api/site/items/${id}`)).status, 404);
 });
 
@@ -168,8 +168,8 @@ test("item pages follow one rule: unsummarised editorial items keep one, hot_sig
   const { articleId: plain } = await material(SOURCE, "plain");
   await publishArticle(plain);
   const { articleId: signal } = await material(SIGNAL, "signal");
-  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, score, selected)
-            VALUES (${signal}, 1, 'replay', 'pass', 'industry', ${`信号-${T}`}, ${`SIGNAL-SUMMARY-${T}`}, 80, false)`;
+  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh)
+            VALUES (${signal}, 1, 'replay', 'pass', 'industry', ${`信号-${T}`}, ${`SIGNAL-SUMMARY-${T}`})`;
   await publishArticle(signal);
 
   const page = await get(`/api/site/items/${plain}`);
@@ -207,7 +207,7 @@ test("summary-only detail keeps neutral metadata without a selected verdict", as
   await publishArticle(id, released());
   const before = JSON.parse((await get(`/api/site/items/${id}`)).body);
   assert.equal(before.selected, true);
-  await setVisibility(id, { visibility: "summary-only", reason: "neutral summary", version: 0 }, "test");
+  await setVisibility(id, { visibility: "summary-only", reason: "neutral summary", version: 1 }, "test");
   const item = JSON.parse((await get(`/api/site/items/${id}`)).body);
   assert.equal(item.title, before.title);
   assert.equal(item.summary, before.summary);

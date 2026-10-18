@@ -30,7 +30,6 @@ interface ArticleRow {
   x_article: { text?: string } | null;
   grouped_at: Date | null;
   grouping_status: "pending" | "complete" | "failed";
-  selection_adds_value: boolean | null;
 }
 
 interface AnalysisRow {
@@ -42,8 +41,6 @@ interface AnalysisRow {
   title_zh: string | null;
   summary_zh: string | null;
   reason_zh: string | null;
-  score: number | null;
-  selected: boolean | null;
 }
 
 interface OverrideRow {
@@ -146,7 +143,7 @@ export async function publishArticle(articleId: string, options: PublishOptions 
 export async function publishArticleTx(tx: Tx, articleId: string, options: PublishOptions = {}): Promise<PublishResult | null> {
   const [article] = await tx<ArticleRow[]>`
     SELECT id, source_id, url, title, language, published_at, discovered_at, timeline_at, backfill, body_status,
-           body_text, x_post, x_article, grouped_at, grouping_status, selection_adds_value
+           body_text, x_post, x_article, grouped_at, grouping_status
     FROM articles WHERE id = ${articleId} FOR UPDATE`;
   if (!article) return null;
   // Explicit imports carry an already-public editorial decision, not a new pending judgement.
@@ -158,7 +155,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     SELECT id, name, kind, tier, participation_mode, first_party, site_fulltext FROM sources WHERE id = ${article.source_id}`;
   if (!source) return null;
   const [analysis] = await tx<AnalysisRow[]>`
-    SELECT id, relevance, category, tags, subjects, title_zh, summary_zh, reason_zh, score, selected
+    SELECT id, relevance, category, tags, subjects, title_zh, summary_zh, reason_zh
     FROM analyses WHERE article_id = ${articleId} ORDER BY input_revision DESC, id DESC LIMIT 1`;
   const [override] = await tx<OverrideRow[]>`SELECT fields, visibility FROM editorial_overrides WHERE article_id = ${articleId}`;
   const [membership] = await tx<{ fact_id: number; story_id: number | null }[]>`
@@ -184,9 +181,9 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   const summary = pickString(f.summary, original ? original.summary : analysis?.summary_zh ?? null);
   const category = pickString(f.category, analysis?.category ?? null);
   const tags = Array.isArray(f.tags) ? (f.tags as string[]) : [...new Set([...(analysis?.tags ?? []), ...(analysis?.subjects ?? []).map((s) => `entity:${s}`)])];
-  const score = f.score === null || typeof f.score === "number" ? f.score : analysis?.score ?? null;
+  const score = typeof f.score === "number" ? f.score : null;
   const relevance = typeof f.relevance === "string" ? (f.relevance as string) : analysis?.relevance ?? null;
-  const judgedSelected = typeof f.selected === "boolean" ? (f.selected as boolean) : analysis?.selected ?? null;
+  const judgedSelected = typeof f.selected === "boolean" ? (f.selected as boolean) : null;
   // Material from an isolated source reaches no public surface at all: not even a detail page.
   const visibility = source.participation_mode === "isolated" ? "withdrawn" : (override?.visibility ?? "public");
 
@@ -195,10 +192,10 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   const eligible = isPoolEligible({ participationMode: source.participation_mode, relevance, title, summary, originalPost: !!original })
     && (!article.backfill || article.published_at !== null || !!options.releasedAt);
   const selectionCandidate = isSelectable(eligible, judgedSelected, source.tier);
-  // Scoring nominates a report; a completed identity/value decision admits it to selection.
-  // A historical import already has its public decision. Preserve that confirmed state on rebuild.
-  const selected = selectionCandidate && article.grouping_status === "complete"
-    && (f.selected === true || article.selection_adds_value !== false);
+  // Only an editorial decision (the recommender's or an editor's override) nominates a report;
+  // a completed identity decision admits it to selection. A historical import already has its
+  // public decision. Preserve that confirmed state on rebuild.
+  const selected = selectionCandidate && article.grouping_status === "complete";
   const reason = selected ? pickString(f.reason, original ? null : analysis?.reason_zh ?? null) : null;
   const hasXPost = !!article.x_post;
   const channel = channelOf(hasXPost);

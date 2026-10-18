@@ -32,15 +32,16 @@ test('independent selected sources retain identity and their own cards across pu
   const [story] = await sql<{id:number}[]>`INSERT INTO stories(public_id,title) VALUES (${randomUUID()},${T}) RETURNING id`;
   const [fact] = await sql<{id:number}[]>`INSERT INTO facts(public_id,story_id,title) VALUES (${T},${story!.id},${T}) RETURNING id`;
   let n = 0;
-  const add = async (source: string, ago: number, options: { selected?: boolean; pending?: boolean; adds?: boolean } = {}) => {
+  const add = async (source: string, ago: number, options: { selected?: boolean; pending?: boolean } = {}) => {
     const at = new Date(+now - ago);
     const {articleId:id} = await upsertMaterial({ sourceId:source,url:`https://example.org/${T}/${++n}`,title:`${T} ${n}`,
       bodyText:'Original article',bodyStatus:'ok',via:'fetch',publishedAt:at,discoveredAt:at,
       ...(source === xSource ? { xPost: { tweetId: `${Date.now()}${n}`, authorName: 'Shared author', handle: 'shared', text: 'Original article' } } : {}) });
-    await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,reason_zh,score,selected,tags,subjects)
-      VALUES (${id},1,'rule','pass','industry',${`${T} title ${n}`},'summary','reason',81,${options.selected ?? true},${[T]},${['openai']})`;
+    await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,reason_zh,tags,subjects)
+      VALUES (${id},1,'rule','pass','industry',${`${T} title ${n}`},'summary','reason',${[T]},${['openai']})`;
+    if (options.selected ?? true) await sql`INSERT INTO editorial_overrides(article_id,fields,reason,updated_by) VALUES (${id},'{"selected":true,"score":81}','test selection','test')`;
     await sql`INSERT INTO fact_articles(fact_id,article_id,role) VALUES (${fact!.id},${id},'report')`;
-    await sql`UPDATE articles SET grouping_status=${options.pending ? 'pending' : 'complete'},selection_adds_value=${options.adds ?? true} WHERE id=${id}`;
+    await sql`UPDATE articles SET grouping_status=${options.pending ? 'pending' : 'complete'},selection_adds_value=true WHERE id=${id}`;
     await publishArticle(id,{now});
     return id;
   };
@@ -50,7 +51,6 @@ test('independent selected sources retain identity and their own cards across pu
   const laterOwn = await add(own, 60_000);
   const rejected = await add(own, 50_000, {selected:false});
   const pending = await add(own, 40_000, {pending:true});
-  const lowValue = await add(own, 30_000, {adds:false});
   const before = await sql`SELECT article_id,fact_id,role,manual FROM fact_articles WHERE fact_id=${fact!.id} ORDER BY article_id`;
   const analysisCount = (await sql`SELECT count(*) AS n FROM analyses`)[0]!.n;
 
@@ -77,8 +77,8 @@ test('independent selected sources retain identity and their own cards across pu
     assert.equal(detail.sameEvent ?? null,null); assert.equal(detail.selected,true); assert.ok(detail.reason);
   }
   assert.equal((await get(`/api/site/items/${other}`)).json().sameEvent.id,official);
-  for (const id of [rejected,pending,lowValue]) assert.equal((await get(`/api/site/items/${id}`)).json().selected,false);
-  await setVisibility(laterOwn,{visibility:'withdrawn',reason:'test withdrawal',version:0},'test');
+  for (const id of [rejected,pending]) assert.equal((await get(`/api/site/items/${id}`)).json().selected,false);
+  await setVisibility(laterOwn,{visibility:'withdrawn',reason:'test withdrawal',version:1},'test');
   const remaining=(await v1Items({mode:'selected',window:'24h',by:'timeline',category:null,q:T,limit:100,cursor:null})).items;
   assert.deepEqual(new Set(remaining.map((x:{id:string})=>x.id)),new Set([firstOwn,official]));
   assert.equal((await get(`/api/site/items/${other}`)).json().sameEvent.id,official);

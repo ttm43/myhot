@@ -38,8 +38,9 @@ async function report(source: string, opts: { selected: boolean; hoursAgo: numbe
     sourceId: source, url: `https://example.com/reading-${T}-${n}`, title: `Report ${n} ${T}`, bodyText: "body", bodyHtml: "<p>body</p>", bodyStatus: "ok", via: "fetch", publishedAt: at,
   });
   await sql`UPDATE articles SET discovered_at = ${at}, timeline_at = ${at} WHERE id = ${articleId}`;
-  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, score, selected, subjects, tags)
-            VALUES (${articleId}, 1, 'rule', 'pass', 'ai-models', ${opts.title ?? `标题${n}-${T}`}, ${`摘要${n}-${T}`}, 80, ${opts.selected}, ${opts.subjects ?? []}, ${[`t-${T}`]})`;
+  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, subjects, tags)
+            VALUES (${articleId}, 1, 'rule', 'pass', 'ai-models', ${opts.title ?? `标题${n}-${T}`}, ${`摘要${n}-${T}`}, ${opts.subjects ?? []}, ${[`t-${T}`]})`;
+  if (opts.selected) await sql`INSERT INTO editorial_overrides (article_id, fields, reason, updated_by) VALUES (${articleId}, '{"selected":true,"score":80}', 'test selection', 'test')`;
   return articleId;
 }
 

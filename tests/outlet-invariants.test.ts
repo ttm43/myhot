@@ -20,8 +20,9 @@ async function fixture(name: string) {
     VALUES (${source}, ${name}, 'rss', 'T1', 'editorial', '2100-01-01')`;
   const { articleId: id } = await upsertMaterial({ sourceId: source, url: `https://example.org/${source}`,
     title: "Source article", bodyText: "Confirmed material", bodyStatus: "ok", publishedAt: new Date(), via: "fetch" });
-  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, title_zh, summary_zh, category, selected, score)
-    VALUES (${id}, 1, 'rule', 'pass', '对外标题', '对外摘要', 'ai-models', true, 90)`;
+  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, title_zh, summary_zh, category)
+    VALUES (${id}, 1, 'rule', 'pass', '对外标题', '对外摘要', 'ai-models')`;
+  await sql`INSERT INTO editorial_overrides (article_id, fields, reason, updated_by) VALUES (${id}, '{"selected":true,"score":90}', 'test selection', 'test')`;
   await publishArticle(id, { releasedAt: new Date(Date.now() - 60_000) });
   return id;
 }

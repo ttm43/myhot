@@ -1,6 +1,5 @@
 // Failure cases before implementation: elapsed time or a stale grouped_at must not publish an
-// unresolved selection; it stays readable in all. Completion publishes once across every outlet;
-// low incremental value stays outside selection.
+// unresolved selection; it stays readable in all. Completion publishes once across every outlet.
 import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { after, before, mock, test } from "node:test";
@@ -26,8 +25,9 @@ after(async () => { mock.timers.reset(); await app.close(); await stopBoss(); aw
 async function candidate(name: string) {
   const { articleId } = await upsertMaterial({ sourceId: SOURCE, url: `https://example.org/${T}/${name}`,
     title: `${T} ${name}`, bodyText: 'A new public result with evidence.', bodyStatus: 'ok', via: 'fetch', publishedAt: new Date() });
-  await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,reason_zh,score,selected)
-    VALUES (${articleId},1,'rule','pass','ai-models',${`新闻 ${T} ${name}`},'有证据的新结果','推荐理由',90,true)`;
+  await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,reason_zh)
+    VALUES (${articleId},1,'rule','pass','ai-models',${`新闻 ${T} ${name}`},'有证据的新结果','推荐理由')`;
+  await sql`INSERT INTO editorial_overrides(article_id,fields,reason,updated_by) VALUES (${articleId},'{"selected":true,"score":90}','test selection','test')`;
   return articleId;
 }
 const read = async (path: string) => (await app.inject({ method: 'GET', url: path })).body;
@@ -47,19 +47,4 @@ test('an unresolved selection never leaks after the old deadline and completion 
   await publishArticle(id);
   mock.timers.tick(5_100); // the public timeline's existing five-second grouped snapshot expires
   for (const path of selectedOutlets) assert.ok((await read(path)).includes(id), `${path} missed completed news`);
-});
-
-test('a confirmed but redundant explanation stays in all, and an editor can explicitly select it', async () => {
-  const id = await candidate('overlap');
-  await sql`UPDATE articles SET grouping_status='complete',grouped_at=now(),selection_adds_value=false,
-    selection_value_reason='已选发布稿已经包含全部要点' WHERE id=${id}`;
-  await publishArticle(id);
-  mock.timers.tick(5_100); // read past the previous test's snapshot, or this check passes on stale rows
-  assert.ok(!(await read('/api/site/timeline?limit=40')).includes(id));
-  assert.ok((await read('/api/site/pool')).includes(id));
-  await sql`INSERT INTO editorial_overrides(article_id,fields,reason,updated_by)
-    VALUES (${id},'{"selected":true}','editor verified independent value','test')`;
-  await publishArticle(id);
-  mock.timers.tick(5_100);
-  assert.ok((await read('/api/site/timeline?limit=40')).includes(id));
 });

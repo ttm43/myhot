@@ -193,7 +193,7 @@ export interface AdminContentChain {
   revisions: Array<{ revision: number; title: string; content_hash: string | null; created_at: Timestamp }>;
   analyses: Array<{
     id: number; origin: string; model: string | null; prompt_version: string | null; input_revision: number; relevance: string | null; category: string | null;
-    score: number | null; selected: boolean | null; title_zh: string | null; reason_zh: string | null; created_at: Timestamp;
+    title_zh: string | null; reason_zh: string | null; created_at: Timestamp;
     receipts: Array<{ id: number; status: string; service: string; model: string | null; cost: number | null; at: Timestamp }>;
   }>;
   publication: AdminPublication | null;
