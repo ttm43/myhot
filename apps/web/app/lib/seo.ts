@@ -1,4 +1,4 @@
-// Page metadata from one place: title template, canonical address, OG images, robots; and list addresses,
+// Page metadata from one place: title template, canonical address, share preview, robots; and list addresses,
 // with the feed filters they carry. The site's name and wording come from site/site.ts;
 //; its address from SITE_URL.
 import type { MetaDescriptor } from "react-router";
@@ -24,7 +24,6 @@ export interface PageMetaInput {
   rawTitle?: boolean;
   description?: string | null;
   path: string;
-  image?: string | null;
   noindex?: boolean;
   nofollow?: boolean;
   type?: "website" | "article";
@@ -75,7 +74,8 @@ export function pageMeta(input: PageMetaInput): MetaDescriptor[] {
   const title = input.title ? (input.rawTitle ? input.title : titled(input.title)) : HOME_TITLE;
   const description = input.description ?? SITE_DESCRIPTION;
   const url = `${base}${input.path}`;
-  const image = input.image ? (input.image.startsWith("http") ? input.image : `${base}${input.image}`) : `${base}/og/site.png`;
+  // Share previews show the site icon: there are no generated share images.
+  const image = `${base}/icon.png`;
   const tags: MetaDescriptor[] = [
     { title },
     { name: "description", content: description },
@@ -86,10 +86,10 @@ export function pageMeta(input: PageMetaInput): MetaDescriptor[] {
     { property: "og:description", content: description },
     { property: "og:url", content: url },
     { property: "og:image", content: image },
-    { property: "og:image:width", content: "1200" },
-    { property: "og:image:height", content: "630" },
+    { property: "og:image:width", content: "512" },
+    { property: "og:image:height", content: "512" },
     { property: "og:locale", content: SITE.locale.replace("-", "_") },
-    { name: "twitter:card", content: "summary_large_image" },
+    { name: "twitter:card", content: "summary" },
     { name: "twitter:title", content: input.title ?? HOME_TITLE },
     { name: "twitter:description", content: description },
     { name: "twitter:image", content: image },

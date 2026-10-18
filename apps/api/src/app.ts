@@ -6,7 +6,6 @@ import { sql } from "@aihot/backend/db";
 import { logError } from "@aihot/backend/lib/log-error";
 import { serverModules } from "@aihot/backend/modules";
 import { registerSite } from "./routes/site.ts";
-import { registerOg } from "./routes/og.ts";
 import { registerAdminAuth } from "./routes/admin-auth.ts";
 import { registerAdmin } from "./routes/admin.ts";
 import { registerIngest } from "./routes/ingest.ts";
@@ -87,7 +86,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   registerSite(app);
-  registerOg(app);
   registerAdminAuth(app);
   registerAdmin(app);
   registerIngest(app);

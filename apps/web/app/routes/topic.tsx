@@ -67,7 +67,6 @@ export function meta({ loaderData }: Route.MetaArgs) {
       : `${topic.name} 最新动态${parts.length ? `与${parts.map((p) => p.name).join("、")}` : ""}`,
     description: text,
     path,
-    image: `/og/topics/${topic.slug}.png`,
     noindex: !topic.indexable,
     jsonLd: page > 1
       ? crumbs

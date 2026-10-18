@@ -14,9 +14,9 @@
 
 ## 1. 站名和文案：`site/site.ts`
 
-- `name`：站名。导航、标题、分享图、MCP、后台都用它。`organization.name` 是结构化数据里的网站运营者（给搜索引擎看），默认也是站名，改站名时一起改；`organization.founder` 是创始人（选填）。
+- `name`：站名。导航、标题、MCP、后台都用它。`organization.name` 是结构化数据里的网站运营者（给搜索引擎看），默认也是站名，改站名时一起改；`organization.founder` 是创始人（选填）。
 - `subject`：行业词。页面上“全部 AI 动态”会变成“全部法律动态”。
-- `homeTitle`、`topicsTitle`、`description`、`tagline`、`keywords`：首页和主题目录页的标题、一句话介绍、分享图下方的小字、给搜索引擎的关键词。
+- `homeTitle`、`topicsTitle`、`description`、`tagline`、`keywords`：首页和主题目录页的标题、一句话介绍、PWA 清单里名字后面的小字、给搜索引擎的关键词。
 - `locale`：界面语言（网页的语言标记、分享卡片和结构化数据），`public/` 文件里的 `{{locale}}` 也换成它。
 - `since`：网站开始收录的年份（结构化数据里的时间范围，选填）。
 - `mcpPrefix`：MCP 工具名前缀，比如 `lawhot` 会得到 `lawhot_get_latest`。有人接入以后不要再改。
@@ -26,10 +26,9 @@
 - `github`：源码仓库的地址（选填），填了就在侧栏和“我的”页底部显示“GitHub 开源”。
 - `rootIcons`：标准图标以外也放在网站根目录的图标，`site/brand/` 里的文件名（选填）。
 - `POLICY`：`xPostIsFullText` 决定 X 帖子本身的文字算不算全文（算的话，只在信源允许全文时显示）。
-- `CARDS`：各页分享图上的文字。
 - `NAV`：`hidden` 写不放进导航的引擎入口，目前只支持热点榜（`"/hot"`）和主题（`"/topics"`）；例如来源还不多、热点榜常是空的站写 `"/hot"`。电脑侧栏、手机底栏和“我的”页都不放；页面照样能打开，直接打开这些页面时所属标签为精选，原来回到它的返回按钮和链接改回精选，给搜索引擎的页面层级（面包屑）也不经过它；写 `"/hot"` 时首页也不放当前热点，事件页不写热点榜名次。默认是空的，导航和原来一样。
   其他入口暂不开放：它们的返回按钮和页面内入口也需要一起支持，避免只隐藏侧栏、别处仍引导读者过去。
-- `ITEM_COPY`：模型写的那句理由叫什么（`reasonLabel`，默认“推荐理由”），读者在网页和分享图上看不看得到 AI 评分（`showScore`；只管显示，MCP 照样带分数）。
+- `ITEM_COPY`：模型写的那句理由叫什么（`reasonLabel`，默认“推荐理由”），读者在网页上看不看得到 AI 评分（`showScore`；只管显示，MCP 照样带分数）。
 - `SOURCE_DEFAULTS`、`COMMUNITY_FEEDS`：后台新建信源时默认展不展示全文，哪些社区站信源按发帖的账号算热度。
 - `ADMIN`：后台几处给管理员的提示（选填）。
 - `DEPLOYMENT`：这个部署自己的安排：凭据文件放在哪、生产 API 启动时额外检查哪些凭据（`requiredSecrets`，默认空）、CDN 回源用的域名、后台登录回跳用的请求头、图片代理的流量上限、采集和图片直连（不走出网代理）的域名、精选评测默认用的样本，都可以不填。
@@ -102,7 +101,6 @@
 
 - `logo.svg`、`icon.png`（512）、`icon-192.png`、`apple-icon.png`（180）、`favicon.ico`：站点图标。
 - `Logo.tsx`：网页左上角的站名标志，默认用站名文字排出来；有自己的 Logo，把 `Wordmark` 换成你的 SVG，参数保持不变。
-- `wordmark.svg`、`wordmark-dark.svg`（可选）：分享图和海报上的字标，深色版用在深色的分享图上；没有就用站名文字。
 
 请不要使用 AIHOT 的名字和 Logo。
 

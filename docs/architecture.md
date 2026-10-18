@@ -7,14 +7,14 @@ flowchart LR
   J --> G["归组<br/>事件 · 热度 · 综述"]
   J --> P["公开读取层<br/>publication/"]
   G --> P
-  P --> O["网页 · MCP · 分享图"]
+  P --> O["网页 · MCP"]
 ```
 
 ## 三个进程
 
 | 进程 | 位置 | 做什么 |
 |---|---|---|
-| api | `apps/api/` | Fastify。网站自用接口（`/api/site/`）、MCP、后台接口、外部推送、图片代理、分享图 |
+| api | `apps/api/` | Fastify。网站自用接口（`/api/site/`）、MCP、后台接口、外部推送、图片代理 |
 | worker | `apps/worker/` | pg-boss 任务队列和定时任务：抓信源、调模型、归组、热度、清理 |
 | web | `apps/web/` | React Router 服务端渲染的网页。只通过 HTTP 读 api，不碰数据库 |
 
@@ -22,7 +22,7 @@ flowchart LR
 
 ## 几条不变的规则
 
-- **一个公开读取层**：网页、MCP、分享图读的都是 `packages/backend/src/publication/`。公开范围、精选席位（机器出口每条新闻只出一条）与事实证据条件只在 `publication/scope.ts` 定义；新增出口也遵循当前的撤回和全文许可。
+- **一个公开读取层**：网页和 MCP 读的都是 `packages/backend/src/publication/`。公开范围、精选席位（机器出口每条新闻只出一条）与事实证据条件只在 `publication/scope.ts` 定义；新增出口也遵循当前的撤回和全文许可。
 - **缓存不延长旧内容的寿命**：可变内容按响应的 `Cache-Control` 到期重新验证；MCP 的 HTTP 响应使用 `no-store`。自建代理或 CDN 同样要遵守，配置要求见 [部署](deploy.md#配域名和-https) 的“配域名和 HTTPS”。
 - **页面不调模型**：读者打开页面只读数据库里已经有的结果；模型只在 worker 的任务里调用。
 - **花钱的请求有回执**：每个付费请求（模型、X、公众号、Jina）先记一张回执，拿到结果先存再用。进程重启、任务重试时，复用已经付过钱的结果，不重复花钱（`providers/receipts.ts`）。结果不明的回执超过 30 分钟后自动放行一次；因它停在失败状态的文章会重新入队，继续未完成的正文提取或分析。再次结果不明时，由管理员在“运行”页核对后放行。

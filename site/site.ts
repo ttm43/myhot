@@ -3,7 +3,7 @@
 // 域名不在这里：部署时用环境变量 SITE_URL 设置。
 
 export const SITE = {
-  /** 站名：导航、页面标题、分享图、MCP、后台都用它。 */
+  /** 站名：导航、页面标题、MCP、后台都用它。 */
   name: "MyHOT",
   /**
    * 行业词：拼进默认说法里，比如“AI 动态”。
@@ -16,7 +16,7 @@ export const SITE = {
   topicsTitle: "AI 主题：公司与模型、技术方向、内容形态的最新动态",
   /** 一句话介绍：搜索引擎、分享卡片、PWA 清单会用。 */
   description: "从一批 AI 信源里挑出值得看的动态，把同一件事的多篇报道归到一起。",
-  /** 一行小字：分享图、海报下方。 */
+  /** 一行小字：PWA 清单里的名字后面。 */
   tagline: "值得关注的 AI 动态",
   /** 搜索引擎读到的关键词（首页结构化数据）。 */
   keywords: ["AI 资讯", "AI 新闻", "AI 行业动态"] as string[],
@@ -74,7 +74,7 @@ export const NAV = {
 export const ITEM_COPY = {
   /** 模型写的那句理由叫什么：卡片、详情页、Markdown 导出和 MCP 的回答都用它。 */
   reasonLabel: "推荐理由",
-  /** 读者在网页和分享图上看不看得到 AI 评分。只管显示：MCP 的数据照样带 score，后台照常显示。 */
+  /** 读者在网页上看不看得到 AI 评分。只管显示：MCP 的数据照样带 score，后台照常显示。 */
   showScore: true,
 };
 
@@ -97,13 +97,6 @@ export const SOURCE_DEFAULTS = {
 export const COMMUNITY_FEEDS: { dev: string[]; hn: string[] } = {
   dev: [],
   hn: [],
-};
-
-/** 各页分享图（/og/pages/*.png）上的文字。主题目录页的那张按主题数自动生成。 */
-export const CARDS: Record<string, { kicker: string; title: string; subtitle: string; accent?: "hot" | "amber" }> = {
-  site: { kicker: subjectAfter("每日", "精选"), title: SITE.tagline, subtitle: SITE.description },
-  all: { kicker: subjectAfter("全部", "动态"), title: "所有信源的最新动态，一站看完", subtitle: "按时间汇总各信源的最新动态，可按类别与标签筛选。" },
-  hot: { kicker: "热点榜", title: "过去 48 小时，大家在讨论什么", subtitle: "热度指数、趋势与组成热度的公开来源。", accent: "hot" },
 };
 
 /** 这个部署自己的几处安排（选填）。 */

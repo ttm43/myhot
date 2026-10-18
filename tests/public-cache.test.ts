@@ -24,7 +24,7 @@ before(async () => {
 after(async()=>{await app.close();await stopBoss();await closeDb();});
 
 test('mutable content never authorizes a reader to reuse stale data beyond the withdrawal window',async()=>{
-  const paths = [`/items/${id}/markdown`, `/og/items/${id}.png`, `/og/posters/${id}.png`];
+  const paths = [`/items/${id}/markdown`];
   const failures:string[]=[];
   for (const url of paths) {
     const response=await app.inject({method:'GET',url});

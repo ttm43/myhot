@@ -35,8 +35,8 @@ export async function dailyRetention(now = new Date()) {
   // Scheduled-task history: 30 days (failures 90) is enough for the runs view.
   const runs = await sql`DELETE FROM job_runs WHERE started_at < ${new Date(now.getTime() - 30 * 86400_000)} AND (status IS DISTINCT FROM 'failed' OR started_at < ${new Date(now.getTime() - 90 * 86400_000)})`;
   const monthMs = 30 * 86400_000;
-  // Derived caches (proxied images, share cards and posters) are rebuilt on demand.
-  const prunedCache = (await removeOlderThan(path.join(config.dataDir, "imgcache"), monthMs, now.getTime())) + (await removeOlderThan(path.join(config.dataDir, "ogcache"), monthMs, now.getTime()));
+  // Proxied images are rebuilt on demand.
+  const prunedCache = await removeOlderThan(path.join(config.dataDir, "imgcache"), monthMs, now.getTime());
   return {
     ...modules,
     deletedJobRuns: runs.count,

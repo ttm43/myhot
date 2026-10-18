@@ -7,15 +7,12 @@ import { createHash, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import sharp from "sharp";
-import { SITE } from "@aihot/site";
 
 const dir = await mkdtemp(path.join(tmpdir(), "aihot-media-test-"));
 process.env.AIHOT_DATA_DIR = dir;
 process.env.ALLOW_PRIVATE_NETWORK_FETCH = "true";
 process.env.MODEL_CALLS_ENABLED = "false";
 const { produceImage } = await import("@aihot/backend/media/images");
-const { renderOg } = await import("@aihot/backend/media/og");
-const { renderPoster } = await import("@aihot/backend/media/poster");
 const { xView } = await import("@aihot/backend/publication/items");
 
 let imageHits = 0;
@@ -161,17 +158,6 @@ test("site media exposes responsive previews and full lightboxes while RSS retai
   const single = xView(row, true)!.media;
   assert.equal(single.length, 1);
   assert.ok(single[0]!.url.includes("mode=thumb"));
-});
-
-test("concurrent cold OG and poster requests all succeed with identical cached bytes", async () => {
-  const card = { kicker: SITE.name, title: "并发渲染验证", subtitle: "同一图片只生成一次" };
-  const cards = await Promise.all(Array.from({ length: 3 }, () => renderOg(card)));
-  for (const result of cards) assert.deepEqual(result, cards[0]);
-  assert.equal((await sharp(cards[0]!.png).metadata()).width, 1200);
-  const poster = { url: "https://example.com/items/test", kicker: SITE.name, title: "海报并发验证", summary: null, source: SITE.name, date: "2026-09-28", score: null };
-  const posters = await Promise.all(Array.from({ length: 2 }, () => renderPoster(poster)));
-  for (const result of posters) assert.deepEqual(result, posters[0]);
-  assert.equal((await sharp(posters[0]!.png).metadata()).width, 1080);
 });
 
 test("successive responsive candidates reuse the completed original download", async () => {

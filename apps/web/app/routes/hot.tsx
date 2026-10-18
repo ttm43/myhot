@@ -29,7 +29,6 @@ export function meta() {
     title: withSubject("热点榜"),
     description: `${subjectAfter("过去 48 小时", "圈")}讨论最多的 10 个事件：热度指数、趋势与组成热度的公开来源。`,
     path: "/hot",
-    image: "/og/pages/hot.png",
   });
 }
 

@@ -22,7 +22,7 @@ export async function loader({ request }: { request: Request }) {
 }
 
 export function meta({ loaderData }: Route.MetaArgs) {
-  if (!loaderData) return pageMeta({ title: SITE.topicsTitle, path: "/topics", image: "/og/pages/topics.png" });
+  if (!loaderData) return pageMeta({ title: SITE.topicsTitle, path: "/topics" });
   const { groups, topics } = loaderData;
   const by = groups.map((g) => g.name).join("、");
   const indexed = topics.filter((t) => t.indexable);
@@ -32,7 +32,6 @@ export function meta({ loaderData }: Route.MetaArgs) {
     title: SITE.topicsTitle,
     description: `按${by}${subjectAfter("追踪", "最新动态")}：${named ? `${named}等 ` : ""}${topics.length} 个主题，浏览最新精选与重要进展，持续更新。`,
     path: "/topics",
-    image: "/og/pages/topics.png",
     jsonLd: [
       {
         "@context": "https://schema.org",

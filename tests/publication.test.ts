@@ -16,7 +16,6 @@ import { publishArticle, republishSource } from "@aihot/backend/publication/publ
 import { computeHotRanking } from "@aihot/backend/events/hot";
 import { latestHotRanking } from "@aihot/backend/publication/hot";
 import { v1Items } from "@aihot/backend/publication/v1";
-import { loadItemShare } from "@aihot/backend/publication/og";
 import { buildApp } from "../apps/api/src/app.ts";
 
 const T = tag();
@@ -80,7 +79,6 @@ test("manual score corrections, including no score, survive every public project
   assert.equal(detail.selected, false);
   const items = (await v1Items({ mode: "all", window: "24h", by: "timeline", category: null, q: detail.title, limit: 10, cursor: null })).items;
   assert.equal(items.find((i) => i.id === id)?.score, null);
-  assert.equal((await loadItemShare(id))?.score, null);
   assert.equal(Number((await sql`SELECT score FROM analyses WHERE article_id = ${id}`)[0]!.score), 90, "the paid result stays intact");
   await assert.rejects(overrideFields(id, { fields: { score: 99 }, reason: "stale correction", version: 0 }, "test"));
   await overrideFields(id, { fields: { score: 0 }, reason: "verified zero score", version: 1 }, "test");
@@ -186,27 +184,13 @@ test("revoking a source's licence takes its articles off every exit", async () =
   await sql`UPDATE sources SET participation_mode = 'editorial', site_fulltext = true WHERE id = ${SOURCE}`;
 });
 
-test("story changes refresh share images and a withdrawal takes down only the stories citing it", async () => {
+test("a withdrawal takes down only the stories citing it", async () => {
   const id = await article();
   await publishArticle(id, released());
   const stories = [await storyFor(id), await storyFor(id, "mention")];
   const other = await article();
   await publishArticle(other, released());
   const unrelated = await storyFor(other);
-  const imageUrl = `/og/stories/${stories[0]}.png`;
-  const image = await app.inject({ method: "GET", url: imageUrl });
-  assert.equal(image.statusCode, 200);
-  assert.equal(image.headers["content-type"], "image/png");
-  const cachedImage = await app.inject({ method: "GET", url: imageUrl, headers: { "if-none-match": String(image.headers.etag) } });
-  assert.equal(cachedImage.statusCode, 304);
-  for (const response of [image, cachedImage]) {
-    assert.equal(response.headers["cache-control"], "public, max-age=300, s-maxage=3600, must-revalidate");
-  }
-  await sql`UPDATE stories SET title = 'Corrected event identity' WHERE public_id = ${stories[0]!}`;
-  const corrected = await app.inject({ method: "GET", url: imageUrl, headers: { "if-none-match": String(image.headers.etag) } });
-  assert.equal(corrected.statusCode, 200);
-  assert.notEqual(corrected.headers.etag, image.headers.etag, "the earlier image validator cannot retain a corrected title");
-  assert.notDeepEqual(corrected.rawPayload, image.rawPayload);
   for (const [index, story] of stories.entries()) {
     for (const prefix of ["/api/site/stories/"]) {
       const response = await get(`${prefix}${story}`);
@@ -216,7 +200,6 @@ test("story changes refresh share images and a withdrawal takes down only the st
   }
 
   await setVisibility(id, { visibility: "withdrawn", reason: "test", version: 0 }, "test");
-  assert.equal((await get(imageUrl, { "if-none-match": String(corrected.headers.etag) })).status, 404, "the old image validator cannot bypass withdrawal");
   for (const story of stories) {
     assert.equal((await get(`/api/site/stories/${story}`)).status, 404);
   }
@@ -314,20 +297,9 @@ test("unchanged republishing preserves freshness, while URL-only changes still r
   assert.equal(changed.revision, before.revision + 1);
 });
 
-test("a cached share-image validator never outlives the selected verdict or a withdrawal", async () => {
-  const id = await article();
-  await publishArticle(id, released());
-  const paths: Array<[string, string]> = [];
-  for (const path of [`/og/items/${id}.png`, `/og/posters/${id}.png`]) paths.push([path, String((await app.inject({ method: "GET", url: path })).headers.etag)]);
-  await sql`UPDATE publications SET visibility = 'summary-only' WHERE article_id = ${id}`;
-  assert.equal((await get(paths[0]![0], { "if-none-match": paths[0]![1] })).status, 200, "summary-only images remove the former selected verdict");
-  await sql`UPDATE publications SET visibility = 'withdrawn' WHERE article_id = ${id}`;
-  for (const [path, etag] of paths) assert.equal((await get(path, { "if-none-match": etag })).status, 404, "cached ETags never bypass current visibility");
-});
-
 // Restricting a selected item to a neutral summary must also remove its selected badge, score,
-// classification and story links from the detail and both share-image projections.
-test("summary-only detail and sharing keep neutral metadata without a selected verdict", async () => {
+// classification and story links from the detail.
+test("summary-only detail keeps neutral metadata without a selected verdict", async () => {
   const id = await article();
   await storyFor(id);
   await publishArticle(id, released());
@@ -346,9 +318,4 @@ test("summary-only detail and sharing keep neutral metadata without a selected v
     assert.deepEqual(item.topics, []);
     assert.equal(item.markdownAvailable, false);
   }
-  const share = (await loadItemShare(id))!;
-  assert.equal(share.selected, false);
-  assert.equal(share.score, null);
-  assert.equal(share.category, null);
-  assert.equal(share.summary, before.summary);
 });

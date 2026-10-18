@@ -10,7 +10,6 @@ const PAGES = ["/", "/all", "/hot", "/daily", "/daily/archive", "/topics", "/mor
 const MACHINE: Array<[path: string, type: RegExp]> = [
   ["/api/health", /json/],
   ["/manifest.webmanifest", /manifest/],
-  ["/og/site.png", /image\/png/],
   ["/icon.png", /image\/png/],
   ["/favicon.ico", /icon/],
 ];

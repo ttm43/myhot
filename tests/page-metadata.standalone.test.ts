@@ -2,7 +2,7 @@
 // Failure modes recorded before the metadata change:
 // - filtered/search feeds compete with their parent or canonicalize to different content;
 // - tracking and obsolete positioning parameters leak into canonical, or ordinary archives become noindex;
-// - an article invents a modification date from its source's publication date or omits its image;
+// - an article invents a modification date from its source's publication date;
 // - a story has no machine-readable subject, or claims its first report is its own publication date.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
@@ -63,10 +63,9 @@ test("ordinary feed pages remain indexable and normalize ignored parameters", as
   }
 });
 
-test("article metadata has a representative image and does not invent an update timestamp", async () => {
+test("article metadata does not invent an update timestamp", async () => {
   const $ = await page(`/items/${item.id}`);
   const article = structured($).find((entry) => entry["@type"] === "NewsArticle")!;
-  assert.equal(article.image, `${web.origin}/og/items/${item.id}.png`);
   assert.equal(article.datePublished, at);
   assert.equal("dateModified" in article, false);
   assert.equal(article.isBasedOn, detail.links.original);

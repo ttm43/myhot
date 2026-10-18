@@ -36,7 +36,6 @@ export function meta({ loaderData }: Route.MetaArgs) {
     title: s.title,
     description: (s.digest ?? s.summary ?? s.excerpt?.text)?.slice(0, 150) ?? `${s.sourceCount} 个报道来源 ${s.reportCount} 篇报道，完整时间线与最新进展。`,
     path: `/story/${s.publicId}`,
-    image: `/og/stories/${s.publicId}.png`,
     type: "article",
     jsonLd: [
       storyLd(s),

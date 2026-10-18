@@ -89,7 +89,6 @@ const ENGINE_API_PATHS: RegExp[] = [
   /^\/manifest\.webmanifest$/,
   /^\/(favicon\.ico|icon\.png|icon-192\.png|apple-icon\.png|logo\.svg)$/,
   ...(SITE.rootIcons.length ? [new RegExp(`^\\/(${SITE.rootIcons.map(literal).join("|")})$`)] : []),
-  /^\/og\//,
   /^\/items\/[^/]+\/markdown$/,
 ];
 
