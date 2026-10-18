@@ -2,7 +2,16 @@
 
 > A personal AI-news site built on [AIHOT](https://github.com/KKKKhazix/AIHOT) (MIT). Two changes: embedding models take over part of the LLM's work, and the front page follows one reader's likes and dislikes instead of heat.
 
-一个人用的 AI 资讯站，**在 [AIHOT](https://github.com/KKKKhazix/AIHOT)（数字生命卡兹克，MIT 协议）的基础上改的**。采集、正文抽取、中文摘要、事件归组、网站和各种出口都是 AIHOT 原有的，部署见 [docs/deploy.md](docs/deploy.md)，原项目的完整说明见 [AIHOT 的 README](https://github.com/KKKKhazix/AIHOT#readme)。这里只改了「选什么给我看」这一层。
+一个人用的 AI 资讯站，**在 [AIHOT](https://github.com/KKKKhazix/AIHOT)（数字生命卡兹克，MIT 协议）的基础上改的硬分叉**。采集、正文抽取、中文摘要、事件归组、网站和 MCP 是 AIHOT 原有的，用不上的功能已经删掉；「选什么给我看」这一层换成了自己的。部署见 [docs/deploy.md](docs/deploy.md)。
+
+## 留下来的功能
+
+- **采集**：RSS、网页列表、JSON 接口三种信源按各自的间隔抓，外部脚本也可以推送进来（`POST /api/ingest/items`）；同一篇只留一份，缺正文时抓原网页。
+- **分析**：预筛（是不是 AI 的事）、结构化（分类、标签、主体公司、新闻事实）、中文标题和摘要。不打分，不判断入选。
+- **事件归组**：不同来源报道的同一件事归成一个事件，人工可以拆开、移动、合并。
+- **网站**：精选首页、全部动态和搜索、文章页（含 Markdown 导出），卡片上有反馈按钮。
+- **MCP**：`<前缀>_get_latest`、`<前缀>_search` 两个工具。
+- **后台**：内容诊断与人工覆盖、信源、运行、模型、审计、付费请求上限。
 
 ## 和 AIHOT 的主要区别
 
@@ -16,11 +25,11 @@ AIHOT 原本每一步判断都调 LLM。这里能用向量做的就换成向量�
 | 判断几篇报道是不是同一件事 | 事件归组用 Gemini `gemini-embedding-2` 向量（`.env` 的 `EMBEDDING_*`，加一处容错补丁）；每日清单再按正文向量余弦 ≥ 0.9 合并 | `packages/backend/src/providers/embeddings.ts`、`recommender/scripts/judge.py daily` |
 | 给评价器挑相关的历史反馈 | 按向量相似度检索（`--feedback retrieved:K`） | `recommender/scripts/judge.py` |
 
-LLM 仍然做的事：AIHOT 的正文分析和中文摘要、老师标注、同事件二手稿判断。
+LLM 仍然做的事：预筛、结构化和中文摘要，老师标注，同事件二手稿判断。
 
 ### 2. 按个人喜恶选，不按热度选
 
-AIHOT 的精选按热度、五个维度加权和来源分级门槛打分，个人博客的门槛比官方来源高，结果个人作者几乎进不了精选。这里不用它的分数：
+AIHOT 的精选按热度、五个维度加权和来源分级门槛打分，个人博客的门槛比官方来源高，结果个人作者几乎进不了精选。这里把它的评分整个删掉了，精选只看人工覆盖（见 [docs/selection.md](docs/selection.md)）：
 
 - **反馈按钮**（`modules/mark/`）：每张卡片下面有 **牛逼**（对我有用）/ **收到**（了解了，不喜欢也不反感）/ **无聊**（不关心）。卡片上同时显示 AI 的判断和理由，AI 建议的那个按钮虚线高亮，点了就以你为准。
 - **评价器**（`recommender/scripts/judge.py`）：读一份用户画像（身份、长期兴趣、评价标准、当前状态、反馈原因五层）、最近的点击和文章全文，预测「这位读者读完会是什么反应」，理由必须指出文章里的具体事实。
@@ -29,7 +38,11 @@ AIHOT 的精选按热度、五个维度加权和来源分级门槛打分，个�
 
 细节和实验记录见 [recommender/README.md](recommender/README.md)。
 
-## 改了 AIHOT 的哪些地方
+## 和 AIHOT 的关系
+
+2026-10-18 起是硬分叉，不再跟进上游，起点是 AIHOT 2026-10 中旬的版本（提交 `652bd6b`）。删掉的功能（评分、翻译、日报周报月报、热榜和事件页、主题页、公开 API 和 RSS、分享图、飞书、内置备份、X 搜索、公众号、Jina 等）和每项对数据库的影响，见 [docs/deploy.md](docs/deploy.md) 的「硬分叉精简」。
+
+框架代码里还留着的本地改动都标了 `local patch`：
 
 | 改动 | 文件 |
 |---|---|
@@ -38,8 +51,6 @@ AIHOT 的精选按热度、五个维度加权和来源分级门槛打分，个�
 | 管理覆盖接口多一个 `relevance` 字段，让外部评价器能把预筛挡住的文章放进候选池 | `packages/backend/src/admin/content.ts` |
 | 推送接口的条目多一个 `body` 字段，作为正文存下（catbus 拿得到 X 帖子全文，x.com 页面抓不了） | `packages/backend/src/ingest/items.ts` |
 | 推荐层脚本 | `recommender/` |
-
-框架代码里的改动都标了 `local patch`。起点是 AIHOT 2026-10 中旬的版本（提交 `652bd6b`），之后的上游改动没有跟进。
 
 ## 跑起来
 

@@ -1,4 +1,4 @@
-// Runtime configuration. Secrets are loaded per group (models, collectors, integrations, auth)
+// Runtime configuration. Secrets are loaded per group (models, collectors, auth)
 // from dotenv files, and only by the backend processes that need them.
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -56,7 +56,7 @@ export const config = {
   adminPassword: env.ADMIN_PASSWORD || null,
 };
 
-export type CredentialGroup = "models" | "collectors" | "integrations" | "auth";
+export type CredentialGroup = "models" | "collectors" | "auth";
 
 const groupCache = new Map<CredentialGroup, Record<string, string>>();
 
