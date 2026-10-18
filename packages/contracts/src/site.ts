@@ -133,6 +133,19 @@ export interface GroupReport {
   originalUrl: string;
 }
 
+/** The home page's 雷达 (/api/site/radar): raw recent items of the collect-only sources, by source. */
+export interface RadarItem {
+  title: string;
+  /** The original link. */
+  url: string;
+  excerpt: string | null;
+  discoveredAt: string;
+}
+
+export interface RadarResponse {
+  sources: Array<{ sourceId: string; sourceName: string; items: RadarItem[] }>;
+}
+
 export interface GroupReportsResponse {
   factId: string;
   reports: GroupReport[];

@@ -73,6 +73,14 @@ export const ADMIN = {
   budgetNote: null as string | null,
 };
 
+/**
+ * 首页「雷达」：只收不分析的信源（hot_signal）最近三天收到的原始条目，按信源分组。
+ * pinned 里的信源（填信源 id）按写的顺序排在最前，其余按最近一条的时间排。
+ */
+export const RADAR = {
+  pinned: ["s135-github-trending"] as string[],
+};
+
 /** 后台新建信源时的默认设置。 */
 export const SOURCE_DEFAULTS = {
   /** 站内展示全文；false 时只显示摘要和原文链接。 */

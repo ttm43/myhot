@@ -167,7 +167,7 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
               <Field label="采集间隔（分钟）">
                 <Input type="number" min={1} max={1440} value={draft.interval_minutes} onChange={(e) => setDraft({ ...draft, interval_minutes: Number(e.target.value) })} />
               </Field>
-              <Field label="参与方式" hint="氛围只收下存着，不分析、不归组、不公开">
+              <Field label="参与方式" hint="氛围只收不分析、不归组，原样列在首页雷达里">
                 <Select value={draft.participation_mode} onChange={(e) => setDraft({ ...draft, participation_mode: e.target.value })}>
                   {Object.entries(MODE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </Select>

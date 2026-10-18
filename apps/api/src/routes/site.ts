@@ -7,6 +7,7 @@ import { exportMarkdown, loadItemDetail } from "@aihot/backend/publication/detai
 import { loadPool, SearchBusyError } from "@aihot/backend/publication/pool";
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { loadGroupReports } from "@aihot/backend/publication/groups";
+import { loadRadar } from "@aihot/backend/publication/radar";
 import { looseQuery, sendJsonWithEtag, sendProblem } from "../http/respond.ts";
 
 type Handler = (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -71,6 +72,10 @@ export function registerSite(app: FastifyInstance) {
     const result = await loadItemDetail(id);
     if (result.kind === "not_found") return sendProblem(req, reply, { status: 404, code: "not_found", detail: "item not found", cacheControl: "public, max-age=60" });
     return sendJsonWithEtag(req, reply, result.item, { etagPrefix: "item", cacheControl: "public, max-age=60, s-maxage=60" });
+  }));
+
+  app.get("/api/site/radar", siteHandler(async (req, reply) => {
+    return sendJsonWithEtag(req, reply, await loadRadar(), { etagPrefix: "radar", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
   app.get("/api/site/groups/:factId/reports", siteHandler(async (req, reply) => {

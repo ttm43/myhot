@@ -37,8 +37,8 @@ export function isPoolEligible(input: {
 
 /**
  * Item detail page (and its Markdown export): every unwithdrawn item from an editorial source has one,
- * with or without a Chinese summary. hot_signal material is only collected
- * and stored, and has none. A paused source keeps its pages.
+ * with or without a Chinese summary. hot_signal material is listed raw on the
+ * home page's radar only (radar.ts), and has none. A paused source keeps its pages.
  */
 export function hasItemPage(p: { visibility: string; sourceMode: string }): boolean {
   return p.visibility !== "withdrawn" && p.sourceMode === "editorial";
