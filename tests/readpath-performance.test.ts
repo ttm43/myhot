@@ -1,4 +1,4 @@
-// Search ranking, capped totals, public scope, report fallback headlines and
+// Search ranking, capped totals, public scope and
 // conditional reads, on a disposable database through the real HTTP handlers and SQL.
 import { tag } from './setup.ts';
 import assert from 'node:assert/strict';
@@ -6,7 +6,6 @@ import { after, before, test } from 'node:test';
 import { closeDb, sql } from '@aihot/backend/db';
 import { loadPool } from '@aihot/backend/publication/pool';
 import { v1Items } from '@aihot/backend/publication/v1';
-import { listReports } from '@aihot/backend/publication/reports';
 import { buildApp } from '../apps/api/src/app.ts';
 
 const T = `readperf${tag()}`;
@@ -92,23 +91,6 @@ test('MCP item search allows terms to match direct text and body, retaining time
   assert.equal(next.items[0]!.id, id(2024));
   const selected = await v1Items({ ...query, mode: 'selected', q: T }, now);
   assert.deepEqual(selected.items.map((i) => i.id), [id(2108)], 'selected direct matches do not require a pool_search row');
-});
-
-test('report directories skip a withdrawn lead for the next citation, including absent historical ones', async () => {
-  const content = { sections: [
-    { label: 'first', items: [{ itemId: id(2106), title: 'Withdrawn first' }] },
-    { label: 'second', items: [{ itemId: `${T}-historical`, title: 'Historical fallback' }, { itemId: id(2), title: 'Third item' }] },
-  ] };
-  const key = `2097-12-${String(1 + Math.floor(Math.random() * 28)).padStart(2, '0')}`;
-  await sql`INSERT INTO reports (kind, key, window_start, window_end, content, generated_at, origin)
-    VALUES ('daily', ${key}, ${now}, ${now}, ${sql.json(content)}, ${now}, 'manual')`;
-  const entry = (await listReports('daily')).find((r) => r.key === key)!;
-  assert.deepEqual([entry.title, entry.count], ['Historical fallback', 3]);
-  const full = (await app.inject({ method: 'GET', url: '/api/site/reports/daily' })).json().items;
-  const navigation = (await app.inject({ method: 'GET', url: `/api/site/reports/daily/navigation/${key}` })).json().items;
-  assert.deepEqual(navigation.map((e: { key: string }) => e.key), full.map((e: { key: string }) => e.key), 'all keys preserve issue numbers and calendar marks');
-  const month = (await app.inject({ method: 'GET', url: `/api/site/reports/daily/months/${key.slice(0, 7)}` })).json().items;
-  assert.equal(month.find((e: { key: string }) => e.key === key).title, 'Historical fallback');
 });
 
 test('unchanged pool and timeline revalidate with 304 while a content change returns a new body', async () => {

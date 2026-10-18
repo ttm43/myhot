@@ -1,8 +1,7 @@
 @import "tailwindcss";
-/* Classes also live in the site's logo and changelog drawings (site/brand, site/changelog) and in the
-   modules' web code (their other files are not scanned: words in backend code and data would become classes). */
+/* Classes also live in the site's logo (site/brand) and in the modules' web code (their other files are
+   not scanned: words in backend code and data would become classes). */
 @source "../../../site/brand";
-@source "../../../site/changelog";
 @source "../../../modules/*/{web.tsx,web/**}";
 
 /* ---------------------------------------------------------------------------
@@ -318,8 +317,8 @@
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
 }
-/* The well: a quiet sunk panel for what navigates or annotates rather than reads (the report's 报眼,
-   the hot lead's heat panel). Radius is set where it is used. */
+/* The well: a quiet sunk panel for what navigates or annotates rather than reads (the hot lead's heat
+   panel). Radius is set where it is used. */
 @utility well {
   background-color: var(--bg-sunk);
   box-shadow: inset 0 0 0 1px var(--line-soft);
@@ -543,38 +542,3 @@
 .prose th, .prose td { border: 1px solid var(--line); padding: 0.5em 0.75em; text-align: left; min-width: 4.5em; overflow-wrap: break-word; }
 .prose th { background: var(--bg-sunk); font-weight: 600; }
 .prose hr { border: 0; border-top: 1px solid var(--line); margin: 2em 0; }
-
-/* Policy pages read smaller and quieter than article bodies, with numbered sections set apart. */
-.prose-compact {
-  font-size: 15px;
-  line-height: 1.85;
-  color: var(--ink-2);
-}
-@media (min-width: 80rem) {
-  .prose-compact { font-size: 16px; line-height: 1.85; }
-}
-.prose-compact h2 {
-  font-size: 18px;
-  font-weight: 600;
-  margin-top: 2.2em;
-  padding-top: 1.4em;
-  border-top: 1px solid var(--line);
-}
-.prose-compact h3 {
-  font-size: 16px;
-  margin-top: 1.6em;
-}
-.prose-compact table {
-  font-size: 13px;
-}
-.prose-compact td:first-child {
-  color: var(--ink);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-/* Report pages read on a faintly toned paper in the light theme, lighter than the site's page ground;
-   the archive column is halfway between the site sidebar and white. */
-:root:not([data-theme="dark"]) body:has(.report-shell) {
-  background: color-mix(in srgb, var(--bg) 60%, var(--surface));
-}

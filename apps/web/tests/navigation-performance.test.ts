@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { before, after, test } from "node:test";
 import { chromium, webkit, expect, type Browser } from "@playwright/test";
-import type { FeedItemSummary, SiteItemDetail, ReportDetail } from "@aihot/contracts/site";
+import type { FeedItemSummary, SiteItemDetail } from "@aihot/contracts/site";
 import { startWebServer, type WebServer } from "./web-server.ts";
 
 const at = '2026-10-04T08:00:00.000Z';
@@ -23,7 +23,6 @@ const readerBody=Array.from({length:30},(_,i)=>`<p>阅读段落 ${i}：先阅读
   +`<pre><code>${codeSource}</code></pre><pre><code>x = 1</code></pre>`
   +Array.from({length:12},(_,i)=>`<img src="/reader-image/${i}.svg" alt="正文配图 ${i}" width="640" height="360" loading="lazy">`).join('')
   +'<img src="/reader-image/tiny.svg" alt="小图标" width="16" height="16" loading="lazy"><a href="https://example.org"><img src="/reader-image/linked.svg" alt="链接图片" width="640" height="360" loading="lazy"></a>';
-const report = (kind:'daily'|'weekly'|'monthly'): ReportDetail => ({kind,key:kind==='daily'?'2026-10-04':kind==='weekly'?'2026-W40':'2026-10',issueNumber:1,title:'Fixture '+kind,generatedAt:at,lead:{title:'Fixture '+kind,leadParagraph:'Fixture report'},leadItemId:null,overview:null,highlights:[],sections:[],flashes:[],cover:null,metrics:{},readingMinutes:1,prev:null,next:null});
 const hits: string[] = [];
 let suggestionsVersion=1;
 let failing='';
@@ -62,8 +61,6 @@ const api=createServer((req,res)=>{
   if(p==='/api/site/items/reader-fixture')return res.end(JSON.stringify({...detail,id:'reader-fixture',title:'阅读增强检查',body:{...detail.body,zh:readerBody}}));
   if(p==='/api/site/items/reader-fixture/original')return res.end(JSON.stringify({...detail,id:'reader-fixture',title:'阅读增强检查',body:{...detail.body,zh:null,original:'<p>Original reader text</p>'},bodyLanguage:'original'}));
   if(p.startsWith('/api/site/items/long-'))return res.end(JSON.stringify({...detail,id:p.split('/').at(-1),title:'长列表详情'}));
-  const kind=p.match(/^\/api\/site\/reports\/(daily|weekly|monthly)\/latest-page$/)?.[1] as 'daily'|'weekly'|'monthly'|undefined;
-  if(kind){const r=report(kind);return res.end(JSON.stringify({report:r,index:[{key:r.key,issueNumber:1,title:r.title,count:0}]}));}
   res.statusCode=404;res.end(JSON.stringify({code:'not_found'}));
 });
 
@@ -132,7 +129,7 @@ test('hover still fetches article data, touches that move do not, and failed pre
   }finally{failing='';await context.close();}
 });
 
-test('SSR all-pages and report kinds return offline with their own content',async()=>{
+test('SSR all-pages return offline with their own content',async()=>{
   const context=await chrome.newContext();const page=await context.newPage();
   try{
     await page.goto(origin+'/all');
@@ -140,11 +137,6 @@ test('SSR all-pages and report kinds return offline with their own content',asyn
     await expect(page.getByRole('link',{name:'全部第 2 页',exact:true})).toBeVisible();
     await context.setOffline(true);await page.goBack();
     await expect(page.getByRole('link',{name:'全部第 1 页',exact:true})).toBeVisible({timeout:1500});
-    await context.setOffline(false);await page.goto(origin+'/daily');
-    await page.getByRole('link',{name:'周报',exact:true}).click();
-    await expect(page.locator('#report-start')).toContainText('周报');
-    await context.setOffline(true);await page.getByRole('link',{name:'日报',exact:true}).click();
-    await expect(page.locator('#report-start')).toContainText('日报',{timeout:1500});
   }finally{await context.close();}
 });
 

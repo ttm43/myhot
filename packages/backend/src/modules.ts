@@ -60,8 +60,6 @@ export interface EngineHooks {
   articleChanged: (change: { id: string; kind: "detail" | "body" | "content"; reduced?: boolean; reason: string; previousStoryIds?: number[] }, tx: Db) => Promise<void>;
   /** A source's articles were published again after changing its public metadata or permissions. */
   sourceRepublished: (change: { sourceId: string }) => Promise<void>;
-  /** A report was published, or what one shows changed. */
-  reportsChanged: (change: { reason: string }, tx: Db) => Promise<void>;
   /** The api answered a request. Never awaited and must not throw. */
   requestAnswered: (req: FastifyRequest, reply: FastifyReply, path: string) => void;
   /**

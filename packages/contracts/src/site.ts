@@ -263,88 +263,11 @@ export interface StoryDetail {
   topics: TopicLink[];
 }
 
-// Reports (daily / weekly / monthly)
-
-export type ReportKind = "daily" | "weekly" | "monthly";
-
-export interface ReportCitation {
-  itemId: string | null;
-  title: string;
-  summary: string | null;
-  sourceName: string;
-  sourceUrl: string;
-  sourceIconUrl: string | null;
-  sourceIconSrcSet?: string;
-  firstParty: boolean;
-  /** When the cited report was published, if it is still in the database. */
-  publishedAt: string | null;
-  /** False once the item was withdrawn; the citation then shows as removed. */
-  available: boolean;
-  /** A daily entry: other sources that reported the event by the issue's cutoff. */
-  otherSources?: number;
-  /** A daily entry's other developments of the event, or reports of the launch merged into it (titles only). */
-  related?: ReportCitation[];
-  /** A daily entry whose event an earlier daily covered: that issue's date. */
-  followUp?: string;
-}
-
-export interface ReportDetail {
-  kind: ReportKind;
-  key: string;
-  /** The issue's place among the existing issues of its kind, oldest first ("第 N 期"). */
-  issueNumber: number;
-  title: string;
-  generatedAt: string;
-  lead: { title: string; leadParagraph: string } | null;
-  /** The still-public item the front page leads with (its headline links there). */
-  leadItemId: string | null;
-  overview: string | null;
-  highlights: ReportCitation[];
-  /** As edited: daily categories, weekly and monthly themes. */
-  sections: Array<{ label: string; summary: string | null; items: ReportCitation[] }>;
-  flashes: ReportCitation[];
-  /**
-   * The front page's picture: from the lead item (a daily's lead, a weekly or monthly's first highlight),
-   * else from another public report of that event. Captioned with the story when it is not the lead's own.
-   */
-  cover: { url: string; srcSet?: string; width: number | null; height: number | null; caption: string | null } | null;
-  metrics: Record<string, number>;
-  readingMinutes: number;
-  prev: string | null;
-  next: string | null;
-}
-
-export interface ReportIndexEntry {
-  key: string;
-  issueNumber: number;
-  title: string | null;
-  count: number;
-}
-
-export interface ReportIndexResponse {
-  kind: ReportKind;
-  items: ReportIndexEntry[];
-}
-
-/** The latest report page: its archive selector and the report in one request. */
-export interface ReportLatestPage {
-  index: ReportNavigationEntry[];
-  report: ReportDetail | null;
-}
-
-/** A report's archive selector, or one month of the daily archive. */
-export interface ReportNavigationResponse {
-  items: ReportNavigationEntry[];
-}
-
 export interface StoryFollowup {
   factId: string;
   representative: { id: string; title: string; source: { name: string }; timelineAt: string };
 }
 export interface StoryFollowupsResponse { items: StoryFollowup[]; more: boolean }
-
-/** An issue in the archive and the calendar, numbered in its whole series; closed daily months omit their titles. */
-export interface ReportNavigationEntry { key: string; issueNumber: number; title?: string | null; count?: number }
 
 // Topics
 

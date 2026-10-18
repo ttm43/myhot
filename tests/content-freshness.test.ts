@@ -14,7 +14,6 @@ import { buildScoreInput, loadAnalyzeInput } from '@aihot/backend/editorial/anal
 import { collectSource } from '@aihot/backend/sources/collect';
 import { groupArticle } from '@aihot/backend/events/group';
 import { publishArticle } from '@aihot/backend/publication/publish';
-import { dailyEdition } from '@aihot/backend/reports/edition';
 import { stopBoss } from '@aihot/backend/jobs/queue';
 import { buildApp } from '../apps/api/src/app.ts';
 
@@ -44,7 +43,7 @@ async function highScore(id:string){
   await publishArticle(id);
 }
 
-test('a previously unseen, undated tail cannot become selected news, heat or a report',async()=>{
+test('a previously unseen, undated tail cannot become selected news or heat',async()=>{
   const now=new Date();
   listing=Array.from({length:60},(_,i)=>({url:`${base}/known-${i}`,title:`Known ${i}`,date:now.toISOString(),summary:body}));
   await collectSource(SOURCE);
@@ -63,8 +62,6 @@ test('a previously unseen, undated tail cannot become selected news, heat or a r
     const res=await app.inject({method:'GET',url});assert.equal(res.statusCode,200,url);assert.ok(!res.body.includes(a!.id),url);
   }
   assert.equal((await app.inject({method:'GET',url:`/api/site/items/${a!.id}`})).statusCode,200,'the material remains readable');
-  const edition=await dailyEdition('2026-10-04',new Date(Date.now()-86400000),new Date(Date.now()+1000));
-  assert.ok(!edition.entries.some(e=>e.entry.itemId===a!.id));
 });
 
 test('an original source can supply a missing date without changing the text; discovery and explicit backfill are preserved',async()=>{

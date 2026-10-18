@@ -1,6 +1,5 @@
 // Public scope through the real api routes: a licence revocation or a withdrawal reaches every exit,
-// reports stop quoting withdrawn items, the hot board drops a withdrawn item at once, and item pages
-// follow one rule.
+// the hot board drops a withdrawn item at once, and item pages follow one rule.
 import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -23,7 +22,6 @@ import { buildApp } from "../apps/api/src/app.ts";
 const T = tag();
 const SOURCE = `test-publication-${T}`;
 const BODY = `FULLTEXT-${T} `.repeat(40);
-const REPORT_KEY = `2099-12-${String(10 + Math.floor(Math.random() * 19))}`;
 const app = await buildApp();
 
 before(async () => {
@@ -186,27 +184,6 @@ test("revoking a source's licence takes its articles off every exit", async () =
   assert.equal((await get(`/api/site/stories/${story}`)).status, 404, "the story drops an isolated source's last report");
 
   await sql`UPDATE sources SET participation_mode = 'editorial', site_fulltext = true WHERE id = ${SOURCE}`;
-});
-
-test("a withdrawn item leaves every report exit", async () => {
-  const id = await article();
-  await publishArticle(id, released());
-  const content = {
-    sections: [{ label: "模型", items: [{ itemId: id, title: `LEAD-${T}`, summary: `QUOTED-${T}`, sourceUrl: `https://example.com/original-${T}`, sourceName: "Test" }] }],
-    flashes: [],
-  };
-  await sql`INSERT INTO reports (kind, key, window_start, window_end, content, generated_at, origin)
-            VALUES ('daily', ${REPORT_KEY}, now() - interval '1 day', now(), ${sql.json(content as never)}, now(), 'manual')
-            ON CONFLICT (kind, key) DO UPDATE SET content = EXCLUDED.content`;
-  assert.ok((await get(`/api/site/reports/daily/${REPORT_KEY}`)).body.includes(`QUOTED-${T}`), "the report quotes the item before");
-
-  await setVisibility(id, { visibility: "withdrawn", reason: "test", version: 0 }, "test");
-  const reports = [`/api/site/reports/daily/${REPORT_KEY}`];
-  for (const url of reports) {
-    const res = await get(url);
-    assert.equal(res.status, 200, url);
-    assert.ok(!res.body.includes(`QUOTED-${T}`) && !res.body.includes(`original-${T}`), `${url} still quotes the withdrawn item`);
-  }
 });
 
 test("story changes refresh share images and a withdrawal takes down only the stories citing it", async () => {

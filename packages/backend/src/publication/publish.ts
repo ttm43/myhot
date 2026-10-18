@@ -171,9 +171,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   // facts' locks first, in a fixed order, so two reports of one fact never settle it at once.
   const seatFacts = [...new Set([previous?.fact_id, membership?.fact_id].filter((x): x is number => typeof x === "number"))].sort((a, b) => a - b);
   for (const fact of seatFacts) await tx`SELECT pg_advisory_xact_lock(hashtext(${`seat:${fact}`}))`;
-  // Reports wait for in-flight publication transactions before taking their candidate snapshot.
-  // Stamp releases after all lock waits, which can cross an edition's cutoff.
-  await tx`SELECT pg_advisory_xact_lock_shared(hashtext('report_candidates'))`;
+  // Stamp releases after all lock waits.
   const now = options.now ?? new Date();
 
   const f = override?.fields ?? {};
@@ -208,8 +206,8 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   const bodyMode = bodyModeOf(source, article.body_status, hasBody);
   const originalTitle = isChineseTitle && title === collapseWhitespace(article.title) ? null : collapseWhitespace(article.title);
 
-  // Waiting candidates are readable in the pool, with no selected seat, sync entry or push.
-  // Completion stamps the actual release after lock waits, including across report cutoffs.
+  // Waiting candidates are readable in the pool, with no selected seat.
+  // Completion stamps the actual release after lock waits.
   const selectedReadyAt = previous?.selected_ready_at ?? (selectionCandidate ? options.releasedAt ?? now : null);
   const visibleAfter = selected ? (previous?.selected && previous.visible_after ? previous.visible_after : options.releasedAt ?? now) : null;
 

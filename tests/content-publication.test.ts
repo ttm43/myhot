@@ -9,7 +9,6 @@ import { loadStoryFollowups } from "@aihot/backend/publication/followups";
 import { loadGroupReports } from "@aihot/backend/publication/groups";
 import { loadItemDetail } from "@aihot/backend/publication/detail";
 import { loadStoryDetail } from "@aihot/backend/publication/stories";
-import { candidates } from "@aihot/backend/reports/edition";
 import { composeStoryDigest, DIGEST_PROMPT_VERSION, DIGEST_SYSTEM, DigestSchema } from "@aihot/backend/events/digest";
 import { chatJson } from "@aihot/backend/providers/llm";
 import { computeHotRanking } from "@aihot/backend/events/hot";
@@ -113,10 +112,6 @@ test("mentions cannot choose a timeline origin, anchor, representative, or a lat
   assert.equal(detail.latest, "Dots 后续更新");
   assert.equal(detail.officialReports.length, 1, "only tier T1 has the first-party label");
   assert.equal(detail.developments[0]!.representative.source.firstParty, false);
-  const edition = await candidates(at(100), now);
-  assert.equal(edition.find((c) => c.factId === g.factPublicId)?.itemId, official, "report editions use the same authority within their own time window");
-  assert.equal(edition.find((c) => c.itemId === official)?.firstParty, false);
-  assert.equal(edition.find((c) => c.itemId === earlyMention)?.factId, null, "a related roundup stays independent in reports");
   await sql`UPDATE publications SET visibility='withdrawn' WHERE article_id=${latest}`;
   const after = (await loadStoryDetail(g.storyId, now))!;
   assert.equal(after.latestReport!.id, official);
@@ -171,7 +166,6 @@ test("digest input excludes mentions, preserves scoped conditions, and ignores g
   const mention = await report(s, g, { title: "MENTION MUST NOT ENTER DIGEST", hours: 1, role: "mention" });
   const composite = await report(s, g, { title: "COMPOSITE WAITING FOR GROUP CLEANUP", hours: 1 });
   await sql`UPDATE analyses SET output=output || '{"scope":"composite"}'::jsonb WHERE article_id=${composite}`;
-  assert.equal((await candidates(at(100), now)).find((c) => c.itemId === composite)?.factId, null, "known composites cannot occupy a report's fact before projection repair");
   assert.equal((await composeStoryDigest(g.storyId)).updated, true);
   assert.ok(digestPrompt.includes("Tasks consume usage.") && digestPrompt.includes("自主执行任务消耗额度"));
   assert.ok(!digestPrompt.includes(mention) && !digestPrompt.includes("MENTION MUST NOT ENTER DIGEST"));

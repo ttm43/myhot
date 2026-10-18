@@ -2,7 +2,7 @@
 // with the feed filters they carry. The site's name and wording come from site/site.ts;
 //; its address from SITE_URL.
 import type { MetaDescriptor } from "react-router";
-import type { ReportDetail, StoryDetail, TimelineFilters } from "@aihot/contracts/site";
+import type { StoryDetail, TimelineFilters } from "@aihot/contracts/site";
 import { isCategoryKey, isChannelKey } from "@aihot/contracts/taxonomy";
 import { SITE, subjectAfter, withSubject } from "@aihot/site";
 
@@ -194,41 +194,6 @@ export function articleLd(input: { path: string; headline: string; description?:
     publisher: orgRef(),
     ...(input.basedOn ? { isBasedOn: input.basedOn } : {}),
   };
-}
-
-/** An archive whose entries are indexable pages of their own (report issues). */
-export function archiveLd(path: string, name: string, entries: Array<{ path: string; name: string }>) {
-  const base = siteUrl();
-  return {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name,
-    url: `${base}${path}`,
-    numberOfItems: entries.length,
-    itemListOrder: "https://schema.org/ItemListOrderDescending",
-    itemListElement: entries.map((e, i) => ({ "@type": "ListItem", position: i + 1, name: e.name, url: `${base}${e.path}` })),
-  };
-}
-
-const REPORT_NAME = { daily: "日报", weekly: "周报", monthly: "月报" } as const;
-
-/** An issue's date and actual editorial lead, falling back only to a still-public visible highlight. */
-export function reportTitle(report: ReportDetail): string {
-  const lead = report.lead?.title.trim() || report.highlights.find((item) => item.available)?.title.trim();
-  const name = `${withSubject(REPORT_NAME[report.kind])} ${report.key}`;
-  return lead ? `${name}：${lead}` : name;
-}
-
-/** One report issue: an editorial round-up by the site (no personal byline), sections as its sections. */
-export function reportLd(r: ReportDetail, path: string, description: string) {
-  return articleLd({
-    path,
-    headline: reportTitle(r),
-    description,
-    publishedAt: r.generatedAt,
-    image: `/og/reports/${r.kind}/${r.key}.png`,
-    section: r.sections.map((s) => s.label),
-  });
 }
 
 /** The event page collects public reports; their publication times do not date the page itself. */

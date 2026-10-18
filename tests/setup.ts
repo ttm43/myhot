@@ -5,8 +5,6 @@
 // the database (databases.ts).
 import { createHash } from "node:crypto";
 import http from "node:http";
-import { beijingAt } from "@aihot/contracts/time";
-import { EDITION_TIMES } from "@aihot/site";
 import { DEFAULTS, PRESETS } from "@aihot/site/models";
 
 const database = new URL(process.env.DATABASE_URL ?? "postgres://unset/unset").pathname.slice(1);
@@ -26,7 +24,7 @@ process.env.COLLECT_ENABLED ??= "true";
 const STEP_MODELS: Record<string, [env: string, model: string]> = {
   prefilter: ["PREFILTER_MODEL", "qwen3.7-flash"], score: ["SCORE_MODEL", "glm-5.3-flash-selection"], understand: ["UNDERSTAND_MODEL", "glm-5.3-flash"],
   summarize: ["SUMMARIZE_MODEL", "deepseek-flash"], structure: ["STRUCTURE_MODEL", "qwen3.8-flash"], group: ["GROUP_MODEL", "deepseek-flash"],
-  groupReview: ["GROUP_REVIEW_MODEL", "mimo-v2.6-flash"], digest: ["DIGEST_MODEL", "deepseek-flash"], report: ["REPORT_MODEL", "deepseek-flash"],
+  groupReview: ["GROUP_REVIEW_MODEL", "mimo-v2.6-flash"], digest: ["DIGEST_MODEL", "deepseek-flash"],
   translate: ["TRANSLATE_MODEL", "deepseek-flash"], wording: ["WORDING_MODEL", "deepseek-flash"],
 };
 for (const [step, [env, model]] of Object.entries(STEP_MODELS)) if (!DEFAULTS[step]) process.env[env] ??= model;
@@ -104,5 +102,3 @@ export function gate<T = void>() {
 /** A short unique tag for the rows a test creates. */
 export const tag = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
-/** `seconds` after the site's edition time of a report kind on a Beijing date (EDITION_TIMES), so tests follow the site's schedule. */
-export const editionAt = (kind: keyof typeof EDITION_TIMES, date: string, seconds = 0) => new Date(beijingAt(date, EDITION_TIMES[kind]).getTime() + seconds * 1000);

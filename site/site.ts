@@ -2,38 +2,24 @@
 // 网页和后端都读它；改完重新构建（docker compose up --build）即可生效。
 // 域名不在这里：部署时用环境变量 SITE_URL 设置。
 
-/**
- * 日报、周报、月报什么时候出（北京时间，HH:mm）：日报收这个时间之前的 24 小时，周报在每个自然周之后的周一出，
- * 月报在每月 1 日出。排程、成刊时间窗口、缺期告警和所有提到时间的文案都读它（public/ 里的文件写占位
- * {{dailyTime}}、{{weeklyTime}}、{{monthlyTime}}）；排程每半小时检查一次，所以写整点或半点。
- */
-export const EDITION_TIMES = { daily: "08:00", weekly: "10:00", monthly: "10:30" };
-
-/** “每天 08:00”“每周一 10:00”“每月 1 日 10:30”：写进句子里的出刊时间。 */
-export const EDITION_WHEN = {
-  daily: `每天 ${EDITION_TIMES.daily}`,
-  weekly: `每周一 ${EDITION_TIMES.weekly}`,
-  monthly: `每月 1 日 ${EDITION_TIMES.monthly}`,
-};
-
 export const SITE = {
   /** 站名：导航、页面标题、分享图、MCP、后台都用它。 */
   name: "MyHOT",
   /**
-   * 行业词：拼进默认说法里，比如“AI 日报”“AI 动态”。
-   * 改成“法律”“HR”“黄金”之类，页面上就会变成“法律日报”“法律动态”。
+   * 行业词：拼进默认说法里，比如“AI 动态”。
+   * 改成“法律”“HR”“黄金”之类，页面上就会变成“法律动态”。
    */
   subject: "AI",
   /** 首页的完整标题（浏览器标签、搜索结果）。 */
-  homeTitle: "MyHOT — AI 行业动态 · 每日精选与日报",
+  homeTitle: "MyHOT — AI 行业动态与每日精选",
   /** 主题目录页（/topics）的标题。 */
   topicsTitle: "AI 主题：公司与模型、技术方向、内容形态的最新动态",
   /** 一句话介绍：搜索引擎、分享卡片、PWA 清单会用。 */
-  description: `从一批 AI 信源里挑出值得看的动态，把同一件事的多篇报道归到一起，${EDITION_WHEN.daily} 出一份日报。`,
+  description: "从一批 AI 信源里挑出值得看的动态，把同一件事的多篇报道归到一起。",
   /** 一行小字：分享图、海报下方。 */
   tagline: "值得关注的 AI 动态",
   /** 搜索引擎读到的关键词（首页结构化数据）。 */
-  keywords: ["AI 资讯", "AI 新闻", "AI 日报", "AI 行业动态"] as string[],
+  keywords: ["AI 资讯", "AI 新闻", "AI 行业动态"] as string[],
   /** 网站开始收录的年份（结构化数据的时间范围，选填）。 */
   since: null as string | null,
   /** 界面语言（HTML lang、og:locale）。 */
@@ -98,31 +84,6 @@ export const ADMIN = {
   budgetNote: null as string | null,
 };
 
-/** 日报、周报、月报版面上的说法。 */
-export const REPORTS = {
-  /** 报头下面的出版者一行。 */
-  imprint: SITE.name.toUpperCase(),
-  /** 报头旁边的一个词。 */
-  motto: SITE.subject as string,
-  /** 每种报告页面的描述（搜索结果、分享卡片），不带句号。 */
-  descriptions: {
-    daily: `${SITE.name} ${subjectAfter(`${EDITION_WHEN.daily}（北京时间）发布的`, "行业精编日报")}`,
-    weekly: subjectAfter("每周", "行业综合回顾"),
-    monthly: subjectAfter("每月", "行业盘点"),
-  },
-  /**
-   * 一期里的一条怎么称呼（“4 件大事”）：没有头条时的标题（“这一天的 4 件 AI 大事”）、报头和往期目录的条数、
-   * 周报月报没有总述时的那句话，以及订阅说明里的“按栏目分好的大事”都用它。
-   */
-  entry: { measure: "件", noun: "大事" },
-  /** 报头上其余几个数字后面的说法；精选数和日报期数在关于页、主题页也这样写。 */
-  metricUnits: { sourcesCount: "个来源", firstPartyEvents: "件一手发布", selectedCount: "条精选", reportsCovered: "期日报" },
-  /** 报告分享图上“共几条”的说法。 */
-  shareUnit: "件大事",
-  /** 日报时段内有资料经过评判、但没有新大事时的标题与导语。 */
-  quiet: { title: "今日安静，无大事发生", paragraph: `${subjectAfter("北京时间 {start} 至 {end}，没有新的", "大事")}。` },
-};
-
 /** 后台新建信源时的默认设置。 */
 export const SOURCE_DEFAULTS = {
   /** 站内展示全文；false 时只显示摘要和原文链接。 */
@@ -143,9 +104,6 @@ export const CARDS: Record<string, { kicker: string; title: string; subtitle: st
   site: { kicker: subjectAfter("每日", "精选"), title: SITE.tagline, subtitle: SITE.description },
   all: { kicker: subjectAfter("全部", "动态"), title: "所有信源的最新动态，一站看完", subtitle: "按时间汇总各信源的最新动态，可按类别与标签筛选。" },
   hot: { kicker: "热点榜", title: "过去 48 小时，大家在讨论什么", subtitle: "热度指数、趋势与组成热度的公开来源。", accent: "hot" },
-  daily: { kicker: withSubject("日报"), title: subjectAfter(`每天 ${spokenTime(EDITION_TIMES.daily)}，一份读得完的`, "日报"), subtitle: `${subjectAfter("前一天值得关注的", "动态")}。` },
-  weekly: { kicker: withSubject("周报"), title: `一周${REPORTS.entry.noun}，一次看清`, subtitle: "本周的主线、重要发布与值得回看的讨论。" },
-  monthly: { kicker: withSubject("月报"), title: "一个月的变化", subtitle: "月度主线与关键事件回顾。" },
 };
 
 /** 这个部署自己的几处安排（选填）。 */
@@ -185,19 +143,13 @@ export const PUBLIC_CATEGORIES = {
   merge: {},
 } as const;
 
-/** “AI 日报”这类说法：行业词和名词之间，英文词加空格，中文词不加。 */
+/** “AI 动态”这类说法：行业词和名词之间，英文词加空格，中文词不加。 */
 export function withSubject(noun: string): string {
   return /[A-Za-z0-9]$/.test(SITE.subject) ? `${SITE.subject} ${noun}` : `${SITE.subject}${noun}`;
 }
 
-/** “按主题看 AI”“往期 AI 日报”这类说法：行业词接在中文后面，英文词前加空格，中文词不加；noun 照 withSubject 接上。 */
+/** “按主题看 AI”“全部 AI 动态”这类说法：行业词接在中文后面，英文词前加空格，中文词不加；noun 照 withSubject 接上。 */
 export function subjectAfter(text: string, noun?: string): string {
   const gap = /^[A-Za-z0-9]/.test(SITE.subject) ? " " : "";
   return `${text}${gap}${noun ? withSubject(noun) : SITE.subject}`;
-}
-
-/** “8 点”“10 点 30 分”：口语里的 HH:mm。 */
-function spokenTime(time: string): string {
-  const [hour, minute] = time.split(":").map(Number) as [number, number];
-  return `${hour} 点${minute ? ` ${minute} 分` : ""}`;
 }

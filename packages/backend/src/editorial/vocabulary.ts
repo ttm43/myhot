@@ -1,6 +1,6 @@
 // Tag normalization and company identity over the industry pack's vocabulary (industry/taxonomy.ts),
 // which the topics (industry/topics.json) are built on.
-import { CATEGORIES, CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, RELEASE, TAG_SYNONYMS, TOPIC_TAGS } from "@aihot/industry/taxonomy";
+import { CATEGORIES, CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, TAG_SYNONYMS, TOPIC_TAGS } from "@aihot/industry/taxonomy";
 
 export { CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, ITEM_TYPES, TOPIC_TAGS } from "@aihot/industry/taxonomy";
 
@@ -26,9 +26,6 @@ export function normalizeTags(v: unknown): string[] {
 
 /** The category boundaries the structure step reads, one line per category. */
 export const CATEGORY_GUIDE = CATEGORIES.map((c) => `- ${c.key}（${c.label}）：${c.guide}`).join("\n");
-
-/** The industry's headline launch (RELEASE): narrower than its category, which also holds prices and benchmarks. */
-export const isRelease = (category: string | null, tags: readonly string[]) => RELEASE !== null && category === RELEASE.category && tags.includes(RELEASE.tag);
 
 const key = (value: string) => value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, "");
 /** Exact entity/alias only: mentions embedded in a sentence are not ownership. */

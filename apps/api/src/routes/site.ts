@@ -2,7 +2,7 @@
 // Reads through the same public read layer as v1; no cookies are read or set.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { isCategoryKey, isChannelKey, type CategoryKey, type ChannelKey } from "@aihot/contracts/taxonomy";
-import type { ReportIndexResponse, ReportLatestPage, ReportNavigationResponse, SearchSuggestions } from "@aihot/contracts/site";
+import type { SearchSuggestions } from "@aihot/contracts/site";
 import { InvalidCursorError } from "@aihot/backend/lib/cursor";
 import { exportMarkdown, loadItemDetail } from "@aihot/backend/publication/detail";
 import { loadPool, SearchBusyError } from "@aihot/backend/publication/pool";
@@ -12,7 +12,6 @@ import { loadGroupReports } from "@aihot/backend/publication/groups";
 import { hotSearchLinks, loadHotStrip } from "@aihot/backend/publication/hot";
 import { listTopicSummaries, loadTopicPage, topicBrowseLinks } from "@aihot/backend/publication/topics";
 import { loadHot, loadStoryDetail, resolveStory } from "@aihot/backend/publication/stories";
-import { listReports, loadReport, reportNavigation, loadReportNavigation, loadReportMonth, type ReportKind } from "@aihot/backend/publication/reports";
 import { looseQuery, sendJsonWithEtag, sendProblem } from "../http/respond.ts";
 
 type Handler = (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -134,47 +133,6 @@ export function registerSite(app: FastifyInstance) {
     const data = await loadStoryDetail(found.storyId);
     if (!data) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "story not public", cacheControl: "public, max-age=60" });
     return sendJsonWithEtag(req, reply, data, { etagPrefix: "story", cacheControl: "public, max-age=60, s-maxage=60" });
-  }));
-
-  app.get("/api/site/reports/:kind", siteHandler(async (req, reply) => {
-    const kind = (req.params as { kind: string }).kind;
-    if (!["daily", "weekly", "monthly"].includes(kind)) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "unknown report kind" });
-    const body: ReportIndexResponse = { kind: kind as ReportKind, items: await listReports(kind as ReportKind) };
-    return sendJsonWithEtag(req, reply, body, { etagPrefix: "reports", cacheControl: "public, max-age=60, s-maxage=60" });
-  }));
-
-  // The latest report page needs its archive selector and the report in one HTTP request.
-  app.get("/api/site/reports/:kind/latest-page", siteHandler(async (req, reply) => {
-    const kind = (req.params as { kind: string }).kind;
-    if (!["daily", "weekly", "monthly"].includes(kind)) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "unknown report kind" });
-    const index = await listReports(kind as ReportKind);
-    const report = index[0] ? await loadReport(kind as ReportKind, index[0].key) : null;
-    const body: ReportLatestPage = { index: reportNavigation(kind as ReportKind, index, report?.key ?? ""), report };
-    return sendJsonWithEtag(req, reply, body, { etagPrefix: "report-latest", cacheControl: "public, max-age=60, s-maxage=60" });
-  }));
-
-  app.get("/api/site/reports/:kind/navigation/:key", siteHandler(async (req, reply) => {
-    const { kind, key } = req.params as { kind: string; key: string };
-    if (!["daily", "weekly", "monthly"].includes(kind) || !/^\d{4}-(\d{2}(-\d{2})?|W\d{2})$/.test(key)) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "report not found" });
-    const body: ReportNavigationResponse = { items: await loadReportNavigation(kind as ReportKind, key) };
-    return sendJsonWithEtag(req, reply, body, { etagPrefix: "report-navigation", cacheControl: "public, max-age=60, s-maxage=60" });
-  }));
-
-  app.get("/api/site/reports/daily/months/:month", siteHandler(async (req, reply) => {
-    const { month } = req.params as { month: string };
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "month not found" });
-    const body: ReportNavigationResponse = { items: await loadReportMonth("daily", month) };
-    return sendJsonWithEtag(req, reply, body, { etagPrefix: "report-month", cacheControl: "public, max-age=60, s-maxage=60" });
-  }));
-
-  app.get("/api/site/reports/:kind/:key", siteHandler(async (req, reply) => {
-    const { kind, key } = req.params as { kind: string; key: string };
-    if (!["daily", "weekly", "monthly"].includes(kind) || !/^\d{4}-(\d{2}(-\d{2})?|W\d{2})$/.test(key)) {
-      return sendProblem(req, reply, { status: 404, code: "not_found", detail: "report not found" });
-    }
-    const data = await loadReport(kind as ReportKind, key);
-    if (!data) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "report not found", cacheControl: "public, max-age=60" });
-    return sendJsonWithEtag(req, reply, data, { etagPrefix: "report", cacheControl: "public, max-age=120, s-maxage=120" });
   }));
 
   // Markdown export: attachment, 404 when there is nothing to export (same predicate as the button).

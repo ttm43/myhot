@@ -1,5 +1,5 @@
 // Failure modes: a reader can reuse withdrawn text for more than six minutes; stale-while-revalidate
-// extends that window; report images use the static brand lifetime; conditional reads restore it.
+// extends that window; conditional reads restore it.
 import { tag } from './setup.ts';
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
@@ -20,19 +20,11 @@ before(async () => {
   await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,category,title_zh,summary_zh,score,selected)
     VALUES(${id},1,'rule','pass','ai-models','公开缓存示例','公开缓存摘要',90,true)`;
   await publishArticle(id,{releasedAt:new Date(Date.now()-60000)});
-  for (const [kind,key] of [['daily','2099-10-04'],['weekly','2099-W40'],['monthly','2099-10']]) {
-    const entry = {itemId:id,title:'公开缓存示例',summary:'公开缓存摘要'};
-    const content = kind==='daily' ? {sections:[{label:'模型',items:[entry]}],flashes:[]}
-      : {headline:'公开缓存示例',themes:[{heading:'模型',storyRefs:[entry]}]};
-    await sql`INSERT INTO reports(kind,key,window_start,window_end,content,origin,generated_at)
-      VALUES(${kind!},${key!},now()-interval '1 day',now(),${sql.json(content)},'manual',now())`;
-  }
 });
 after(async()=>{await app.close();await stopBoss();await closeDb();});
 
 test('mutable content never authorizes a reader to reuse stale data beyond the withdrawal window',async()=>{
-  const paths = [`/items/${id}/markdown`, `/og/items/${id}.png`, `/og/posters/${id}.png`,
-    '/og/reports/daily/2099-10-04.png','/og/reports/weekly/2099-W40.png','/og/reports/monthly/2099-10.png'];
+  const paths = [`/items/${id}/markdown`, `/og/items/${id}.png`, `/og/posters/${id}.png`];
   const failures:string[]=[];
   for (const url of paths) {
     const response=await app.inject({method:'GET',url});

@@ -1,15 +1,14 @@
-// Share images (1200×630 PNG) for pages, items, reports, topics and events. Only public content
+// Share images (1200×630 PNG) for pages, items, topics and events. Only public content
 // gets a card; anything else is a real 404.
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { CATEGORY_LABELS } from "@aihot/contracts/taxonomy";
 import { beijingDate } from "@aihot/contracts/time";
 import { loadItemOgCard, loadItemShare } from "@aihot/backend/publication/og";
-import { loadReport, type ReportKind } from "@aihot/backend/publication/reports";
 import { findTopic, TOPIC_GROUPS, TOPICS } from "@aihot/backend/publication/topics";
 import { loadStoryDetail, resolveStory } from "@aihot/backend/publication/stories";
 import { ogEtag, renderOg, type OgCard } from "@aihot/backend/media/og";
 import { posterEtag, renderPoster, type Poster } from "@aihot/backend/media/poster";
-import { CARDS, ITEM_COPY, REPORTS, subjectAfter, withSubject } from "@aihot/site";
+import { CARDS, ITEM_COPY, subjectAfter, withSubject } from "@aihot/site";
 import { config } from "@aihot/backend/config";
 
 /** The pages' share cards: the site's texts, and the topic count of the topic list. */
@@ -19,7 +18,7 @@ const PAGES: Record<string, OgCard> = {
 };
 
 /**
- * Article, event and report images carry editable content. A reader may keep a copy for five
+ * Article and event images carry editable content. A reader may keep a copy for five
  * minutes; shared caches are refreshed on publication changes. Brand images keep their own lifetime.
  */
 const CONTENT_IMAGE_CACHE = "public, max-age=300, s-maxage=3600, must-revalidate";
@@ -34,8 +33,6 @@ async function send(req: FastifyRequest, reply: FastifyReply, card: OgCard, maxA
 function notFound(reply: FastifyReply) {
   return reply.code(404).header("Cache-Control", "public, max-age=300").type("text/plain; charset=utf-8").send("Not found");
 }
-
-const REPORT_NAMES: Record<ReportKind, string> = { daily: withSubject("日报"), weekly: withSubject("周报"), monthly: withSubject("月报") };
 
 export function registerOg(app: FastifyInstance) {
   app.get("/og/site.png", (req, reply) => send(req, reply, PAGES.site!, 86400));
@@ -74,21 +71,6 @@ export function registerOg(app: FastifyInstance) {
     reply.header("ETag", tag).header("Cache-Control", CONTENT_IMAGE_CACHE);
     if (String(req.headers["if-none-match"] ?? "").split(",").some((t) => t.trim().replace(/^W\//, "") === tag)) return reply.code(304).send();
     return reply.type("image/png").send((await renderPoster(poster)).png);
-  });
-
-  app.get("/og/reports/:kind/:file", async (req, reply) => {
-    const { kind, file } = req.params as { kind: string; file: string };
-    if (!["daily", "weekly", "monthly"].includes(kind) || !file.endsWith(".png")) return notFound(reply);
-    const r = await loadReport(kind as ReportKind, file.slice(0, -4));
-    if (!r) return notFound(reply);
-    const count = r.sections.reduce((n, s) => n + s.items.length, 0);
-    return send(req, reply, {
-      kicker: `${REPORT_NAMES[r.kind]} · ${r.key}`,
-      title: r.lead?.title ?? r.title,
-      subtitle: r.lead?.leadParagraph ?? r.overview,
-      // A quiet day's issue (REPORTS.quiet) has nothing to count.
-      meta: count > 0 ? `${count} ${REPORTS.shareUnit} · 约 ${r.readingMinutes} 分钟读完` : null,
-    }, 3600, CONTENT_IMAGE_CACHE);
   });
 
   app.get("/og/topics/:file", async (req, reply) => {

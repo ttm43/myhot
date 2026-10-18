@@ -1,10 +1,10 @@
 // Site navigation in one place: the desktop sidebar's sections and the phone tab bar's tabs, the engine's
 // and the site's modules'.
 import type { ReactNode } from "react";
-import { NAV, subjectAfter, withSubject } from "@aihot/site";
+import { NAV, subjectAfter } from "@aihot/site";
 import { webModules } from "../../site-modules";
 import {
-  IconBolt, IconDoc, IconFlame, IconGrid, IconList, IconUser,
+  IconBolt, IconFlame, IconGrid, IconList, IconUser,
 } from "../icons";
 
 export interface NavItem {
@@ -22,7 +22,6 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { to: "/", label: "精选", icon: IconBolt, end: true },
       { to: "/all", label: subjectAfter("全部", "动态"), icon: IconList },
       { to: "/hot", label: "热点榜", icon: IconFlame },
-      { to: "/daily", label: withSubject("日报"), icon: IconDoc },
       { to: "/topics", label: "主题", icon: IconGrid },
     ],
   },
@@ -46,22 +45,20 @@ export function sidebar(): Array<{ title: string; items: NavItem[] }> {
   return sections;
 }
 
-/** A sidebar entry is lit on its pages; 日报 also covers weekly and monthly reports. */
+/** A sidebar entry is lit on its pages. */
 export function sidebarIsActive(item: NavItem, pathname: string): boolean {
   if (item.end) return pathname === item.to;
-  if (item.to === "/daily") return /^\/(daily|weekly|monthly)(\/|$)/.test(pathname);
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
 /**
- * The phone tab bar: 全部 lives beside 精选 as a switch, 热点 and 日报 are tabs, and "我的" at /more holds
- * 收藏, 外观, the tools and the site's own pages. Which tab a page sits under is declared by the page
+ * The phone tab bar: 全部 lives beside 精选 as a switch, 热点 is a tab, and "我的" at /more holds
+ * 外观 and the tools. Which tab a page sits under is declared by the page
  * itself (components/shell/screens.ts).
  */
 export type TabKey =
   | "featured"
   | "hot"
-  | "daily"
   | "me"
   // A module's tab.
   | (string & {});
@@ -76,7 +73,6 @@ export interface Tab {
 const ENGINE_TABS: Tab[] = [
   { key: "featured", to: "/", label: "精选", icon: IconBolt },
   { key: "hot", to: "/hot", label: "热点", icon: IconFlame },
-  { key: "daily", to: "/daily", label: "日报", icon: IconDoc },
   { key: "me", to: "/more", label: "我的", icon: IconUser },
 ];
 

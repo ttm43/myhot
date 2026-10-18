@@ -3,7 +3,6 @@
 // Visibility changes and manual corrections go through editorial overrides with a version check, are
 // re-projected to every public exit, and are audited.
 import { z } from "zod";
-import { correctReportClassification } from "../reports/correct.ts";
 import type { AdminContentChain, AdminContentRow, AdminPublication, BeforeJson } from "@aihot/contracts/admin";
 import { ARTICLE_ID_PATTERN, CATEGORY_KEYS } from "@aihot/contracts/taxonomy";
 import { sql, type Tx } from "../db.ts";
@@ -230,7 +229,6 @@ export async function overrideFields(id: string, input: { fields: unknown; clear
     if (published?.changed) {
       await emit("articleChanged", { id, kind: "content", reduced: published.reduced, reason: "manual correction" }, tx);
       const changedFields = new Set([...Object.keys(fields), ...(input.clear ?? [])]);
-      if (changedFields.has("category") || changedFields.has("tags")) await correctReportClassification(tx, id, input.reason);
       const [st] = await tx<{ story_id: number | null }[]>`SELECT story_id FROM publications WHERE article_id = ${id}`;
       if (st?.story_id && [...changedFields].some(k => k !== "category" && k !== "tags")) {
         await enqueue(QUEUES.digest, { storyId: st.story_id }, { singletonKey: `story:${st.story_id}` }, tx);
