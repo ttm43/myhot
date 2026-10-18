@@ -21,7 +21,7 @@ export interface AdminMe {
 }
 
 /** Items waiting for the admin, shown on the navigation: the engine's, and the modules' under their own keys. */
-export type AdminNavCounts = Partial<Record<"feedback" | "sources" | "runs", number>> & Record<string, number | undefined>;
+export type AdminNavCounts = Partial<Record<"sources" | "runs", number>> & Record<string, number | undefined>;
 
 /** One manual change (audit_log), as a history list shows it. */
 export interface AdminAuditEntry {
@@ -212,33 +212,6 @@ export interface AdminContentChain {
   history: AdminAuditEntry[];
 }
 
-// Feedback
-
-export interface AdminFeedbackRow {
-  id: number;
-  content: string;
-  email: string | null;
-  page_url: string | null;
-  /** local (viewable here until forwarded), feishu (in the internal chat), gone (could not be forwarded), or null. */
-  screenshot: "local" | "feishu" | "gone" | null;
-  source_hash: string;
-  status: string;
-  note: string | null;
-  forwarded_at: Timestamp | null;
-  forward_error: string | null;
-  created_at: Timestamp;
-  updated_at: Timestamp;
-  banned: boolean;
-  from_source: number;
-}
-
-export interface AdminFeedback {
-  page: number;
-  rows: AdminFeedbackRow[];
-  counts: Record<string, number>;
-  bans: Array<{ source_hash: string; reason: string | null; created_by: string | null; created_at: Timestamp }>;
-}
-
 // Runs
 
 export interface AdminReceiptIssue {
@@ -318,7 +291,6 @@ export interface AdminBudget {
 }
 
 export interface AdminSettings {
-  contact: { wechatQr: string | null; feishuQr: string | null };
   targets: AdminNotifyTarget[];
   budgets: AdminBudget[];
 }

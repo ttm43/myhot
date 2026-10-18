@@ -1,8 +1,7 @@
 import {
-  isRouteErrorResponse, Link, Links, Meta, Outlet, Scripts, ScrollRestoration, useLoaderData, useLocation, useNavigation, useRouteError, useRouteLoaderData,
+  isRouteErrorResponse, Link, Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation, useNavigation, useRouteError, useRouteLoaderData,
   type ShouldRevalidateFunction,
 } from "react-router";
-import type { SiteMeta } from "@aihot/contracts/site";
 import { SITE } from "@aihot/site";
 import { RingMark } from "@aihot/site/brand/Logo.tsx";
 import { useEffect, useState, type ReactNode } from "react";
@@ -15,8 +14,7 @@ import { usePageTransition } from "./components/shell/transitions";
 import { SearchOverlay } from "./features/search/SearchOverlay";
 import { BackToTop, NavigationProgress } from "./components/shell/Chrome";
 import { buttonClass } from "./components/ui/Controls";
-import { rememberPage, APPEARANCE_BOOT_SCRIPT, useAppearanceSync } from "./lib/local-state";
-import { apiGet } from "./lib/api.server";
+import { APPEARANCE_BOOT_SCRIPT, useAppearanceSync } from "./lib/local-state";
 import { useHydratedFlag } from "./lib/hydration";
 import { titled } from "./lib/seo";
 import { webModules } from "./site-modules";
@@ -30,17 +28,8 @@ export const links: Route.LinksFunction = () => [
 ];
 
 /** The release rendering this document: once a newer one is deployed, a render error reloads the page (entry.client). */
-export async function loader({ request }: Route.LoaderArgs) {
-  const release = process.env.AIHOT_RELEASE ?? null;
-  try {
-    const meta = await apiGet<SiteMeta>("/api/site/meta", {
-      headers: Object.assign({}, ...webModules().map((m) => m.root?.documentHeaders?.(request) ?? {})),
-      signal: request.signal,
-    });
-    return { ...meta, release };
-  } catch {
-    return { changelogVersion: null, release };
-  }
+export async function loader() {
+  return { release: process.env.AIHOT_RELEASE ?? null };
 }
 
 export const shouldRevalidate: ShouldRevalidateFunction = () => false;
@@ -79,7 +68,7 @@ export function meta({ error }: Route.MetaArgs) {
 }
 
 /** Sidebar, main column and phone tab bar around a page (or an error). */
-function SiteShell({ changelogVersion, children }: { changelogVersion: string | null; children: ReactNode }) {
+function SiteShell({ children }: { children: ReactNode }) {
   const navigation = useNavigation();
   // The phone search and pull-to-refresh are client-side, mounted once the page is interactive.
   const [interactive, setInteractive] = useState(false);
@@ -90,7 +79,7 @@ function SiteShell({ changelogVersion, children }: { changelogVersion: string | 
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[70] focus:rounded-control focus:bg-surface focus:px-3 focus:py-2">
         跳到正文
       </a>
-      <Sidebar changelogVersion={changelogVersion} />
+      <Sidebar />
       {/* Phone shell (≤ 960px): each page's top bar (PhoneBar), one centred column, the tab bar below.
           Desktop: the page fills the main area up to the list width (--page-max-wide), centred beyond it. */}
       <main id="main" className="min-w-0 flex-1 pb-[calc(72px+env(safe-area-inset-bottom))] lg:px-7 lg:pb-[72px] lg:pt-6">
@@ -99,7 +88,7 @@ function SiteShell({ changelogVersion, children }: { changelogVersion: string | 
           {children}
         </div>
       </main>
-      <TabBar changelogVersion={changelogVersion} />
+      <TabBar />
       {interactive && <SearchOverlay />}
       {interactive && <PullToRefresh />}
       <BackToTop />
@@ -108,11 +97,9 @@ function SiteShell({ changelogVersion, children }: { changelogVersion: string | 
 }
 
 export default function App() {
-  const meta = useLoaderData<typeof loader>();
   useHydratedFlag();
   useAppearanceSync();
-  const { pathname, search } = useLocation();
-  useEffect(() => rememberPage(pathname + search), [pathname, search]);
+  const { pathname } = useLocation();
   usePageTransition();
   // iOS Safari only shows :active (pressed) styles once the document listens for touches.
   useEffect(() => {
@@ -124,7 +111,7 @@ export default function App() {
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return <Outlet />;
   return (
     <>
-      <SiteShell changelogVersion={meta.changelogVersion}>
+      <SiteShell>
         <Outlet />
       </SiteShell>
       {webModules().map((m) => m.root?.Bottom && <m.root.Bottom key={m.name} />)}
@@ -135,7 +122,6 @@ export default function App() {
 export function ErrorBoundary() {
   useAppearanceSync();
   const error = useRouteError();
-  const site = useRouteLoaderData<typeof loader>("root");
   const { pathname, search, hash } = useLocation();
   const status = isRouteErrorResponse(error) ? error.status : 500;
   const notFound = status === 404;
@@ -164,5 +150,5 @@ export function ErrorBoundary() {
   );
   // Admin errors stay inside the admin's own chrome.
   if (pathname === "/admin" || pathname.startsWith("/admin/")) return body;
-  return <SiteShell changelogVersion={site?.changelogVersion ?? null}>{body}</SiteShell>;
+  return <SiteShell>{body}</SiteShell>;
 }

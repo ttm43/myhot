@@ -2,35 +2,18 @@
 // keys and formats once readers have data under them: existing readers' data must stay readable as-is.
 // Storage failures degrade silently.
 import { useEffect, useSyncExternalStore } from "react";
-import { beijingDate } from "@aihot/contracts/time";
 
 export const KEYS = {
-  starred: "aihot-starred-items",
   read: "aihot-read-items",
   theme: "aihot-theme",
   font: "aihot-font",
-  changelogSeen: "aihot-changelog-seen-version",
-  feedbackDraft: "aihot-feedback-draft-v1",
   recentSearches: "aihot-recent-searches",
 } as const;
 
-const STARRED_LIMIT = 500;
 const READ_LIMIT = 5000;
 const RECENT_SEARCH_LIMIT = 10;
 const RECENT_SEARCH_MAX_CHARS = 200;
-const IMPORT_MAX_CHARS = 2_000_000;
 const ID_PATTERN = /^[a-zA-Z0-9_-]{1,80}$/;
-
-export interface LocalStarredItem {
-  id: string;
-  title: string;
-  summary: string | null;
-  sourceName: string;
-  savedAt: string;
-  publishedAt: string | null;
-  score: number | null;
-  aiSelected: boolean;
-}
 
 type StorageKind = "local" | "session";
 
@@ -111,11 +94,9 @@ function subscribeKey(key: string) {
     };
   };
 }
-const subscribeStarred = subscribeKey(KEYS.starred);
 const subscribeRead = subscribeKey(KEYS.read);
 const subscribeTheme = subscribeKey(KEYS.theme);
 const subscribeFont = subscribeKey(KEYS.font);
-const subscribeChangelog = subscribeKey(KEYS.changelogSeen);
 const subscribeRecentSearches = subscribeKey(KEYS.recentSearches);
 
 // Snapshot cache so useSyncExternalStore gets stable references between changes.
@@ -134,74 +115,6 @@ function invalidate(key: string) {
 function editLocalData<T>(change: () => T): T {
   cache.clear();
   return change();
-}
-
-// starred
-function isStarredItem(v: unknown): v is LocalStarredItem {
-  if (!v || typeof v !== "object") return false;
-  const o = v as Record<string, unknown>;
-  return typeof o.id === "string" && ID_PATTERN.test(o.id) && typeof o.title === "string";
-}
-
-// A parseable instant can still overflow when shifted into the page's display timezone.
-function isDisplayableDate(value: unknown): value is string {
-  if (typeof value !== "string") return false;
-  try {
-    beijingDate(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function normalizeStarred(v: Record<string, unknown>): LocalStarredItem {
-  return {
-    id: String(v.id),
-    title: String(v.title),
-    summary: typeof v.summary === "string" ? v.summary : null,
-    sourceName: typeof v.sourceName === "string" ? v.sourceName : "",
-    savedAt: isDisplayableDate(v.savedAt) ? v.savedAt : new Date().toISOString(),
-    publishedAt: isDisplayableDate(v.publishedAt) ? v.publishedAt : null,
-    score: typeof v.score === "number" ? v.score : null,
-    aiSelected: v.aiSelected === true,
-  };
-}
-
-export function getStarred(): LocalStarredItem[] {
-  return cached(KEYS.starred, () => {
-    const parsed = readJson(KEYS.starred);
-    return Array.isArray(parsed) ? parsed.filter(isStarredItem).map((v) => normalizeStarred(v as unknown as Record<string, unknown>)).slice(0, STARRED_LIMIT) : [];
-  });
-}
-
-const starredSetCache = { items: null as LocalStarredItem[] | null, ids: new Set<string>() };
-function isStarred(id: string): boolean {
-  const items = getStarred();
-  if (starredSetCache.items !== items) {
-    starredSetCache.items = items;
-    starredSetCache.ids = new Set(items.map((item) => item.id));
-  }
-  return starredSetCache.ids.has(id);
-}
-
-export function toggleStar(item: Omit<LocalStarredItem, "savedAt">): boolean {
-  return editLocalData(() => {
-    if (starredUnreadable()) return false;
-    const list = getStarred();
-    const exists = list.some((s) => s.id === item.id);
-    const next = exists ? list.filter((s) => s.id !== item.id) : [{ ...item, savedAt: new Date().toISOString() }, ...list].slice(0, STARRED_LIMIT);
-    const saved = writeRaw(KEYS.starred, JSON.stringify(next));
-    invalidate(KEYS.starred);
-    return saved && !exists;
-  });
-}
-
-export function removeStar(id: string) {
-  editLocalData(() => {
-    if (starredUnreadable()) return;
-    writeRaw(KEYS.starred, JSON.stringify(getStarred().filter((s) => s.id !== id)));
-    invalidate(KEYS.starred);
-  });
 }
 
 // read items (LRU, newest first)
@@ -310,17 +223,6 @@ export function useAppearanceSync() {
 /** Inline script run before paint so the first frame already has the reader's appearance. */
 export const APPEARANCE_BOOT_SCRIPT = `(function(){var f='system';try{f=localStorage.getItem('${KEYS.font}')==='browser'?'browser':'system'}catch(e){}document.documentElement.setAttribute('data-font',f);try{var t=localStorage.getItem('${KEYS.theme}');if(t==='light'||t==='dark'){var c=t==='dark'?'${THEME_COLOR.dark}':'${THEME_COLOR.light}';document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.content=c})}else{t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.setAttribute('data-theme',t)}catch(e){document.documentElement.setAttribute('data-theme','light')}})();`;
 
-// changelog red dot
-function getChangelogSeen(): string | null {
-  const v = readRaw(KEYS.changelogSeen);
-  return v && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(v) ? v : null;
-}
-
-export function setChangelogSeen(version: string) {
-  writeRaw(KEYS.changelogSeen, version);
-  invalidate(KEYS.changelogSeen);
-}
-
 // recent searches (newest first, at most RECENT_SEARCH_LIMIT; this browser only)
 function getRecentSearches(): string[] {
   return cached(KEYS.recentSearches, () => {
@@ -343,135 +245,8 @@ export function clearRecentSearches() {
   invalidate(KEYS.recentSearches);
 }
 
-// the page the reader was on (feedback records where a problem was seen)
-const LAST_PAGE_KEY = "aihot:last-page";
-const NOT_A_PLACE = /^\/(feedback|more)(\/|$)|^\/admin(\/|$)/;
-
-/** Called on every in-site navigation: remembers the latest real page, never feedback, "更多" or the admin. */
-export function rememberPage(path: string) {
-  if (!NOT_A_PLACE.test(path)) writeRaw(LAST_PAGE_KEY, path, "session");
-}
-
-export function lastPage(): string | null {
-  const v = readRaw(LAST_PAGE_KEY, "session");
-  return v && v.startsWith("/") && !v.startsWith("//") ? v : null;
-}
-
-// export / import (version 1)
-export interface ExportBundle {
-  version: 1;
-  starred: LocalStarredItem[];
-  read: string[];
-  theme: "light" | "dark" | "auto" | null;
-  font?: "system" | "browser";
-}
-
-export function exportBundle(): ExportBundle {
-  const pref = getThemePreference();
-  return { version: 1, starred: getStarred(), read: getReadIds(), theme: pref ?? "auto", font: getFontPreference() ?? "system" };
-}
-
-export interface ImportReport {
-  starredAdded: number;
-  starredSkipped: number;
-  readAdded: number;
-  readSkipped: number;
-  themeApplied: boolean;
-  fontApplied: boolean;
-  /** The stars were saved but the read marks could not be (storage full or unavailable). */
-  readFailed: boolean;
-}
-
-/** Merge: existing stars are not overwritten, read ids are unioned, appearance only if unset. */
-export function importBundle(text: string): ImportReport {
-  if (text.length > IMPORT_MAX_CHARS) throw new Error("文件过大（上限 2,000,000 字符）");
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error("不是有效的 JSON 文件");
-  }
-  const d = data as Partial<ExportBundle>;
-  if (!d || typeof d !== "object" || d.version !== 1) throw new Error("文件格式不对（需要 version: 1）");
-  return mergeLocalData({
-    starred: Array.isArray(d.starred) ? d.starred : [],
-    read: Array.isArray(d.read) ? d.read : [],
-    theme: d.theme ?? null,
-    font: d.font ?? null,
-  });
-}
-
-/** Stored stars that cannot be read (not JSON, not a list): an import must not write over them. */
-function starredUnreadable(): boolean {
-  const raw = readRaw(KEYS.starred);
-  if (!raw) return false;
-  try {
-    return !Array.isArray(JSON.parse(raw));
-  } catch {
-    return true;
-  }
-}
-
-function mergeLocalData(incoming: { starred: unknown[]; read: unknown[]; theme: unknown; font?: unknown }): ImportReport {
-  return editLocalData(() => {
-    // The reader's own data stays recoverable (export it, or fix it) rather than replaced by the import.
-    if (starredUnreadable()) throw new Error("这台设备上已有的收藏数据无法读取，为避免覆盖，这次没有导入。");
-    const current = getStarred();
-    const have = new Set(current.map((s) => s.id));
-    const additions: LocalStarredItem[] = [];
-    let starredSkipped = 0;
-    for (const s of incoming.starred) {
-      if (!isStarredItem(s)) { starredSkipped++; continue; }
-      if (have.has(s.id)) continue;
-      have.add(s.id);
-      additions.push(normalizeStarred(s as unknown as Record<string, unknown>));
-    }
-    const room = Math.max(0, STARRED_LIMIT - current.length);
-    const accepted = additions.slice(0, room);
-    starredSkipped += additions.length - accepted.length;
-    const mergedStarred = [...current, ...accepted].sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
-    // An import is reported only after it was written; a failure here leaves the browser as it was.
-    if (!writeRaw(KEYS.starred, JSON.stringify(mergedStarred))) throw new Error("浏览器存储已满或不可用，这次没有导入任何内容。");
-
-    const readIds = getReadIds();
-    const readHave = new Set(readIds);
-    const readAdditions: string[] = [];
-    let readSkipped = 0;
-    for (const id of incoming.read) {
-      if (typeof id !== "string" || !ID_PATTERN.test(id)) { readSkipped++; continue; }
-      if (readHave.has(id)) continue;
-      readHave.add(id);
-      readAdditions.push(id);
-    }
-    const readRoom = Math.max(0, READ_LIMIT - readIds.length);
-    readSkipped += Math.max(0, readAdditions.length - readRoom);
-    const readFailed = !writeRaw(KEYS.read, JSON.stringify([...readIds, ...readAdditions.slice(0, readRoom)]));
-
-    let themeApplied = false;
-    if (!getThemePreference() && (incoming.theme === "light" || incoming.theme === "dark")) {
-      themeApplied = writeRaw(KEYS.theme, incoming.theme);
-    }
-    const fontApplied = !getFontPreference() && incoming.font === "browser" && writeRaw(KEYS.font, "browser");
-    cache.clear();
-    emit();
-    return { starredAdded: accepted.length, starredSkipped, readAdded: readFailed ? 0 : Math.min(readAdditions.length, readRoom), readSkipped, themeApplied, fontApplied, readFailed };
-  });
-}
-
-/** Imports from elsewhere (the site's modules') merge through the same path. */
-export { mergeLocalData };
-
 // React hooks
-const EMPTY_STARRED: LocalStarredItem[] = [];
 const EMPTY_SET = new Set<string>();
-
-export function useStarred(): LocalStarredItem[] {
-  return useSyncExternalStore(subscribeStarred, getStarred, () => EMPTY_STARRED);
-}
-
-export function useIsStarred(id: string): boolean {
-  return useSyncExternalStore(subscribeStarred, () => isStarred(id), () => false);
-}
 
 export function useReadSet(): Set<string> {
   return useSyncExternalStore(subscribeRead, getReadSet, () => EMPTY_SET);
@@ -483,10 +258,6 @@ export function useThemePreference(): ThemePreference {
 
 export function useFontPreference(): FontPreference {
   return useSyncExternalStore(subscribeFont, getFontPreference, () => null);
-}
-
-export function useChangelogSeen(): string | null {
-  return useSyncExternalStore(subscribeChangelog, getChangelogSeen, () => null);
 }
 
 const NO_SEARCHES: string[] = [];

@@ -83,6 +83,7 @@ docker compose run --rm setup && docker compose up -d
 
 MyHOT 不再跟进上游，只留采集、预筛、摘要、归组和自己读的页面。下面每条是一项删掉的功能；迁移只删表，不调用模型，删掉的表里的数据找不回来，要留的先用下方 [备份](#备份) 导出。
 
+- **读者反馈和几张公开站点的页面**：`/feedback`（连同后台“反馈”页、`feedback.forward` 定时任务）、`/about`（连同 `/contact/*` 二维码和后台的二维码设置）、`/terms`、`/privacy`、`/changelog`（连同红点）和 `/starred`（卡片和文章页上的收藏按钮）都去掉了；`site/pages/`、`site/changelog.json` 删除，`site/site.ts` 去掉 `ABOUT`、`feedback*`、`footerNote`、`POLICY.privacy`。迁移 `0086`、`0087` 删掉 `feedback_bans`、`feedback` 两张表；数据卷里的 `uploads/`、`feedback-screenshots/` 目录不再使用，可以删掉。`settings` 表里的 `contact_qr` 不再读。
 - **内置备份**：`ops.backup` 定时任务和 `DB_BACKUP_STORE_*` 都去掉了，`.env` 里的这几项可以删掉；镜像不再带 `pg_dump`。备份改用下方的手动导出或自己的脚本。`settings` 表里的 `backup.last` 不再读，可以手动删：`DELETE FROM settings WHERE key = 'backup.last';`
 
 日报缺期告警按北京时间的具体日期跟踪，跨午夜不会自动恢复；只有对应日报存在才发恢复通知。新缺期检查最近 7 个日历日（含今天），不早于最早的日报或 reports.compose 运行记录；没有历史记录时只检查今天。已告警的日期在这 7 天里一直跟踪，关闭采集/模型或 worker 启动宽限期也不会把缺期当成恢复；超出 7 天仍没有日报的，发一条“没能补出、停止提醒”后不再提醒。旧的 report.daily 状态自动按首次告警时间迁移，保留提醒间隔。出刊后两小时告警、每小时提醒及飞书开关保持不变；无需数据库迁移。自定义 responder 若按旧 `report.daily` 精确匹配，需改为识别 `report.daily:YYYY-MM-DD` 日期键。

@@ -1,10 +1,8 @@
 // Small building blocks shared by feed items, detail pages and lists.
 import { useState } from "react";
 import type { FeedItemSummary, MediaView } from "@aihot/contracts/site";
-import { IconBookmark } from "../../components/icons";
 import { SourceAvatar } from "../../components/ui/SourceAvatar";
 import { Lightbox } from "../../components/ui/Lightbox";
-import { toggleStar, useIsStarred } from "../../lib/local-state";
 
 /** The source's name, or, for X, avatar + display name + @handle. */
 export function SourceLine({ item, className = "" }: { item: Pick<FeedItemSummary, "source" | "x" | "channel">; className?: string }) {
@@ -48,45 +46,5 @@ export function MediaThumbs({ media, className = "" }: { media: MediaView[]; cla
     </div>
     <Lightbox images={images} index={index} onIndex={setIndex} onClose={() => setIndex(null)} />
     </>
-  );
-}
-
-type Starrable = Pick<FeedItemSummary, "id" | "title" | "summary" | "source" | "publishedAt" | "score" | "selected">;
-
-/** Whether an item is in this browser's 收藏, a toggle, and a counter that bumps when it is added. */
-export function useStar(item: Starrable) {
-  const on = useIsStarred(item.id);
-  const [pulse, setPulse] = useState(0);
-  const toggle = () => {
-    const added = toggleStar({
-      id: item.id, title: item.title, summary: item.summary, sourceName: item.source.name,
-      publishedAt: item.publishedAt, score: item.score, aiSelected: item.selected,
-    });
-    if (added) setPulse((p) => p + 1);
-  };
-  return { on, toggle, pulse };
-}
-
-/** Bookmark toggle kept in this browser (收藏): 26px, or sized by `size` or by `className`. */
-export function StarButton({ item, size, className = "size-[26px]" }: { item: Starrable; size?: number; className?: string }) {
-  const { on, toggle, pulse } = useStar(item);
-  return (
-    <button
-      type="button"
-      aria-pressed={on}
-      aria-label={on ? "取消收藏" : "收藏"}
-      title={on ? "取消收藏" : "收藏"}
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        toggle();
-      }}
-      style={size ? { width: size, height: size } : undefined}
-      className={`relative z-10 inline-flex shrink-0 items-center justify-center rounded-control transition-colors duration-150 ${on ? "text-accent" : "text-ink-4 hover:bg-bg-sunk hover:text-ink-2"} ${className}`}
-    >
-      <span key={pulse} className={`flex ${pulse ? "anim-bump" : ""}`}>
-        <IconBookmark size={size ? Math.round(size * 0.6) : 16} filled={on} />
-      </span>
-    </button>
   );
 }

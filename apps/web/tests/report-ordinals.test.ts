@@ -28,7 +28,6 @@ let web: WebServer;
 const api = createServer((req, res) => {
   const path = new URL(req.url!, "http://api.local").pathname;
   res.setHeader("Content-Type", "application/json");
-  if (path === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: "2026-09-28T12:00" }));
   if (path === "/api/site/reports/daily") return res.end(JSON.stringify({ kind: "daily", items: index("daily").map((entry) => ({ ...entry, count: 1 })) }));
   const match = /^\/api\/site\/reports\/(daily|weekly|monthly)\/(.+)$/.exec(path);
   if (match) {

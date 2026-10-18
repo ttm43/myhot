@@ -45,7 +45,6 @@ const api = createServer((req, res) => {
   const url = new URL(req.url!, "http://local");
   const p = url.pathname;
   res.setHeader("Content-Type", "application/json");
-  if (p === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: "fixture" }));
   if (p === "/api/site/track") { res.statusCode = 204; return res.end(); }
   if (p === "/api/health") return res.end("{}");
   if (p === "/api/site/topics") return res.end(JSON.stringify({ groups: [], topics: [] }));

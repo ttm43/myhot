@@ -338,71 +338,11 @@ export interface ReportNavigationResponse {
   items: ReportNavigationEntry[];
 }
 
-/** Site-wide facts for the web shell: the changelog red-dot anchor. */
-export interface SiteMeta {
-  changelogVersion: string;
-}
-
-/** One entry of the site's changelog (site/changelog.json), newest first. */
-export interface ChangelogRelease {
-  date: string;
-  time: string;
-  kind: "更新" | "优化" | "公告" | "下线";
-  title: string;
-  body: string[];
-  /** A notice readers must act on: drawn in the warning red so it cannot be skimmed past. */
-  urgent?: true;
-  /** A major release's long form, drawn by the site's own drawing when it ships one; its shape is the site's. */
-  feature?: unknown;
-}
-
-export interface ChangelogResponse {
-  latestVersion: string;
-  releases: ChangelogRelease[];
-}
-
-/**
- * The about page's contact codes (uploaded in the admin or shipped with the site; null when there is
- * none) and the maker's avatar through the image proxy.
- */
-export interface SiteContact {
-  wechatQr: string | null;
-  feishuQr: string | null;
-  makerAvatar: string | null;
-}
-
-/** Figures and samples for the about page (site-only; not part of v1). */
-export interface SiteStats {
-  /** Sources collected from now. */
-  sources: number;
-  /** Enabled sources by kind: x_search, rss, web_list, mp_account, json_list. */
-  sourceKinds: Record<string, number>;
-  /** Everything collected and not withdrawn, heat-only sources included. */
-  items: number;
-  selected: number;
-  dailies: number;
-  /** The last 24 hours: items found (heat-only sources included), and items that made 精选 (by their place on the timeline). */
-  day: { collected: number; selected: number };
-  /** Enabled sources in a daily shuffle, for the about page's river: one line per source. */
-  sampleSources: Array<{ name: string; kind: string; heatOnly: boolean }>;
-  /** The latest 精选, newest first. */
-  latest: Array<{ id: string; title: string; source: string }>;
-}
-
 export interface StoryFollowup {
   factId: string;
   representative: { id: string; title: string; source: { name: string }; timelineAt: string };
 }
 export interface StoryFollowupsResponse { items: StoryFollowup[]; more: boolean }
-
-/**
- * A starred item as the site can show it now (/api/site/items/availability, keyed by id). Stars keep the
- * source name of the day they were saved; a public item also brings the name shown today.
- */
-export interface ItemAvailability {
-  status: "public" | "summary-only" | "unavailable";
-  sourceName?: string;
-}
 
 /** An issue in the archive and the calendar, numbered in its whole series; closed daily months omit their titles. */
 export interface ReportNavigationEntry { key: string; issueNumber: number; title?: string | null; count?: number }

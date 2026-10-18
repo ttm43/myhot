@@ -11,7 +11,6 @@ let web: WebServer;
 const api = createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.url === '/api/health') return res.end(JSON.stringify({ ok: true }));
-  if (req.url === '/api/site/meta') return res.end(JSON.stringify({ changelogVersion: '2026-01-01T00:00' }));
   res.statusCode = 404;
   res.end(JSON.stringify({ code: 'not_found' }));
 });

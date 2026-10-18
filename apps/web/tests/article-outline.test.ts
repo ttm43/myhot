@@ -21,7 +21,6 @@ test("a wrapping outline settles with classic scrollbars at a limited viewport h
   const api = createServer((req, res) => {
     const path = new URL(req.url!, "http://local").pathname;
     res.setHeader("Content-Type", "application/json");
-    if (path === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: "fixture" }));
     if (path === "/api/site/track") { res.statusCode = 204; return res.end(); }
     if (path === "/api/site/items/outline-fixture") return res.end(JSON.stringify(item));
     res.statusCode = 404; res.end("{}");

@@ -13,7 +13,6 @@ import { ScoreLabel, shownScore } from "../components/ui/Score";
 import { PillTabs } from "../components/ui/Tabs";
 import { ArticleLayout, RailSection } from "../components/ui/Page";
 import { Menu, MenuItem } from "../components/ui/Menu";
-import { StarButton } from "../features/feed/parts";
 import { GroupButton, GroupSources } from "../features/feed/ReadingGroup";
 import { StoryFollowups } from "../features/item/StoryFollowups";
 import { MediaGallery } from "../features/item/MediaGallery";
@@ -269,7 +268,6 @@ function ItemPreview({ preview }: { preview: FeedItemSummary }) {
         </div>
       </article>
       <ReaderToolbar
-        item={preview}
         originalLabel={isX ? "原推" : "原文"}
         onShare={async () => {
           if ((await shareOrCopy(preview)) === "copied") setToast("链接已复制");
@@ -400,7 +398,6 @@ function ItemView({ item }: { item: SiteItemDetail }) {
       >
         {originalLabel} <IconExternal size={13} />
       </a>
-      <StarButton item={item} size={32} />
       {moreMenu}
     </div>
   );
@@ -623,7 +620,6 @@ function ItemView({ item }: { item: SiteItemDetail }) {
       </ArticleLayout>
 
       <ReaderToolbar
-        item={item}
         originalUrl={item.links.original}
         originalLabel={isX ? "原推" : "原文"}
         onOutline={showOutline ? () => setOutlineOpen(true) : undefined}

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { NAV, subjectAfter, withSubject } from "@aihot/site";
 import { webModules } from "../../site-modules";
 import {
-  IconBolt, IconBookmark, IconDoc, IconFlame, IconGrid, IconHeart, IconHistory, IconList, IconMessage, IconPlug, IconUser,
+  IconBolt, IconDoc, IconFlame, IconGrid, IconList, IconPlug, IconUser,
 } from "../icons";
 
 export interface NavItem {
@@ -13,8 +13,6 @@ export interface NavItem {
   icon: (p: { size?: number }) => ReactNode;
   /** Match the path exactly (the home page). */
   end?: boolean;
-  /** Shows the unread dot while the changelog has news. */
-  changelog?: boolean;
 }
 
 const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
@@ -26,16 +24,12 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { to: "/hot", label: "热点榜", icon: IconFlame },
       { to: "/daily", label: withSubject("日报"), icon: IconDoc },
       { to: "/topics", label: "主题", icon: IconGrid },
-      { to: "/starred", label: "收藏", icon: IconBookmark },
     ],
   },
   {
     title: "更多",
     items: [
       { to: "/agent", label: "Agent 接入", icon: IconPlug },
-      { to: "/about", label: "关于", icon: IconHeart },
-      { to: "/changelog", label: "更新日志", icon: IconHistory, changelog: true },
-      { to: "/feedback", label: "反馈", icon: IconMessage },
     ],
   },
 ];
@@ -85,14 +79,13 @@ export interface Tab {
   to: string;
   label: string;
   icon: (p: { size?: number }) => ReactNode;
-  changelog?: boolean;
 }
 
 const ENGINE_TABS: Tab[] = [
   { key: "featured", to: "/", label: "精选", icon: IconBolt },
   { key: "hot", to: "/hot", label: "热点", icon: IconFlame },
   { key: "daily", to: "/daily", label: "日报", icon: IconDoc },
-  { key: "me", to: "/more", label: "我的", icon: IconUser, changelog: true },
+  { key: "me", to: "/more", label: "我的", icon: IconUser },
 ];
 
 /** The tab bar: the engine's, the modules' before 我的. */

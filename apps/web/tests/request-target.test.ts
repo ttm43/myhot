@@ -10,7 +10,6 @@ const upstreamPaths: string[] = [];
 const api = createServer((req, res) => {
   upstreamPaths.push(req.url ?? "");
   res.setHeader("Content-Type", "application/json");
-  if (req.url === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: null }));
   if (req.url?.startsWith("/api/site/timeline")) return res.end(JSON.stringify({
     cards: [], nextCursor: null, dayCounts: {}, hot: [], filters: { category: null, channel: null, tag: null },
   }));

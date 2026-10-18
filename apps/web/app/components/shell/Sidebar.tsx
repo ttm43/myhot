@@ -1,22 +1,11 @@
-import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { SITE } from "@aihot/site";
 import { Wordmark } from "@aihot/site/brand/Logo.tsx";
-import { useChangelogSeen } from "../../lib/local-state";
 import { sidebar, sidebarIsActive, type NavItem } from "./nav";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { IconGithub } from "../icons";
 
-/** True while the changelog has an entry newer than the one this reader last opened. */
-export function useChangelogDot(latestVersion: string | null): boolean {
-  const seen = useChangelogSeen();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted || !latestVersion) return false;
-  return !seen || seen < latestVersion;
-}
-
-function SideLink({ item, dot }: { item: NavItem; dot: boolean }) {
+function SideLink({ item }: { item: NavItem }) {
   const { pathname } = useLocation();
   const isActive = sidebarIsActive(item, pathname);
   const Icon = item.icon;
@@ -33,13 +22,11 @@ function SideLink({ item, dot }: { item: NavItem; dot: boolean }) {
         <Icon size={17} />
       </span>
       <span className="min-w-0 truncate">{item.label}</span>
-      {dot && item.changelog && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-hot" aria-label="有新的更新" />}
     </Link>
   );
 }
 
-export function Sidebar({ changelogVersion }: { changelogVersion: string | null }) {
-  const dot = useChangelogDot(changelogVersion);
+export function Sidebar() {
   return (
     <aside className="sticky top-0 hidden h-dvh w-[180px] shrink-0 flex-col border-r border-line bg-sidebar px-3 pb-3.5 pt-6 lg:flex">
       <Link to="/" className="mb-4 flex h-[50px] items-center px-1 text-ink" aria-label={`${SITE.name} 首页`}>
@@ -51,7 +38,7 @@ export function Sidebar({ changelogVersion }: { changelogVersion: string | null 
             <div className="px-2.5 pb-1 pt-3.5 text-[11px] text-ink-4">{section.title}</div>
             <div className="flex flex-col gap-1">
               {section.items.map((item) => (
-                <SideLink key={item.to} item={item} dot={dot} />
+                <SideLink key={item.to} item={item} />
               ))}
             </div>
           </div>

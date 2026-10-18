@@ -28,7 +28,6 @@ const api = createServer((req, res) => {
   }
   if (url.pathname === "/video/unsupported") { unsupportedRequests++; res.writeHead(404); return res.end(); }
   res.setHeader("Content-Type", "application/json");
-  if (url.pathname === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: "fixture" }));
   if (url.pathname === "/api/site/track") { res.statusCode = 204; return res.end(); }
   if (url.pathname === "/api/health") return res.end("{}");
   if (url.pathname === "/api/site/items/video-fixture") {

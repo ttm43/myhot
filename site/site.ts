@@ -28,12 +28,6 @@ export const SITE = {
   homeTitle: "MyHOT — AI 行业动态 · 每日精选与日报",
   /** 主题目录页（/topics）的标题。 */
   topicsTitle: "AI 主题：公司与模型、技术方向、内容形态的最新动态",
-  /** 反馈表单输入框里的示例。 */
-  feedbackExample: "例如：我在搜索某个关键词时遇到……我原本想……",
-  /** 反馈页标题下面的一句话。 */
-  feedbackLead: "发现 bug、想要的功能、看不顺眼的地方，都可以告诉我们。",
-  /** 反馈表单邮箱框里的提示。 */
-  feedbackEmailHint: "留下邮箱，我们可以回信联系你",
   /** 一句话介绍：搜索引擎、分享卡片、RSS、llms.txt 会用。 */
   description: `从一批 AI 信源里挑出值得看的动态，把同一件事的多篇报道归到一起，${EDITION_WHEN.daily} 出一份日报。`,
   /** llms.txt 里一句话介绍下面的一段详细介绍（选填）。 */
@@ -62,8 +56,6 @@ export const SITE = {
   interfaceVersion: "4.0.0",
   /** 对外联系邮箱（选填）：llms.txt 和给 Agent 的使用说明里会写。 */
   contactEmail: null as string | null,
-  /** 关于页底部的一行小字（选填）。 */
-  footerNote: "由 AIHOT 开源框架驱动",
   /** 中国大陆网站的 ICP 备案号（选填），填了就显示在侧栏底部和“我的”页底部，并链接到工信部备案系统。 */
   icp: null as string | null,
   /** 源码的 GitHub 仓库地址（选填），填了就在侧栏底部和“我的”页底部显示“GitHub 开源”。 */
@@ -78,7 +70,7 @@ export const SITE = {
   crawlerName: "MyHOTBot/1.0",
 } as const;
 
-/** 使用规则和隐私说明两页（正文在 pages/ 里）。 */
+/** 使用规则（公开接口的响应头和说明会引用它）与 X 帖子的全文规则。 */
 export const POLICY = {
   terms: {
     /** 页面名：导航、页脚、页面标题都用它。 */
@@ -98,11 +90,6 @@ export const POLICY = {
      * Link 头（rel="terms-of-service"）；浏览器里的调用方也读得到它们。
      */
     headers: null as null | Record<string, string>,
-  },
-  privacy: {
-    description: "本站如何处理浏览器本地数据、反馈资料与访问日志。",
-    /** llms.txt 里对这一页的一句说明（选填）。 */
-    covers: null as string | null,
   },
   /**
    * X 帖子本身的文字和图片算不算全文：算的话，只在这篇允许站内全文时显示（信源允许全文、正文也取到了）；
@@ -128,56 +115,8 @@ export const ITEM_COPY = {
   showScore: true,
 };
 
-/** 关于页的一张二维码卡片。 */
-interface ContactCard {
-  kind: string;
-  title: string;
-  note: string;
-  /** 站外链接过的根目录文件名（选填），比如 qr-wechat.jpg：这个地址总是跳到现在的二维码。 */
-  alias?: string;
-}
-
-/** 关于页的文案。数字（信源数、收录数、精选数、日报期数）来自站内实时统计，不用写在这里。 */
-export const ABOUT = {
-  kicker: `关于 ${SITE.name}`,
-  /** 页面描述（搜索结果、分享卡片）。 */
-  description: `关于 ${SITE.name}：${SITE.description}`,
-  /** 大标题：第一行正常颜色，第二行强调色。 */
-  headline: ["AI 圈每天都有新动静，", "值得看的，只有几条。"] as [string, string],
-  /** 标题下面的一段话。{sources} 会换成实时的信源数（两边自动加空格，所以 {sources} 两边不写空格）；统计没取到时换成 sourcesFallback。 */
-  lead: `${SITE.name} 替你盯着{sources}个信源：抓取、归并、打分、精选，${EDITION_WHEN.daily} 出一份日报。免费，不用注册。`,
-  sourcesFallback: "十几",
-  /** 信源河动画下面的四个环节。 */
-  steps: {
-    collect: "官方博客、媒体和个人的订阅源都在看；更新越勤的源看得越勤，最快 15 分钟看一次。",
-    store: "抓到的都存下来，同一件事的报道归到一起，热点榜就是从这里算出来的。",
-    select: `模型先看是不是这个行业的事、有没有实际信息，再写中文标题、摘要和${ITEM_COPY.reasonLabel}；营销稿和重复转发进不来。`,
-    publish: `${EDITION_WHEN.daily} 出日报，${EDITION_WHEN.weekly} 出周报，${EDITION_WHEN.monthly} 出月报。`,
-  },
-  /**
-   * 作者块（选填），null 就不显示。
-   * avatarSourceId：一个 X 账号信源的 id，头像取它的（选填）。
-   * 二维码在后台“设置”里上传，或者放进 site/brand/contact/；没有二维码就不显示那张卡片。
-   */
-  maker: null as null | {
-    name: string;
-    avatarSourceId?: string | null;
-    greeting: string[];
-    wechat?: ContactCard;
-    feishu?: ContactCard;
-  },
-  /** 页面底部的版权与下架说明，中间接“反馈页”的链接。 */
-  copyright: [`${SITE.name} 是聚合摘要和阅读索引，原文版权归各来源所有。如果你是来源方，希望更正、下架或调整展示方式，可以通过`, "联系我们。"] as [string, string],
-  /** 页面底部“使用规则”链接的锚点 id（选填）：外部文档写死过这个锚点就填上，以后不要改。 */
-  termsAnchor: null as string | null,
-} as const;
-
 /** 后台页面上给管理员的提示（选填）。 */
 export const ADMIN = {
-  /** “反馈”页标题下的一行。 */
-  feedbackNote: null as string | null,
-  /** 确认框里补的一句本站规定：封禁反馈来源时。 */
-  banNote: null as string | null,
   /** 确认框里补的一句本站规定：调整付费服务的请求上限时。 */
   budgetNote: null as string | null,
 };
@@ -246,11 +185,6 @@ export const CARDS: Record<string, { kicker: string; title: string; subtitle: st
   daily: { kicker: withSubject("日报"), title: subjectAfter(`每天 ${spokenTime(EDITION_TIMES.daily)}，一份读得完的`, "日报"), subtitle: `${subjectAfter("前一天值得关注的", "动态")}。` },
   weekly: { kicker: withSubject("周报"), title: `一周${REPORTS.entry.noun}，一次看清`, subtitle: "本周的主线、重要发布与值得回看的讨论。" },
   monthly: { kicker: withSubject("月报"), title: "一个月的变化", subtitle: "月度主线与关键事件回顾。" },
-  about: { kicker: "关于", title: `关于 ${SITE.name}`, subtitle: SITE.description },
-  terms: { kicker: "使用规则", title: `${SITE.name} 使用规则`, subtitle: "网页、API、RSS 与 MCP 的使用范围。" },
-  privacy: { kicker: "隐私说明", title: `${SITE.name} 隐私说明`, subtitle: "访问日志、浏览器本地数据与反馈资料的处理方式。" },
-  changelog: { kicker: "更新日志", title: `${SITE.name} 更新日志`, subtitle: "功能更新、优化、公告与下线记录。" },
-  feedback: { kicker: "反馈", title: "告诉我们哪里可以更好", subtitle: "内容、功能、接入，或来源方的更正与下架请求。" },
   agent: { kicker: "Agent 接入", title: `把 ${SITE.name} 接进你的 Agent`, subtitle: "MCP、RSS、API 三种方式，匿名只读，无需 API Key。" },
 };
 

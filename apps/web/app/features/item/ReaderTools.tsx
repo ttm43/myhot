@@ -1,13 +1,9 @@
-// Phones: the article's own bottom toolbar in place of the tab bar — 收藏,
+// Phones: the article's own bottom toolbar in place of the tab bar —
 // 目录 for long reads (components/ui/OutlineSheet), 分享 and 原文 — sliding away while reading down and
 // back on the way up or at the end; and the sheet of the article's further actions.
 import { useEffect, useState, type ReactNode } from "react";
 import { Sheet } from "../../components/ui/Sheet";
-import { IconBookmark, IconExternal, IconList, IconShare } from "../../components/icons";
-import { useStar } from "../feed/parts";
-import type { FeedItemSummary } from "@aihot/contracts/site";
-
-type Starrable = Pick<FeedItemSummary, "id" | "title" | "summary" | "source" | "publishedAt" | "score" | "selected">;
+import { IconExternal, IconList, IconShare } from "../../components/icons";
 
 /** True while the reader is scrolling down through the page (not near its top or end). */
 function useReadingDown(): boolean {
@@ -39,23 +35,22 @@ function useReadingDown(): boolean {
   return down;
 }
 
-function Tool({ icon, label, onClick, href, pressed }: { icon: ReactNode; label: string; onClick?: () => void; href?: string; pressed?: boolean }) {
-  const cls = `flex flex-col items-center justify-center gap-[2px] text-[10.5px] transition-colors active:opacity-50 disabled:opacity-40 ${pressed ? "font-semibold text-accent" : "text-ink-3"}`;
+function Tool({ icon, label, onClick, href }: { icon: ReactNode; label: string; onClick?: () => void; href?: string }) {
+  const cls = "flex flex-col items-center justify-center gap-[2px] text-[10.5px] text-ink-3 transition-colors active:opacity-50 disabled:opacity-40";
   return href ? (
     <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
       {icon}
       {label}
     </a>
   ) : (
-    <button type="button" onClick={onClick} disabled={!onClick} aria-pressed={pressed} className={cls}>
+    <button type="button" onClick={onClick} disabled={!onClick} className={cls}>
       {icon}
       {label}
     </button>
   );
 }
 
-export function ReaderToolbar({ item, originalUrl, originalLabel, onOutline, onShare }: {
-  item: Starrable;
+export function ReaderToolbar({ originalUrl, originalLabel, onOutline, onShare }: {
   /** Missing while the article is still loading. */
   originalUrl?: string;
   originalLabel: string;
@@ -64,23 +59,12 @@ export function ReaderToolbar({ item, originalUrl, originalLabel, onOutline, onS
   onShare: () => void;
 }) {
   const hidden = useReadingDown();
-  const star = useStar(item);
   return (
     <nav
       aria-label="阅读工具"
       className={`fixed inset-x-0 bottom-0 z-40 bg-surface/90 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] shadow-[0_-1px_0_var(--line)] backdrop-blur-xl backdrop-saturate-150 transition-transform duration-300 ease-[var(--ease-out-quart)] lg:hidden ${hidden ? "translate-y-full" : ""}`}
     >
-      <div className={`mx-auto grid h-[50px] max-w-[640px] ${onOutline ? "grid-cols-4" : "grid-cols-3"}`}>
-        <Tool
-          pressed={star.on}
-          onClick={star.toggle}
-          label={star.on ? "已收藏" : "收藏"}
-          icon={
-            <span key={star.pulse} className={`flex ${star.pulse ? "anim-bump" : ""}`}>
-              <IconBookmark size={22} filled={star.on} />
-            </span>
-          }
-        />
+      <div className={`mx-auto grid h-[50px] max-w-[640px] ${onOutline ? "grid-cols-3" : "grid-cols-2"}`}>
         {onOutline && <Tool onClick={onOutline} label="目录" icon={<IconList size={22} />} />}
         <Tool onClick={onShare} label="分享" icon={<IconShare size={22} />} />
         {originalUrl ? <Tool href={originalUrl} label={originalLabel} icon={<IconExternal size={22} />} /> : <Tool label={originalLabel} icon={<IconExternal size={22} />} />}

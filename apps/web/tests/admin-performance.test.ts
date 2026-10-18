@@ -23,7 +23,6 @@ const api = createServer(async (req, res) => {
   const url = new URL(req.url!, "http://api.local");
   if (url.pathname.startsWith("/api/admin/")) reads.push(url.pathname);
   res.setHeader("Content-Type", "application/json");
-  if (url.pathname === "/api/site/meta") return res.end(JSON.stringify({ changelogVersion: null }));
   if (url.pathname.startsWith("/api/admin/") && !signedIn) {
     res.statusCode = 401;
     return res.end(JSON.stringify({ detail: "unauthorized" }));

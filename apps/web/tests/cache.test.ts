@@ -9,17 +9,11 @@ import { startWebServer, type WebServer } from "./web-server.ts";
 let web: WebServer;
 let origin: string;
 let deadline: number;
-/** Root metadata answers only after the selected deadline has passed: a slow sibling loader. */
-let metaAfterDeadline = false;
 const apiCookies: Array<string | undefined> = [];
 const api = createServer((req, res) => {
   const url = new URL(req.url!, "http://api.local");
   apiCookies.push(req.headers.cookie);
   res.setHeader("Content-Type", "application/json");
-  if (url.pathname === "/api/site/meta") {
-    const respond = () => res.end(JSON.stringify({ changelogVersion: "2026-09-28T12:00" }));
-    return metaAfterDeadline ? setTimeout(respond, deadline * 1000 - Date.now() + 50) : respond();
-  }
   if (url.pathname === "/api/site/timeline") {
     const filters = { channel: "all", category: url.searchParams.get("category"), tag: null };
     res.setHeader("X-Accel-Expires", `@${deadline}`);
@@ -34,7 +28,6 @@ const api = createServer((req, res) => {
     return res.end("# Article");
   }
   if (url.pathname === "/api/site/items/long-lived") return res.end(JSON.stringify({ id: "long-lived", title: "t" }));
-  if (url.pathname === "/api/site/contact") return res.end(JSON.stringify({ wechatQr: "/qr.png", feishuQr: "/qr.png" }));
   if (url.pathname === "/api/site/stories/merged") {
     res.statusCode = 308;
     return res.end(JSON.stringify({ mergedInto: "surviving-story" }));
@@ -88,8 +81,8 @@ test("HTML and navigation share freshness; cookies do not personalize public res
   assert.equal(html.status, 200);
   assert.equal(html.headers.get("X-Accel-Expires"), `@${deadline}`);
   assert.match(await html.text(), /精选/);
-  const plain = await fetch(`${origin}/about.data`);
-  const signedIn = await fetch(`${origin}/about.data?_routes=root`, { headers: { cookie: "admin_session=private; reader=returning" } });
+  const plain = await fetch(`${origin}/more.data`);
+  const signedIn = await fetch(`${origin}/more.data?_routes=root`, { headers: { cookie: "admin_session=private; reader=returning" } });
   assert.match(plain.headers.get("Cache-Control")!, /^public,/);
   assert.match(plain.headers.get("X-Accel-Expires")!, /^@\d+$/);
   assert.equal(signedIn.headers.get("Set-Cookie"), null);
@@ -126,7 +119,7 @@ test("admin data and actions never become public cache entries", async () => {
   await action.text();
 });
 
-test("browser freshness shares the selected deadline, including slow sibling loaders", async () => {
+test("browser freshness shares the selected deadline", async () => {
   const savedDeadline = deadline;
   try {
     deadline = Math.floor(Date.now() / 1000) + 20;
@@ -142,20 +135,8 @@ test("browser freshness shares the selected deadline, including slow sibling loa
       assert.doesNotMatch(cc, /stale/);
       await res.text();
     }
-    // The selected loader initially grants a positive TTL (at least a whole second), but root metadata
-    // finishes after it.
-    deadline = Math.floor(Date.now() / 1000) + 2;
-    metaAfterDeadline = true;
-    await Promise.all(["/", "/_.data?_routes=routes%2Fhome"].map(async (pathname) => {
-      const res = await fetch(origin + pathname);
-      assert.equal(res.status, 200);
-      assert.equal(res.headers.get("Cache-Control"), "no-cache");
-      assert.equal(res.headers.get("X-Accel-Expires"), "0");
-      await res.text();
-    }));
   } finally {
     deadline = savedDeadline;
-    metaAfterDeadline = false;
   }
 });
 
@@ -171,19 +152,19 @@ test("a shared cache may keep an item page longer than browsers", async () => {
 // A tab opened before a page lost its loader still asks for that page's result, and its router rejects
 // a missing one before React's release recovery can run.
 test("a page without a loader still answers navigation with an empty result", async () => {
-  const res = await fetch(`${origin}/terms.data?_routes=routes%2Fterms`);
+  const res = await fetch(`${origin}/more.data?_routes=routes%2Fmore`);
   assert.equal(res.status, 200);
   const { value } = await UNSAFE_decodeViaTurboStream(res.body!, globalThis);
   const result = value as Record<string, { data: unknown }>;
-  assert.ok("routes/terms" in result, "an already open router must be able to unwrap its requested route");
-  assert.equal(result["routes/terms"]!.data, null);
+  assert.ok("routes/more" in result, "an already open router must be able to unwrap its requested route");
+  assert.equal(result["routes/more"]!.data, null);
 });
 
 test("browser caching preserves noindex and private sign-in responses", async () => {
-  const feedback = await fetch(origin + "/feedback");
-  assert.equal(feedback.status, 200);
-  assert.match(await feedback.text(), /name="robots" content="noindex/);
-  assert.equal(feedback.headers.get("Cache-Control"), "public, max-age=300, s-maxage=300, must-revalidate");
+  const more = await fetch(origin + "/more");
+  assert.equal(more.status, 200);
+  assert.match(await more.text(), /name="robots" content="noindex/);
+  assert.equal(more.headers.get("Cache-Control"), "public, max-age=300, s-maxage=300, must-revalidate");
   const login = await fetch(origin + "/admin/login");
   assert.equal(login.status, 200);
   assert.equal(login.headers.get("Cache-Control"), "private, no-store");

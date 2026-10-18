@@ -1,12 +1,11 @@
 import { ADMIN, SITE } from "@aihot/site";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { Route } from "./+types/settings";
 import type { AdminSettings } from "@aihot/contracts/admin";
 import { adminGet } from "../../lib/admin.server";
 import { useAdminAction } from "../../features/admin/action";
 import { bj, num } from "../../features/admin/format";
 import { AdminPage, Badge, Button, Card, DataTable, Input, ReasonDialog } from "../../features/admin/ui";
-import { toast } from "../../features/admin/toast";
 
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -14,40 +13,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export const meta: Route.MetaFunction = () => [{ title: `设置 · ${SITE.name} 后台` }];
-
-function QrSlot({ slot, label, src }: { slot: "wechatQr" | "feishuQr"; label: string; src: string | null }) {
-  const { run, pending } = useAdminAction();
-  const input = useRef<HTMLInputElement>(null);
-  return (
-    <div className="flex items-center gap-4">
-      {src ? <img src={src} alt={label} className="size-28 rounded-card bg-white object-contain p-1.5 ring-1 ring-line" /> : <div className="flex size-28 shrink-0 items-center justify-center rounded-card bg-surface text-sm text-ink-4 ring-1 ring-line">未设置</div>}
-      <div>
-        <div className="text-[14px] font-medium text-ink">{label}</div>
-        <div className="mt-0.5 break-all font-mono text-[11.5px] text-ink-4">{src}</div>
-        <input
-          ref={input}
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          className="hidden"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (!file) return;
-            if (file.size > 2 * 1024 * 1024) return toast("图片最大 2MB", "error");
-            const image = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(String(reader.result));
-              reader.onerror = reject;
-              reader.readAsDataURL(file);
-            });
-            await run("POST", "/api/admin/settings/contact-qr", { slot, image }, { label: `qr-${slot}`, success: `${label}已更换，关于页 5 分钟内更新` });
-          }}
-        />
-        <Button className="mt-2" size="sm" busy={pending === `qr-${slot}`} onClick={() => input.current?.click()}>更换图片</Button>
-      </div>
-    </div>
-  );
-}
 
 function BudgetRow({ b }: { b: AdminSettings["budgets"][number] }) {
   const { run, pending } = useAdminAction();
@@ -103,12 +68,6 @@ export default function SettingsAdmin({ loaderData: s }: Route.ComponentProps) {
   return (
     <AdminPage title="设置" subtitle="不改代码即可替换的运营设置。每次修改都写入审计记录。">
       <div className="grid gap-5 xl:grid-cols-2">
-        <Card title="关于页二维码">
-          <div className="space-y-5">
-            <QrSlot slot="wechatQr" label="微信公众号二维码" src={s.contact.wechatQr} />
-            <QrSlot slot="feishuQr" label="飞书群二维码" src={s.contact.feishuQr} />
-          </div>
-        </Card>
         <Card title="通知目的地" pad={false}>
           <DataTable
             rows={s.targets}

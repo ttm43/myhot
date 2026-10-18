@@ -3,7 +3,6 @@ import { Link, useLocation, useRevalidator } from "react-router";
 import { tabs, type TabKey } from "./nav";
 import { noteScreen, rememberedTab, useScreen } from "./screens";
 import { markBack } from "./transitions";
-import { useChangelogDot } from "./Sidebar";
 
 const subscribe = () => () => {};
 const serverTab = () => null;
@@ -15,11 +14,10 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
  * as the bar's back button does); on that screen it scrolls to the top, and at the top it reloads the
  * page's data. Articles bring their own toolbar instead.
  */
-export function TabBar({ changelogVersion }: { changelogVersion: string | null }) {
+export function TabBar() {
   const screen = useScreen();
   const { pathname, key } = useLocation();
   const revalidator = useRevalidator();
-  const dot = useChangelogDot(changelogVersion);
   const last = useRef<TabKey | undefined>(undefined);
   const restored = useSyncExternalStore(subscribe, () => rememberedTab(key), serverTab);
   const items = tabs();
@@ -63,7 +61,6 @@ export function TabBar({ changelogVersion }: { changelogVersion: string | null }
             >
               <Icon size={23} />
               <span>{t.label}</span>
-              {dot && t.changelog && <span className="absolute left-[calc(50%+9px)] top-[7px] size-1.5 rounded-full bg-hot" aria-label="有新的更新" />}
             </Link>
           );
         })}

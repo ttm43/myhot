@@ -1,9 +1,9 @@
 // Failure modes: startup overwrites the saved choice, malformed/unavailable storage breaks the
-// document, denied writes prevent even an in-tab choice, or version-1 backups lose/replace a preference.
+// document, or denied writes prevent even an in-tab choice.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
-import { APPEARANCE_BOOT_SCRIPT, exportBundle, getFontPreference, importBundle, KEYS, setFontPreference } from "../apps/web/app/lib/local-state.ts";
+import { APPEARANCE_BOOT_SCRIPT, getFontPreference, KEYS, setFontPreference } from "../apps/web/app/lib/local-state.ts";
 
 class MemoryStorage {
   values = new Map<string, string>();
@@ -28,19 +28,9 @@ test("appearance startup applies a saved browser font before rendering and safel
   }
 });
 
-test("font choices survive version-1 backups and denied writes without touching existing reader data", () => {
+test("font choices survive denied writes", () => {
   setFontPreference("browser");
   assert.equal(getFontPreference(), "browser");
-  const backup = exportBundle();
-  assert.equal(backup.version, 1);
-  assert.equal(backup.font, "browser");
-  setFontPreference(null);
-  importBundle(JSON.stringify({ version: 1, starred: [], read: [], theme: "auto" }));
-  assert.equal(getFontPreference(), null, "old backups remain valid");
-  importBundle(JSON.stringify(backup));
-  assert.equal(getFontPreference(), "browser");
-  importBundle(JSON.stringify({ ...backup, font: "system" }));
-  assert.equal(getFontPreference(), "browser", "merging does not overwrite the reader's choice");
   setFontPreference(null);
   store.denied = true;
   setFontPreference("browser");

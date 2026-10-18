@@ -1,17 +1,16 @@
 // Discovery and static files: sitemap, llms.txt, the site's public files (robots.txt, security.txt, the web
-// manifest, the OpenAPI document), icons, the IndexNow key and the about page's contact codes.
+// manifest, the OpenAPI document), icons, and the IndexNow key.
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { EDITION_TIMES, SITE } from "@aihot/site";
-import { CONTACT_ALIASES, PUBLIC_INTERFACE_VERSION } from "@aihot/contracts/http-policy";
+import { PUBLIC_INTERFACE_VERSION } from "@aihot/contracts/http-policy";
 import { PUBLIC_API_CATEGORY_KEYS } from "@aihot/contracts/taxonomy";
 import { REPO_ROOT, config } from "@aihot/backend/config";
 import { applyPublicHeaders, sendTextWithEtag } from "../http/respond.ts";
 import { loadSitemap } from "@aihot/backend/publication/sitemap";
 import { llmsTxt, loadLlmsAvailability } from "@aihot/backend/publication/llms";
-import { loadContact } from "@aihot/backend/site/contact";
 
 const PUBLIC = path.join(REPO_ROOT, "site/public");
 /** The site's brand files (site/brand/), and how long its icons are cached. */
@@ -141,24 +140,4 @@ export function registerStatic(app: FastifyInstance) {
   for (const icon of ["favicon.ico", "icon.png", "icon-192.png", "apple-icon.png", "logo.svg", ...SITE.rootIcons]) {
     app.get(`/${icon}`, (req, reply) => sendFile(req, reply, path.join(BRAND, icon), { cacheControl: ICON_CACHE }));
   }
-
-  // Contact codes' root addresses linked from outside lead to the codes the about page shows now
-  // (replacing a code changes its file name).
-  for (const { slot, file } of CONTACT_ALIASES) {
-    app.get(`/${file}`, async (_req, reply) => {
-      const contact = await loadContact();
-      return reply.code(302).header("Location", contact[`${slot}Qr`]).header("Cache-Control", "public, max-age=3600").send();
-    });
-  }
-
-  // Contact codes on the about page: uploaded in the admin (content-hashed names), or shipped in the pack.
-  app.get("/contact/:file", async (req, reply) => {
-    const file = (req.params as { file: string }).file;
-    if (!/^[\w.-]+\.(png|jpg|jpeg|webp)$/.test(file)) return reply.code(404).send();
-    const hashed = /-[0-9a-f]{8}\./.test(file);
-    const cacheControl = hashed ? "public, max-age=31536000, immutable" : "public, max-age=3600";
-    const uploaded = path.join(config.dataDir, "uploads", file);
-    const target = (await stat(uploaded).then(() => true, () => false)) ? uploaded : path.join(BRAND, "contact", file);
-    return sendFile(req, reply, target, { cacheControl });
-  });
 }

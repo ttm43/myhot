@@ -1,7 +1,7 @@
 // Outward HTTP behaviour, defined once: CORS, the public interface version, redirects and which process
 // owns a path, the engine's and then those of the site's modules. The API server and the web server both
 // read this module.
-import { ABOUT, POLICY, SITE } from "@aihot/site";
+import { POLICY, SITE } from "@aihot/site";
 import { MODULES } from "@aihot/site/modules";
 
 /** CORS for /api/v1/* and /openapi-v1.json. */
@@ -44,7 +44,7 @@ export interface RedirectRule {
 const ENGINE_REDIRECTS: RedirectRule[] = [
   {
     match: "regex",
-    path: "^/(all|about|agent|changelog|feedback|starred|more|privacy|terms)/+$",
+    path: "^/(all|agent|more)/+$",
     status: 301,
     location: "/$1",
     keepQuery: true,
@@ -107,12 +107,6 @@ export const OAUTH_PROBE_PATHS = [
   "/api/mcp/.well-known/openid-configuration",
 ];
 
-/** Root addresses of the about page's contact codes that were linked from outside (ABOUT.maker), served by routes/static.ts. */
-export const CONTACT_ALIASES = (["wechat", "feishu"] as const).flatMap((slot) => {
-  const file = ABOUT.maker?.[slot]?.alias;
-  return file ? [{ slot, file }] : [];
-});
-
 const literal = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /**
@@ -130,8 +124,7 @@ const ENGINE_API_PATHS: RegExp[] = [
   /^\/\.well-known\//,
   /^\/(favicon\.ico|icon\.png|icon-192\.png|apple-icon\.png|logo\.svg)$/,
   ...(SITE.rootIcons.length ? [new RegExp(`^\\/(${SITE.rootIcons.map(literal).join("|")})$`)] : []),
-  /^\/(og|contact)\//,
-  ...(CONTACT_ALIASES.length ? [new RegExp(`^\\/(${CONTACT_ALIASES.map((a) => literal(a.file)).join("|")})$`)] : []),
+  /^\/og\//,
   /^\/[0-9a-f]{32}\.txt$/,
   /^\/items\/[^/]+\/markdown$/,
 ];

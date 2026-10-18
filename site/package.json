@@ -9,7 +9,6 @@
     "./modules": "./modules/index.ts",
     "./modules/server": "./modules/server.ts",
     "./modules/web": "./modules/web.ts",
-    "./pages/*": "./pages/*",
     "./brand/*": "./brand/*"
   },
   "dependencies": {

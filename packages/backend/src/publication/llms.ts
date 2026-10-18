@@ -50,7 +50,6 @@ export function llmsTxt(opts: {
   const u = siteUrl;
   const v = PUBLIC_INTERFACE_VERSION;
   const rss = (name: string, id: Parameters<typeof feedMeta>[0]) => `- [${name}](${u(feedMeta(id).path)}): ${feedMeta(id).description}`;
-  const page = (name: string, path: string, covers: string | null) => `- [${name}](${u(path)})${covers ? `: ${covers}` : ""}`;
   // Examples use a real category: the second-to-last (papers in the AI pack).
   const sample = PUBLIC_API_CATEGORY_KEYS.at(-2) ?? PUBLIC_API_CATEGORY_KEYS[0];
   const field = TOPIC_GROUPS.find((g) => g.key === "field")?.name ?? "方向";
@@ -95,8 +94,7 @@ export function llmsTxt(opts: {
   }
   lines.push(`- [公开 API · 当前全部精选](${u("/api/v1/selected/snapshot")}): 首次完整快照；后续使用响应 cursor 调 selected/changes`);
   lines.push(`- [公开 API · 精选增量](${u("/api/v1/selected/changes")}): 只返回新增、修改和撤选，不按发布时间猜窗口`);
-  lines.push(page(POLICY.terms.name, "/terms", POLICY.terms.covers));
-  lines.push(page("隐私说明", "/privacy", POLICY.privacy.covers), "");
+  lines.push("");
   lines.push("## 用得省、跑得快（写接入代码时请照做）", "");
   lines.push("- 开压缩：请求带 Accept-Encoding: gzip 或 br（curl 加 --compressed），JSON 压缩后约为原来的 1/4 到 1/8。");
   lines.push("- 带条件请求：保存响应的 ETag，下次带 If-None-Match；内容没变时返回 304，没有正文。");

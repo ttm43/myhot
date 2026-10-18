@@ -17,21 +17,18 @@
 - `name`：站名。导航、标题、分享图、RSS、MCP、后台都用它。`organization.name` 是结构化数据里的网站运营者（给搜索引擎看），默认也是站名，改站名时一起改；`organization.founder` 是创始人（选填）。
 - `subject`：行业词。页面上“AI 日报”“全部 AI 动态”会变成“法律日报”“全部法律动态”。
 - `homeTitle`、`topicsTitle`、`description`、`tagline`、`keywords`：首页和主题目录页的标题、一句话介绍、分享图下方的小字、给搜索引擎的关键词。
-- `feedbackExample`：反馈表单输入框里的示例。
 - `locale`：界面语言（网页的语言标记、分享卡片和结构化数据），`public/` 文件里的 `{{locale}}` 也换成它。
 - `since`：网站开始收录的年份（结构化数据里的时间范围，选填）。
 - `mcpPrefix`：MCP 工具名前缀，比如 `lawhot` 会得到 `lawhot_get_latest`。有人接入以后不要再改。
 - `interfaceVersion`：公开接口（MCP、OpenAPI、`llms.txt`）的版本号，只升不降；改了接口里已有的字段或含义时升主版本。
 - `crawlerName`：抓取信源时报的名字，别用别人的站名。
 - `contactEmail`：对外联系邮箱（选填），填了就在 `llms.txt` 和给 Agent 的使用说明里写成授权联系方式。
-- `footerNote`：关于页底部的一行小字。默认是一行框架署名“由 AIHOT 开源框架驱动”，可以留也可以删（设成 `null`）。
 - `icp`：中国大陆网站的备案号，填了就显示在页脚。
 - `github`：源码仓库的地址（选填），填了就在侧栏和“我的”页底部显示“GitHub 开源”。
 - `llmsIntro`：`llms.txt` 里一句话介绍下面的一段详细介绍（选填）。
 - `rootIcons`：标准图标以外也放在网站根目录的图标，`site/brand/` 里的文件名（选填）。
 - `EDITION_TIMES`：日报、周报、月报的出刊时间（北京时间）。排程、日报收录的时间窗口、缺期告警和所有提到时间的文案都读它；排程每半小时检查一次，写整点或半点。`EDITION_WHEN` 是由它拼出来、写进句子里的说法（“每天 08:00”“每周一 10:00”“每月 1 日 10:30”），一般不用改。
-- `POLICY`：使用规则和隐私说明两页的名字和简介；`terms.license` 是讲清哪些用途要先取得授权的话，`terms.headers` 是公开接口声明使用规则的响应头（都选填）；`xPostIsFullText` 决定 X 帖子本身的文字算不算全文（算的话，只在信源允许全文时显示）。
-- `ABOUT`：关于页的大标题、四个环节的说明、作者块（可选）、版权说明，以及“使用规则”链接的锚点（`termsAnchor`，选填）。
+- `POLICY`：使用规则的名字和简介；`terms.license` 是讲清哪些用途要先取得授权的话，`terms.headers` 是公开接口声明使用规则的响应头（都选填）；`xPostIsFullText` 决定 X 帖子本身的文字算不算全文（算的话，只在信源允许全文时显示）。
 - `CARDS`：各页分享图上的文字。
 - `NAV`：`hidden` 写不放进导航的引擎入口，目前只支持热点榜（`"/hot"`）和主题（`"/topics"`）；例如来源还不多、热点榜常是空的站写 `"/hot"`。电脑侧栏、手机底栏和“我的”页都不放；页面照样能打开，直接打开这些页面时所属标签为精选，原来回到它的返回按钮和链接改回精选，给搜索引擎的页面层级（面包屑）也不经过它；写 `"/hot"` 时首页也不放当前热点，事件页不写热点榜名次。默认是空的，导航和原来一样。
   其他入口暂不开放：它们的返回按钮和页面内入口也需要一起支持，避免只隐藏侧栏、别处仍引导读者过去。
@@ -122,17 +119,14 @@
   npm pack @fontsource/noto-sans-sc@5.3.0 && tar xzf fontsource-noto-sans-sc-5.3.0.tgz
   node scripts/nameplates.ts package
   ```
-- 关于页的二维码：先在 `site.ts` 的 `ABOUT.maker` 写好作者块，并写上 `wechat`、`feishu` 卡片（标题和说明）；再在后台“设置 → 关于页二维码”上传图片，或者把图片放进 `site/brand/contact/`，文件名以 `qr-wechat`、`qr-feishu` 开头，格式是 png、jpg 或 webp。作者块、卡片或图片缺一样，那张二维码就不显示。
 
 请不要使用 AIHOT 的名字和 Logo。
 
-读者可以在“我的”页将字体从“默认字体”改为“浏览器默认字体”。后一项使用读者在浏览器中设置的标准字体，覆盖普通正文、表单和动态图表文字；代码仍用等宽字体，Logo、报头字和分享图片仍按站点品牌显示。字体选择只在当前浏览器保存，不转换简繁体。收藏页的版本 1 备份增加了可选的 `font` 字段，旧备份仍可导入；导入不会覆盖读者已经选择的浏览器字体。
+读者可以在“我的”页将字体从“默认字体”改为“浏览器默认字体”。后一项使用读者在浏览器中设置的标准字体，覆盖普通正文、表单和动态图表文字；代码仍用等宽字体，Logo、报头字和分享图片仍按站点品牌显示。字体选择只在当前浏览器保存，不转换简繁体。
 
-## 7. 页面文案：`site/pages/`、`site/public/`、`site/changelog.json`
+## 7. 网站根目录的固定文件：`site/public/`
 
-- `pages/terms.md`、`pages/privacy.md`：使用规则和隐私说明。**现在是模板**，上线前按你的实际情况改写，必要时请专业人士看一下。
 - `public/`：网站根目录上的四个固定文件，替换占位符后发布：`robots.txt`、`manifest.webmanifest`（装到手机桌面时的名字和图标）、`openapi-v1.json`（公开 API 的说明），以及可选的 `.well-known/security.txt`（安全问题的联系方式）。只发布这四个文件，放进去的其他文件不会出现在网站上；没有的文件访问时是 404。文件里可以写这些占位符：`{{siteName}}`、`{{siteUrl}}`、`{{description}}`、`{{tagline}}`、`{{locale}}`，出刊时间 `{{dailyTime}}`、`{{weeklyTime}}`、`{{monthlyTime}}`，公开接口版本 `{{version}}`，逗号分隔的公开分类 `{{categoryList}}`；JSON 文件里 `enum` 或 `examples` 列表中的 `"{{categories}}"` 会换成公开分类的 key 列表。
-- `changelog.json`：更新日志。自带一条“网站上线”示例，上线前把它的 `date`、`time` 和 `latestVersion` 改成你的上线时间；示例正文里的框架署名（“用 AIHOT 开源框架搭起了这个站”）同样可留可删。新条目写在最前面，把 `latestVersion` 改成它的日期和时间。`kind` 是“更新”“优化”“公告”“下线”之一；要读者一定看到的加 `"urgent": true`（红色，标“重要”）。
 
 ## 8. 模型和部署
 
@@ -149,4 +143,4 @@ node scripts/smoke.ts --base http://localhost:3000   # 站点跑起来以后
 
 改写提示词、重新校准门槛不会让测试失败：测试按每一步实际渲染出的提示词认请求，门槛从 `industry/selection.ts` 读。`tests/` 里有些测试用的是示例行业的分类、标签和公司（比如 `ai-models`、“模型发布”、Anthropic）。改了 `industry/taxonomy.ts` 以后这些测试会失败，把例子换成你行业里的对应项即可，测的规则本身不用改。
 
-然后打开网站看一眼首页、全部动态、日报、主题页和关于页，再去后台“信源”页看信源是不是都抓成功了。
+然后打开网站看一眼首页、全部动态、日报和主题页，再去后台“信源”页看信源是不是都抓成功了。

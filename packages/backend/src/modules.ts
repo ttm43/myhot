@@ -280,8 +280,6 @@ export interface ServerModule {
   notices?: Partial<RequestNotices>;
   /** The origin v1 links stories at while it returns one, instead of the site's (publication/links.ts: hot topics' links.story, related stories' links.api). */
   storyOrigin?: () => string | null;
-  /** More keys a feedback sender is known by; a ban under any of them holds (operations/feedback.ts). */
-  feedbackKeys?: (ip: string) => string[];
 }
 
 export function defineServerModule(module: ServerModule): ServerModule {
