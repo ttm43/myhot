@@ -1,7 +1,6 @@
 // An X post's own text, its translation, the post it quotes and its media are its body, on a site that
 // counts them as one (POLICY.xPostIsFullText): it shows them only when the source allows full text
-// (site_fulltext), full RSS only when it may also syndicate. Every other exit keeps the item with its
-// licensed summary.
+// (site_fulltext). Every other exit keeps the item with its licensed summary.
 import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -28,7 +27,7 @@ after(async () => {
 });
 
 async function fixture(options: {
-  full?: boolean; syndicate?: boolean; kind?: "x_search" | "rss"; summary?: boolean;
+  full?: boolean; kind?: "x_search" | "rss"; summary?: boolean;
   shape?: "missing" | "quote-only"; bodyStatus?: "ok" | "unconfirmed" | "none";
   translation?: "missing" | "stale" | "same"; mode?: "editorial" | "hot_signal" | "isolated";
 } = {}) {
@@ -54,8 +53,8 @@ async function fixture(options: {
       { kind: "video", url: `https://example.org/${media}.mp4`, poster: `https://example.org/${media}-poster.png`, alt: `${media}-视频描述` },
     ],
   };
-  await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, site_fulltext, syndicate_fulltext, icon_url, next_fetch_at)
-    VALUES (${source}, '许可测试来源', ${kind}, 'T1', ${options.mode ?? "editorial"}, ${options.full ?? false}, ${options.syndicate ?? true}, 'https://example.org/source.png', '2100-01-01')`;
+  await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, site_fulltext, icon_url, next_fetch_at)
+    VALUES (${source}, '许可测试来源', ${kind}, 'T1', ${options.mode ?? "editorial"}, ${options.full ?? false}, 'https://example.org/source.png', '2100-01-01')`;
   const { articleId: id } = await upsertMaterial({ sourceId: source, url, title: `Original title ${key}`, language: "en",
     bodyText: options.bodyStatus === "none" ? null : main, bodyHtml: options.bodyStatus === "none" ? null : `<p>${main}</p>`,
     bodyStatus: options.bodyStatus ?? "ok", xPost, via: "fetch", publishedAt: new Date() });
@@ -128,15 +127,7 @@ async function summaryLists(f: Fixture) {
   assert.equal(toFeedItemSummary(row!).x, null);
 }
 
-async function feedItem(path: string, f: Fixture) {
-  const response = await get(path, 200, /(?:application|text)\/(?:rss\+)?xml/);
-  const item = response.body.match(/<item>[\s\S]*?<\/item>/g)?.find((part) => part.includes(`<guid isPermaLink="false">${f.id}</guid>`));
-  assert.ok(item, `${path} 确实包含目标条目`);
-  assert.ok(item.includes(f.summary!));
-  return item;
-}
-
-async function revoke(f: Fixture, patch: { site_fulltext?: boolean; syndicate_fulltext?: boolean }) {
+async function revoke(f: Fixture, patch: { site_fulltext?: boolean }) {
   const [source] = await sql<{ updated_at: Date }[]>`SELECT updated_at FROM sources WHERE id = ${f.source}`;
   await updateSource(f.source, { patch, version: source!.updated_at.toISOString(), reason: "本地许可测试" }, "test");
   const [queued] = await sql<{ value: { status: string } }[]>`SELECT value FROM settings WHERE key = ${`republish.source:${f.source}`}`;
@@ -167,31 +158,16 @@ test("R03: every list projection retains the item without unlicensed X content",
 test("R04: revoking only site fulltext keeps editorial summaries after republishing", hidesPosts, async () => {
   const f = await fixture({ full: true });
   assert.ok((await get(`/api/site/items/${f.id}/original`)).body.includes(f.main));
-  assert.ok((await feedItem("/feed/full.xml", f)).includes(f.zh));
   await revoke(f, { site_fulltext: false });
   await summaryDetail(f);
   await summaryMarkdown(f);
   await summaryLists(f);
-  const feed = await feedItem("/feed/full.xml", f);
-  noContent(feed, f);
-  assert.ok(!feed.includes("content:encoded"));
-});
-
-test("R05: revoking only syndication preserves licensed site reading and Markdown", async () => {
-  const f = await fixture({ full: true });
-  await revoke(f, { syndicate_fulltext: false });
-  assert.ok((await get(`/api/site/items/${f.id}`)).body.includes(f.zh));
-  assert.ok((await get(`/api/site/items/${f.id}/original`)).body.includes(f.main));
-  assert.ok((await get(`/items/${f.id}/markdown`, 200, /text\/markdown/)).body.includes(f.main));
-  const feed = await feedItem("/feed/full.xml", f);
-  noContent(feed, f);
-  assert.ok(!feed.includes("content:encoded"));
 });
 
 for (const kind of ["x_search", "rss"] as const) {
-  for (const full of [false, true]) for (const syndicate of [false, true]) {
-    test(`R06/R07: ${kind} licence matrix site=${full}, syndicate=${syndicate}`, kind === "x_search" && !full ? hidesPosts : {}, async () => {
-      const f = await fixture({ kind, full, syndicate });
+  for (const full of [false, true]) {
+    test(`R06/R07: ${kind} licence matrix site=${full}`, kind === "x_search" && !full ? hidesPosts : {}, async () => {
+      const f = await fixture({ kind, full });
       if (full) {
         const normal = (await get(`/api/site/items/${f.id}`)).json();
         const original = (await get(`/api/site/items/${f.id}/original`)).json();
@@ -216,14 +192,6 @@ for (const kind of ["x_search", "rss"] as const) {
         await summaryDetail(f);
         await summaryMarkdown(f);
       }
-      const fullFeed = await feedItem("/feed/full.xml", f);
-      assert.equal(fullFeed.includes("content:encoded"), full && syndicate);
-      if (full && syndicate) assert.ok(fullFeed.includes(f.zh));
-      else noContent(fullFeed, f);
-      for (const path of ["/feed.xml", "/feed/all.xml"]) noContent(await feedItem(path, f), f);
-      const v1 = await get(`/api/v1/items?mode=selected&q=${f.key}`);
-      assert.ok(v1.body.includes(f.id));
-      noContent(v1.body, f);
     });
   }
 }

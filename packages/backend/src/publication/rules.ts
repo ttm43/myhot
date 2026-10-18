@@ -18,7 +18,6 @@ export interface SourceFacts {
   participation_mode: string;
   first_party: boolean;
   site_fulltext: boolean;
-  syndicate_fulltext: boolean;
 }
 
 export function channelOf(sourceKind: string, hasXPost: boolean): "x" | "news" {
@@ -38,7 +37,7 @@ export function isPoolEligible(input: {
 
 /**
  * Item detail page (and its Markdown export): every unwithdrawn item from an editorial source has one,
- * with or without a Chinese summary (noindex unless indexable). hot_signal material is heat evidence
+ * with or without a Chinese summary. hot_signal material is heat evidence
  * only and has none. A paused source keeps its pages.
  */
 export function hasItemPage(p: { visibility: string; sourceMode: string }): boolean {
@@ -56,19 +55,6 @@ export function isSelectable(eligible: boolean, judgedSelected: boolean | null, 
  */
 export function bodyModeOf(source: SourceFacts, bodyStatus: string, hasBody: boolean): "full" | "summary" {
   return source.site_fulltext && bodyStatus === "ok" && hasBody ? "full" : "summary";
-}
-
-/** Full-RSS redistribution whitelist: only sources that explicitly allow it. */
-export function mayRedistribute(source: SourceFacts, bodyMode: "full" | "summary"): boolean {
-  return source.syndicate_fulltext && bodyMode === "full";
-}
-
-/**
- * Detail pages are noindex by default. Selected items are indexed automatically; an editor
- * can mark any other public page for indexing, or exclude a page, which then stays out.
- */
-export function isIndexable(p: { visibility: string; sourceMode: string; hasSummary: boolean; selected: boolean; seoIndexedAt: Date | null; seoExcludedAt: Date | null }): boolean {
-  return p.visibility === "public" && hasItemPage(p) && p.hasSummary && p.seoExcludedAt === null && (p.selected || p.seoIndexedAt !== null);
 }
 
 /** Display tags exclude internal entity markers. */

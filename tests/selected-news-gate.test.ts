@@ -37,20 +37,16 @@ test('an unresolved selection never leaks after the old deadline and completion 
   await sql`UPDATE articles SET grouping_status='failed',grouped_at=now()-interval '1 hour',grouping_error='provider timeout' WHERE id=${id}`;
   await publishArticle(id, { now: new Date(Date.now() - 3600_000) });
   await publishArticle(id);
-  const selectedOutlets = ['/api/site/timeline?limit=40','/api/v1/items?mode=selected',
-    '/feed.xml','/api/v1/agent/latest?limit=30','/api/v1/selected/snapshot?limit=1000'];
+  const selectedOutlets = ['/api/site/timeline?limit=40'];
   for (const path of selectedOutlets) assert.ok(!(await read(path)).includes(id), `${path} exposed unresolved news`);
-  for (const path of ['/api/site/pool', '/api/v1/items?mode=all', `/api/site/items/${id}`]) {
+  for (const path of ['/api/site/pool', `/api/site/items/${id}`]) {
     assert.ok((await read(path)).includes(id), `${path} hid otherwise readable content`);
   }
-  assert.equal((await sql`SELECT 1 FROM selected_ledger WHERE article_id=${id}`).length, 0, 'no premature sync upsert');
 
   await sql`UPDATE articles SET grouping_status='complete',grouped_at=now(),grouping_error=NULL,selection_adds_value=true WHERE id=${id}`;
   await publishArticle(id);
   mock.timers.tick(5_100); // the public timeline's existing five-second grouped snapshot expires
   for (const path of selectedOutlets) assert.ok((await read(path)).includes(id), `${path} missed completed news`);
-  await publishArticle(id);
-  assert.equal((await sql`SELECT 1 FROM selected_ledger WHERE article_id=${id} AND op='upsert'`).length, 1);
 });
 
 test('a confirmed but redundant explanation stays in all, and an editor can explicitly select it', async () => {
@@ -60,7 +56,7 @@ test('a confirmed but redundant explanation stays in all, and an editor can expl
   await publishArticle(id);
   mock.timers.tick(5_100); // read past the previous test's snapshot, or this check passes on stale rows
   assert.ok(!(await read('/api/site/timeline?limit=40')).includes(id));
-  assert.ok((await read('/api/v1/items?mode=all')).includes(id));
+  assert.ok((await read('/api/site/pool')).includes(id));
   await sql`INSERT INTO editorial_overrides(article_id,fields,reason,updated_by)
     VALUES (${id},'{"selected":true}','editor verified independent value','test')`;
   await publishArticle(id);

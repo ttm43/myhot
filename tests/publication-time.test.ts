@@ -1,6 +1,6 @@
 // An item whose original carries no reliable date keeps its public page, and no exit presents when it was
 // collected as when it was published. Failure cases: the Markdown export labels the collection time
-// "发布时间"; RSS gives the collection time as pubDate; a dated item loses its publication time.
+// "发布时间"; a dated item loses its publication time.
 import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
@@ -44,11 +44,4 @@ test("the Markdown export names the collection time as such when the publication
   assert.ok(undated.includes(`- 收录时间：${discovered.toISOString()}`));
   assert.ok(!undated.includes("发布时间"));
   assert.ok((await get(`/items/${ids.dated}/markdown`)).includes(`- 发布时间：${published.toISOString()}`));
-});
-
-test("RSS gives no pubDate for an item without a known publication time", async () => {
-  const feed = await get("/feed/all.xml");
-  const entry = (id: string) => feed.split("<item>").find((block) => block.includes(`>${id}</guid>`));
-  assert.ok(entry(ids.undated) && !entry(ids.undated)!.includes("<pubDate>"));
-  assert.ok(entry(ids.dated)!.includes(`<pubDate>${published.toUTCString()}</pubDate>`));
 });

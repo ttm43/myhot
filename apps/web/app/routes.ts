@@ -32,7 +32,6 @@ export default [
   route("topics/:slug", "routes/topic.tsx", { id: "topic" }),
   route("topics/:slug/page/:page", "routes/topic.tsx", { id: "topic-page" }),
   route("more", "routes/more.tsx"),
-  route("agent", "routes/agent.tsx"),
   ...modulePages,
   route("admin/login", "routes/admin-login.tsx"),
   layout("routes/admin/layout.tsx", { id: "admin-layout" }, [

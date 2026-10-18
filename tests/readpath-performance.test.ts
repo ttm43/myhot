@@ -1,4 +1,4 @@
-// Search ranking, capped totals, public scope, licensed RSS bodies, report fallback headlines and
+// Search ranking, capped totals, public scope, report fallback headlines and
 // conditional reads, on a disposable database through the real HTTP handlers and SQL.
 import { tag } from './setup.ts';
 import assert from 'node:assert/strict';
@@ -6,7 +6,6 @@ import { after, before, test } from 'node:test';
 import { closeDb, sql } from '@aihot/backend/db';
 import { loadPool } from '@aihot/backend/publication/pool';
 import { v1Items } from '@aihot/backend/publication/v1';
-import { itemFeed } from '@aihot/backend/publication/feeds';
 import { listReports } from '@aihot/backend/publication/reports';
 import { buildApp } from '../apps/api/src/app.ts';
 
@@ -25,11 +24,11 @@ before(async () => {
       ${T} || CASE WHEN n = 1 THEN ' needle' ELSE ' general' END, ${now}, ${now}, ${now}, '<p>licensed body</p>', 'en'
     FROM generate_series(1, 2108) n`;
   await sql`INSERT INTO publications (article_id, title, source_id, channel, url, discovered_at, timeline_at, published_at, sort_at,
-      eligible, selected, visible_after, visibility, search_text, tags, summary, body_mode, syndicate)
+      eligible, selected, visible_after, visibility, search_text, tags, summary, body_mode)
     SELECT a.id, a.title, a.source_id, 'news', a.url, a.discovered_at, a.timeline_at, a.published_at, a.timeline_at,
       a.id <> ${id(2108)}, a.id = ${id(2108)}, ${new Date(+now - 1000)},
       CASE WHEN a.id = ${id(2106)} THEN 'withdrawn' ELSE 'public' END,
-      ${T} || ' needle', ${[T]}, 'fixture summary', 'full', false FROM articles a WHERE a.source_id = ${SOURCE}`;
+      ${T} || ' needle', ${[T]}, 'fixture summary', 'full' FROM articles a WHERE a.source_id = ${SOURCE}`;
   await sql`INSERT INTO pool_search (article_id, direct, body)
     SELECT article_id, search_text, CASE WHEN right(article_id, 4)::int % 2 = 0 THEN 'needle bodyonly' ELSE 'needle' END
     FROM publications WHERE source_id = ${SOURCE} AND eligible`;
@@ -83,7 +82,7 @@ test('unfiltered single-term relevance combines direct/body scores and retains o
   assert.deepEqual([empty.items, empty.total], [[], 0]);
 });
 
-test('v1 search allows terms to match direct text and body, retaining time cursor order and public scope', async () => {
+test('MCP item search allows terms to match direct text and body, retaining time cursor order and public scope', async () => {
   const query = { mode: 'all' as const, window: '7d' as const, by: 'timeline' as const, category: null, q: `${T} bodyonly`, limit: 40, cursor: null };
   const first = await v1Items(query, now);
   const expected = Array.from({ length: 40 }, (_, i) => id(2104 - i * 2));
@@ -93,20 +92,6 @@ test('v1 search allows terms to match direct text and body, retaining time curso
   assert.equal(next.items[0]!.id, id(2024));
   const selected = await v1Items({ ...query, mode: 'selected', q: T }, now);
   assert.deepEqual(selected.items.map((i) => i.id), [id(2108)], 'selected direct matches do not require a pool_search row');
-});
-
-test('RSS summary excludes bodies; full RSS includes only licensed items', async () => {
-  await sql`UPDATE publications SET selected = true, syndicate = true WHERE article_id = ${id(1)}`;
-  const summary = await itemFeed('selected', null, { now });
-  const full = await itemFeed('selected-full', null, { now });
-  assert.ok(summary.includes(`<guid isPermaLink="false">${id(1)}</guid>`));
-  assert.ok(!summary.includes('<content:encoded>'));
-  assert.ok(full.includes('licensed body'));
-  await sql`UPDATE publications SET syndicate = false WHERE article_id = ${id(1)}`;
-  const revoked = await itemFeed('selected-full', null, { now });
-  // Restrict the assertion to this item's XML: unrelated fixtures may legitimately syndicate.
-  const item = revoked.split('<item>').find((i) => i.includes(`<guid isPermaLink="false">${id(1)}</guid>`))!;
-  assert.ok(!item.includes('<content:encoded>'));
 });
 
 test('report directories skip a withdrawn lead for the next citation, including absent historical ones', async () => {

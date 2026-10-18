@@ -127,7 +127,6 @@ const EDITABLE = z
     first_party: z.boolean(),
     owner_entity_id: z.string().max(120).nullable(),
     site_fulltext: z.boolean(),
-    syndicate_fulltext: z.boolean(),
     tags: z.array(z.string().max(60)).max(30),
     config: z.record(z.string(), z.unknown()),
   })
@@ -206,7 +205,7 @@ export async function updateSource(id: string, input: { patch: unknown; version:
 }
 
 /** Source fields the public projection reads (publication/rules.ts and the v1 payload). */
-const PUBLICATION_FIELDS: string[] = ["kind", "participation_mode", "site_fulltext", "syndicate_fulltext", "tier", "name", "first_party", "owner_entity_id"];
+const PUBLICATION_FIELDS: string[] = ["kind", "participation_mode", "site_fulltext", "tier", "name", "first_party", "owner_entity_id"];
 
 /** Replacing a working collector requires the fields its replacement needs to produce articles. */
 function assertReplacementConfig(kind: string, config: Record<string, unknown>): void {
@@ -230,7 +229,6 @@ const CreateSchema = z
     first_party: z.boolean().default(false),
     tags: z.array(z.string()).default([]),
     site_fulltext: z.boolean().default(SOURCE_DEFAULTS.siteFulltext),
-    syndicate_fulltext: z.boolean().default(false),
   })
   .strict();
 
@@ -266,9 +264,9 @@ export async function createSource(input: unknown, actor: string): Promise<Befor
     const dup = await findDuplicateSource(s.kind, s.config, undefined, tx);
     if (dup) return { created: false as const, duplicate: dup };
     const [row] = await tx<BeforeJson<AdminSource>[]>`
-    INSERT INTO sources (id, name, kind, config, tier, participation_mode, interval_minutes, first_party, tags, site_fulltext, syndicate_fulltext, next_fetch_at)
+    INSERT INTO sources (id, name, kind, config, tier, participation_mode, interval_minutes, first_party, tags, site_fulltext, next_fetch_at)
     VALUES (${s.id}, ${s.name}, ${s.kind}, ${tx.json(s.config as never)}, ${s.tier}, ${s.participation_mode}, ${s.interval_minutes}, ${s.first_party}, ${s.tags},
-            ${s.site_fulltext}, ${s.syndicate_fulltext}, now())
+            ${s.site_fulltext}, now())
     ON CONFLICT (id) DO NOTHING RETURNING *`;
     if (!row) throw new Conflict(`信源 ID ${s.id} 已存在`);
     await audit(actor, "source.create", `source:${s.id}`, null, null, s, { db: tx });

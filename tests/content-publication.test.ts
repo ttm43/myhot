@@ -8,7 +8,7 @@ import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { loadStoryFollowups } from "@aihot/backend/publication/followups";
 import { loadGroupReports } from "@aihot/backend/publication/groups";
 import { loadItemDetail } from "@aihot/backend/publication/detail";
-import { loadStoryDetail, v1HotTopics, v1Story } from "@aihot/backend/publication/stories";
+import { loadStoryDetail } from "@aihot/backend/publication/stories";
 import { candidates } from "@aihot/backend/reports/edition";
 import { composeStoryDigest, DIGEST_PROMPT_VERSION, DIGEST_SYSTEM, DigestSchema } from "@aihot/backend/events/digest";
 import { chatJson } from "@aihot/backend/providers/llm";
@@ -121,7 +121,6 @@ test("mentions cannot choose a timeline origin, anchor, representative, or a lat
   const after = (await loadStoryDetail(g.storyId, now))!;
   assert.equal(after.latestReport!.id, official);
   assert.equal(after.latest, "Dots 正式发布");
-  assert.equal((await v1Story(g.storyId))!.story.latest, after.latest);
   const firstParty = await loadTimeline({ ...q, channel: "firstParty" });
   assert.ok(!firstParty.cards.some(c => c.item.id === official), "a stale true projection flag cannot put T1_5 into first-party channel");
 });
@@ -149,7 +148,7 @@ test("item detail counts the same fact evidence as its expanded group", async ()
 // A newer archive report may remain readable without qualifying as news. It cannot become the
 // machine-only latest development while the website points at a different report; archive-only
 // stories still need one shared readable fallback.
-test("website and machine stories choose the same latest development and archive fallback", async () => {
+test("stories choose the latest development and archive fallback", async () => {
   const s = await source("latest-scope", "T1");
   const g = await story();
   const news = await report(s, g, { title: "仍然公开的最近进展", hours: 3, selected: false });
@@ -157,14 +156,10 @@ test("website and machine stories choose the same latest development and archive
   await sql`UPDATE publications SET eligible = false WHERE article_id = ${archive}`;
   for (const [expectedId, expectedTitle, expectedHours] of [[news, "仍然公开的最近进展", 3], [archive, "未进入公开列表的近期归档稿", 1]] as const) {
     const site = (await loadStoryDetail(g.storyId, now))!;
-    const api = (await v1Story(g.storyId))!.story;
     assert.equal(site.latest, expectedTitle);
     assert.equal(site.latestReport!.id, expectedId);
     assert.equal(site.latestAt, at(expectedHours).toISOString());
-    assert.equal(api.latest, site.latest);
-    assert.equal(api.latestAt, site.latestAt);
     assert.equal(site.reportCount, 2);
-    assert.equal(api.reportCount, 2);
     await sql`UPDATE publications SET eligible = false WHERE article_id = ${news}`;
   }
 });
@@ -197,7 +192,7 @@ test("digest input excludes mentions, preserves scoped conditions, and ignores g
   assert.equal(publicStory.digest, null, "a saved digest loses its withdrawn evidence before any model refresh");
   assert.equal(publicStory.latestReport!.id, remaining);
   await sql`UPDATE publications SET visibility='withdrawn' WHERE article_id IN ${sql([remaining, composite])}`;
-  assert.equal(await v1Story(g.storyId), null, "mentions alone cannot supply an event or invent required v1 latest/time fields");
+  assert.equal(await loadStoryDetail(g.storyId, now), null, "mentions alone cannot supply an event or invent required latest/time fields");
   const beforeClear = provider.hits();
   assert.equal((await composeStoryDigest(g.storyId)).updated, true);
   assert.equal(provider.hits(), beforeClear, "clearing an empty story does not call a model");
@@ -234,14 +229,14 @@ test("a cleared digest recovers from matching saved evidence without another mod
   const g = await story();
   const id = await report(s, g, { title: "可恢复的真实报道", hours: 2, selected: false });
   assert.equal((await composeStoryDigest(g.storyId)).updated, true);
-  const original = (await v1Story(g.storyId))!.story.digest;
+  const original = (await loadStoryDetail(g.storyId, now))!.digest;
   const calls = provider.hits();
   await sql`UPDATE publications SET visibility = 'withdrawn' WHERE article_id = ${id}`;
   assert.equal((await composeStoryDigest(g.storyId)).updated, true);
-  assert.equal(await v1Story(g.storyId), null);
+  assert.equal(await loadStoryDetail(g.storyId, now), null);
   await sql`UPDATE publications SET visibility = 'public' WHERE article_id = ${id}`;
   assert.equal((await composeStoryDigest(g.storyId)).updated, true, "restoration cannot be skipped merely because the input hash is unchanged");
-  assert.equal((await v1Story(g.storyId))!.story.digest, original);
+  assert.equal((await loadStoryDetail(g.storyId, now))!.digest, original);
   assert.equal(provider.hits(), calls, "the matching saved digest is reused without paying again");
   assert.equal((await composeStoryDigest(g.storyId)).updated, false, "the restored projection is idempotent");
 
@@ -262,11 +257,11 @@ for (const correction of ["title", "summary", "source", "time", "conditions", "e
     const g = await story();
     const id = await report(s, g, { title: "旧综述所用报道", hours: 2, selected: false });
     await composeStoryDigest(g.storyId);
-    const original = (await v1Story(g.storyId))!.story.digest;
+    const original = (await loadStoryDetail(g.storyId, now))!.digest;
     assert.ok(original);
     await report(s, g, { title: "新抵达而未改变旧证据的报道", hours: 1, selected: false });
     assert.equal((await storyTexts([g.storyId], now)).get(g.storyId)!.digest, original);
-    assert.equal((await v1Story(g.storyId))!.story.digest, original);
+    assert.equal((await loadStoryDetail(g.storyId, now))!.digest, original);
     if (correction === "title" || correction === "summary") {
       await overrideFields(id, { fields: { [correction]: "已经核实的更正内容" }, reason: "correct evidence", version: 0 }, "test");
     }
@@ -277,9 +272,8 @@ for (const correction of ["title", "summary", "source", "time", "conditions", "e
     if (correction === "unlisted") await sql`UPDATE publications SET eligible = false WHERE article_id = ${id}`;
     const calls = provider.hits();
     const site = (await loadStoryDetail(g.storyId, now))!;
-    const api = (await v1Story(g.storyId))!.story;
     const hot = (await storyTexts([g.storyId], now)).get(g.storyId)!;
-    for (const [exit, result] of [["site", site], ["v1/agent/mcp", api], ["hot text", hot]] as const) {
+    for (const [exit, result] of [["site", site], ["hot text", hot]] as const) {
       assert.equal(result.digest, null, `${exit} still publishes corrected evidence`);
       assert.equal(result.digestUpdatedAt, null, exit);
     }
@@ -308,9 +302,8 @@ for (const proof of ["no-hash", "no-ids", "no-version", "different-text"] as con
         await setVisibility(id, { visibility: "withdrawn", reason: "withdraw historical evidence", version: 1 }, "test");
       }
       const site = (await loadStoryDetail(g.storyId, now))!;
-      const api = (await v1Story(g.storyId))!.story;
       const hot = (await storyTexts([g.storyId], now)).get(g.storyId)!;
-      for (const [exit, result] of [["site", site], ["v1/agent/mcp", api], ["hot", hot]] as const) {
+      for (const [exit, result] of [["site", site], ["hot", hot]] as const) {
         assert.equal(result.digest, null, `${exit} ${change}`);
         assert.equal(result.digestUpdatedAt, null, `${exit} ${change}`);
       }
@@ -375,10 +368,8 @@ test("hot exits date latest progress by current event evidence after a withdrawa
   await computeHotRanking(new Date());
   for (const hours of [2, 4]) {
     const detail = (await loadStoryDetail(g.storyId, now))!;
-    const hot = (await v1HotTopics()).items.find((entry) => entry.links.story.endsWith(g.storyPublicId))!;
     const common = (await latestHotRanking())!.entries.find((entry) => entry.storyId === g.storyId)!;
     assert.equal(detail.latestAt, at(hours).toISOString());
-    assert.equal(hot.latestAt, detail.latestAt);
     assert.equal(common.latestAt, detail.latestAt, "legacy and site share the same current ranking metadata");
     await sql`UPDATE publications SET visibility = 'withdrawn' WHERE article_id = ${ids[2]!}`;
   }

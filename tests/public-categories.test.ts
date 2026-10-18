@@ -1,13 +1,11 @@
-// A category filter on the public API, RSS and MCP takes in exactly the categories the site publishes as
-// it (site/site.ts PUBLIC_CATEGORIES), whatever the industry's categories are; the website filters by each
-// of its own. Failure cases: a public filter takes in a category the site publishes on its own (or misses
-// one merged into it); the website's filter merges categories; the exits disagree; HTTP validation,
-// Agent search, MCP input schemas or OpenAPI still advertise a retired category list.
+// A category filter on MCP takes in exactly the categories the site publishes as it (site/site.ts
+// PUBLIC_CATEGORIES), whatever the industry's categories are; the website filters by each of its own.
+// Failure cases: a public filter takes in a category the site publishes on its own (or misses one merged
+// into it); the website's filter merges categories; MCP input schemas still advertise a retired category list.
 import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
-import { itemFeed } from "@aihot/backend/publication/feeds";
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { v1Items } from "@aihot/backend/publication/v1";
 import { CATEGORY_KEYS, PUBLIC_API_CATEGORY_KEYS, toPublicApiCategory } from "@aihot/contracts/taxonomy";
@@ -45,9 +43,7 @@ test("a public category takes in the categories the site publishes as it, and on
   for (const key of PUBLIC_API_CATEGORY_KEYS) {
     const want = CATEGORY_KEYS.filter((k) => toPublicApiCategory(k) === key).map(title).sort();
     const v1 = await v1Items({ mode: "selected", window: "24h", by: "timeline", category: key, q: null, limit: 100, cursor: null }, now);
-    assert.deepEqual(ours(v1.items.map((i) => i.title)), want, `v1 and MCP, ${key}`);
-    const rss = await itemFeed("selected", key, { now });
-    assert.deepEqual(ours([...rss.matchAll(/<title><!\[CDATA\[(.*?)\]\]><\/title>/g)].map((m) => m[1]!)), want, `RSS, ${key}`);
+    assert.deepEqual(ours(v1.items.map((i) => i.title)), want, `MCP, ${key}`);
   }
 });
 
@@ -58,12 +54,7 @@ test("the website filters by each of its own categories", async () => {
   }
 });
 
-test("HTTP, Agent, MCP and discovery agree on the public categories and returned items", async () => {
-  const spec = (await app.inject('/openapi-v1.json')).json();
-  for (const path of ['/api/v1/items', '/api/v1/agent/latest', '/api/v1/agent/search']) {
-    const parameter = spec.paths[path].get.parameters.find((p: { name?: string }) => p.name === 'category');
-    assert.deepEqual(parameter.schema.examples ?? parameter.schema.enum, [...PUBLIC_API_CATEGORY_KEYS], path);
-  }
+test("MCP agrees on the public categories and returned items", async () => {
   const tools = await client.listTools();
   for (const name of [MCP_TOOL_NAMES.latest, MCP_TOOL_NAMES.search]) {
     const schema = tools.tools.find((tool) => tool.name === name)?.inputSchema.properties?.category as { enum: string[] };
@@ -71,18 +62,6 @@ test("HTTP, Agent, MCP and discovery agree on the public categories and returned
   }
   for (const key of PUBLIC_API_CATEGORY_KEYS) {
     const want = CATEGORY_KEYS.filter((k) => toPublicApiCategory(k) === key).map(title).sort();
-    for (const mode of ['all', 'selected']) {
-      const response = await app.inject(`/api/v1/items?mode=${mode}&category=${key}`);
-      assert.equal(response.statusCode, 200);
-      assert.deepEqual(ours(response.json().items.map((item: { title: string }) => item.title)), want);
-      assert.ok(response.json().items.every((item: { category: string }) => item.category === key));
-    }
-    for (const path of [`/api/v1/agent/latest?category=${key}`, `/api/v1/agent/search?q=${T}&category=${key}`]) {
-      const response = await app.inject(path);
-      assert.equal(response.statusCode, 200, path);
-      for (const item of want) assert.ok(response.body.includes(item), path);
-      for (const other of CATEGORY_KEYS.filter((k) => toPublicApiCategory(k) !== key)) assert.ok(!response.body.includes(title(other)), path);
-    }
     for (const name of [MCP_TOOL_NAMES.latest, MCP_TOOL_NAMES.search]) {
       const result = await client.callTool({ name, arguments: { category: key, ...(name === MCP_TOOL_NAMES.search ? { q: T } : {}) } });
       assert.notEqual(result.isError, true);

@@ -99,7 +99,6 @@ for (const entrance of ["publisher", "source-mode"] as const) test(`${entrance} 
   await publishArticle(fresh);
   const [pending] = await sql`SELECT p.selection_candidate,p.selected,a.grouping_status FROM publications p JOIN articles a ON a.id=p.article_id WHERE a.id=${fresh}`;
   assert.deepEqual({ ...pending }, { selection_candidate: true, selected: false, grouping_status: "pending" });
-  assert.equal((await sql`SELECT 1 FROM selected_ledger WHERE article_id=${fresh}`).length, 0);
 });
 
 test("a T1 channel linking another publisher is still a discovery, not that URL's publisher", async () => {
@@ -161,8 +160,8 @@ test("a later verified publisher repairs source and author, preserving judgement
   const [p] = await sql`SELECT * FROM publications WHERE article_id = ${articleId}`;
   assert.deepEqual([correction.articleId, correction.created, correction.revised], [articleId, false, false]);
   assert.deepEqual([a!.source_id, a!.author, a!.revision, a!.body_text], [official, "Publisher team", 1, "Release body"]);
-  assert.deepEqual([p!.source_id, p!.first_party, p!.selected, Number(p!.score), p!.analysis_id, p!.body_mode, p!.syndicate],
-    [official, true, true, 85, before!.analysis_id, before!.body_mode, before!.syndicate]);
+  assert.deepEqual([p!.source_id, p!.first_party, p!.selected, Number(p!.score), p!.analysis_id, p!.body_mode],
+    [official, true, true, 85, before!.analysis_id, before!.body_mode]);
   assert.equal(p!.sort_at.toISOString(), before!.sort_at.toISOString());
   assert.equal(p!.visible_after.toISOString(), before!.visible_after.toISOString());
   assert.equal(p!.revision, before!.revision + 1);

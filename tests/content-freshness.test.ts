@@ -59,7 +59,7 @@ test('a previously unseen, undated tail cannot become selected news, heat or a r
   await highScore(a!.id);
   assert.equal((await groupArticle(a!.id)).verdict,'historical');
   assert.equal((await sql`SELECT selected FROM publications WHERE article_id=${a!.id}`)[0]!.selected,false);
-  for(const url of ['/api/v1/items?mode=selected','/api/site/timeline','/feed.xml','/api/v1/agent/latest']){
+  for(const url of ['/api/site/timeline']){
     const res=await app.inject({method:'GET',url});assert.equal(res.statusCode,200,url);assert.ok(!res.body.includes(a!.id),url);
   }
   assert.equal((await app.inject({method:'GET',url:`/api/site/items/${a!.id}`})).statusCode,200,'the material remains readable');

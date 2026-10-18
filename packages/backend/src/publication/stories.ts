@@ -1,7 +1,5 @@
-// Stories (events) and the hot ranking through the public read layer. The website sees heat values;
-// v1 and MCP only see ranks and counts.
+// Stories (events) and the hot ranking through the public read layer.
 import type { HeatPoint, HotResponse, StoryDetail, StoryReportView } from "@aihot/contracts/site";
-import { SITE } from "@aihot/site";
 import { sql } from "../db.ts";
 import { cachedByKey, SHARED_ONLY } from "../lib/cache.ts";
 import { proxiedImage, proxiedImageSet } from "../media/imgproxy.ts";
@@ -13,7 +11,6 @@ import { publicSourceName } from "./rules.ts";
 import { latestHotRanking, rankingExtras } from "./hot.ts";
 import { storyTexts } from "./story-text.ts";
 import { topicsOfStory } from "./topics.ts";
-import { itemUrl, storyUrl, v1StoryApiUrl, v1StoryUrl } from "./links.ts";
 
 export type StoryLookup = { kind: "found"; storyId: number; publicId: string } | { kind: "merged"; target: string } | { kind: "not_found" };
 
@@ -278,72 +275,5 @@ export async function loadHot(): Promise<HotResponse> {
         cover: picture && coverUrl ? { url: coverUrl, srcSet: proxiedImageSet(picture.url, "hero") ?? undefined, width: picture.width, height: picture.height } : null,
       };
     }),
-  };
-}
-
-// v1 shapes (ranks and counts only; no heat values)
-
-export async function v1HotTopics() {
-  const ranking = await latestHotRanking();
-  const items = (ranking?.entries ?? []).map((e) => {
-    const links = {
-      aihot: e.representativeItemId ? itemUrl(e.representativeItemId) : storyUrl(e.storyPublicId),
-      original: e.representativeUrl ?? storyUrl(e.storyPublicId),
-      story: v1StoryUrl(e.storyPublicId),
-    };
-    return {
-      rank: e.rank,
-      id: e.representativeItemId ?? e.storyPublicId,
-      title: e.title,
-      source: { name: e.representativeSource ?? e.sourceNames[0] ?? SITE.name },
-      links,
-      sourceCount: e.sourceCount,
-      signalCount: e.signalCount,
-      participantCount: e.participantCount,
-      sourceNames: e.sourceNames,
-      latestAt: new Date(e.latestAt).toISOString(),
-    };
-  });
-  return { schemaVersion: 1 as const, count: items.length, items };
-}
-
-export async function v1Story(storyId: number) {
-  const now = new Date();
-  const content = await storyContent(storyId, now);
-  if (!content) return null;
-  const { s, reports, latestReport, firstReportAt } = content;
-  // The latest development and digest follow the same evidence as the website.
-  const text = (await storyTexts([storyId], now)).get(storyId)!;
-  const latest = text.latest ?? latestReport;
-  const latestAt = latest.at;
-  const neighbors = (await relatedStories(storyId, now)).map((r) => {
-    const links = { aihot: storyUrl(r.public_id), api: v1StoryApiUrl(r.public_id) };
-    return { publicId: r.public_id, title: r.title, relation: r.relation, links };
-  });
-  return {
-    schemaVersion: 1 as const,
-    story: {
-      publicId: s.public_id,
-      title: s.title,
-      status: storyStatusFor(latestAt, now.getTime()) === "settled" ? ("settled" as const) : ("active" as const),
-      sourceCount: new Set(reports.map((r) => r.source_id)).size,
-      reportCount: reports.length,
-      firstReportAt: firstReportAt.toISOString(),
-      latestAt: latestAt.toISOString(),
-      latest: latest.title,
-      digest: text.digest,
-      digestUpdatedAt: text.digestUpdatedAt?.toISOString() ?? null,
-      links: { aihot: storyUrl(s.public_id) },
-      reports: reports.slice(0, 50).map((r) => ({
-        id: r.id,
-        title: r.title,
-        summary: r.summary,
-        source: { name: r.source_name, firstParty: r.first_party },
-        publishedAt: r.at.toISOString(),
-        links: { aihot: itemUrl(r.id), original: r.url },
-      })),
-      storyline: neighbors.filter((n) => n.relation === "storyline"),
-      related: neighbors.filter((n) => n.relation === "related"),
-    },
   };
 }

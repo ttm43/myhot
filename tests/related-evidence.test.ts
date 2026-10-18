@@ -69,7 +69,7 @@ async function bridge(own: Awaited<ReturnType<typeof story>>, other: Awaited<Ret
 }
 
 async function advertised(a: Awaited<ReturnType<typeof story>>, b: Awaited<ReturnType<typeof story>>, expected: boolean) {
-  for (const prefix of ['/api/site/stories/', '/api/v1/stories/', '/api/v1/agent/stories/']) {
+  for (const prefix of ['/api/site/stories/']) {
     const response = await app.inject({method:'GET',url:prefix+a.publicId});
     assert.equal(response.statusCode, 200);
     assert.equal(response.body.includes(b.publicId), expected, `${prefix} advertises the same neighbors`);

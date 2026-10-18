@@ -8,7 +8,7 @@ import { pageMeta, reportLd, reportTitle, titled } from "../lib/seo";
 import { beijingDate } from "@aihot/contracts/time";
 import { ReportLayout } from "../features/report/ReportLayout";
 import { ReportPaper, reportOutline } from "../features/report/ReportPaper";
-import { KIND_LABEL, feedLink, kindFromPath } from "../features/report/format";
+import { KIND_LABEL, kindFromPath } from "../features/report/format";
 import type { Screen } from "../components/shell/screens";
 
 export const handle: Screen = { tab: "daily", name: "日报" };
@@ -37,14 +37,14 @@ export function meta({ loaderData }: Route.MetaArgs) {
   const r = loaderData.report;
   const description = r.lead?.leadParagraph ?? r.overview?.slice(0, 150) ?? `${SITE.name} ${r.key} ${subjectAfter("的", KIND_LABEL[r.kind])}。`;
   const path = `/${r.kind}/${r.key}`;
-  return [...pageMeta({
+  return pageMeta({
     title: reportTitle(r),
     description,
     path,
     image: `/og/reports/${r.kind}/${r.key}.png`,
     type: "article",
     jsonLd: reportLd(r, path, description),
-  }), feedLink(r.kind)];
+  });
 }
 
 export default function ReportDetailPage() {

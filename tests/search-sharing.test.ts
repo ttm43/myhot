@@ -39,7 +39,7 @@ async function blocked<T>(read: () => Promise<T>): Promise<T> {
 }
 
 test('a burst of identical searches completes without consuming the distinct-search queue', async () => {
-  for (const path of [`/api/site/pool?tag=${id}&q=${id}&tab=relevance`, `/api/v1/items?mode=all&window=7d&q=${id}`]) {
+  for (const path of [`/api/site/pool?tag=${id}&q=${id}&tab=relevance`]) {
     const responses = await blocked(() => Promise.all(Array.from({ length: 20 }, () => app.inject(path))));
     assert.deepEqual(responses.map(r => r.statusCode), Array(20).fill(200), path);
     for (const response of responses) assert.deepEqual(response.json().items.map((i: { id: string }) => i.id), [id]);

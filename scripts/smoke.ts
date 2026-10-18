@@ -1,4 +1,4 @@
-// Opens the site's main pages and machine exits and checks each answers: the whole-site check after a
+// Opens the site's main pages and its few machine addresses and checks each answers: the whole-site check after a
 // deploy, and CI's check of the built site on an empty database.
 //   node scripts/smoke.ts [--base http://localhost:3000]
 import { SITE } from "@aihot/site";
@@ -6,19 +6,10 @@ import { SITE } from "@aihot/site";
 const at = process.argv.indexOf("--base");
 const base = (at > 0 ? process.argv[at + 1] : process.env.SITE_URL) ?? "http://localhost:3000";
 
-const PAGES = ["/", "/all", "/hot", "/daily", "/daily/archive", "/topics", "/agent", "/more", "/admin/login"];
+const PAGES = ["/", "/all", "/hot", "/daily", "/daily/archive", "/topics", "/more", "/admin/login"];
 const MACHINE: Array<[path: string, type: RegExp]> = [
   ["/api/health", /json/],
-  ["/api/v1/items", /json/],
-  ["/api/v1/hot-topics", /json/],
-  ["/api/v1/selected/snapshot", /json/],
-  ["/feed.xml", /xml/],
-  ["/feed/all.xml", /xml/],
-  ["/llms.txt", /text\/plain/],
-  ["/robots.txt", /text\/plain/],
-  ["/sitemap.xml", /xml/],
   ["/manifest.webmanifest", /manifest/],
-  ["/openapi-v1.json", /json/],
   ["/og/site.png", /image\/png/],
   ["/icon.png", /image\/png/],
   ["/favicon.ico", /icon/],

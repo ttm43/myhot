@@ -5,7 +5,7 @@ import { after, test } from 'node:test';
 import { closeDb, sql } from '@aihot/backend/db';
 import type { HotEntry } from '@aihot/backend/events/hot';
 import { loadHotStrip, rankingExtras } from '@aihot/backend/publication/hot';
-import { loadHot, v1HotTopics } from '@aihot/backend/publication/stories';
+import { loadHot } from '@aihot/backend/publication/stories';
 
 // Failure cases: names or participant counts disappear; a duplicate public name consumes a face slot;
 // tier/real-image ordering changes; signal-group images leak into the payload; a missing image
@@ -76,8 +76,4 @@ test('faces are 精选组 sources by tier (T1, T1.5, T2), at most 6; 氛围组 o
   assert.equal(full[1]!.iconUrl,null,'a visible initial still takes one of the six slots');
   const signals=extras.participants({...entries[0]!,participants:entries[0]!.participants.filter(p=>p.kind==='signal')});
   assert.deepEqual(signals,order.filter(i=>inputs[i]!.kind==='signal').map(i=>({name:name(i),kind:'signal'})),'no editorial faces means no image URLs at all');
-  const external=(await v1HotTopics()).items[0]!;
-  assert.equal(external.participantCount,12);
-  assert.deepEqual(external.sourceNames,entries[0]!.sourceNames,'machine clients keep every stored source name');
-  assert.deepEqual(Object.keys(external).sort(),['rank','id','title','source','links','sourceCount','signalCount','participantCount','sourceNames','latestAt'].sort(),'the external hot-topic contract is unchanged');
 });

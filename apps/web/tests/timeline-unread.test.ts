@@ -23,7 +23,7 @@ function detailOf(id: string, title: string): SiteItemDetail {
     ...summaryOf(id, title), x: null, originalTitle: title, links: { original: "https://example.org/article" }, discoveredAt: at,
     story: null, readingMode: "full", author: null,
     body: { zh: "<p>固定正文</p>", original: null, zhKind: "translation", complete: true },
-    outline: [], relatedStories: [], topics: [], indexable: true, markdownAvailable: true, group: null,
+    outline: [], relatedStories: [], topics: [], markdownAvailable: true, group: null,
     hasTranslation: true, bodyLanguage: "zh",
   };
 }

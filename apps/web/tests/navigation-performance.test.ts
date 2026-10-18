@@ -3,7 +3,6 @@
 // - query variants mix content/SEO, or restores lose their anchor;
 // - intent no longer loads data, scroll-through touches download it, or a failed prefetch breaks the current page;
 // - visits renew deadlines, expired/errors stay cached, or refresh stops working;
-// - Agent tabs choose an invalid panel or leave canonical/history behind;
 // - search downloads two whole pages, requests before opening, or never retries/updates suggestions.
 // Reader work failures fixed before changing enhancement and return-position code:
 // - offscreen code downloads/runs immediately, visible code stays plain, or raw copying changes;
@@ -18,7 +17,7 @@ import { startWebServer, type WebServer } from "./web-server.ts";
 
 const at = '2026-10-04T08:00:00.000Z';
 const item: FeedItemSummary = {id:'navigation-fixture',title:'性能检查文章',summary:'固定摘要',reason:'固定推荐理由',source:{name:'Fixture'},publishedAt:at,timelineAt:at,category:'ai-models',tags:[],score:80,selected:true,channel:'news',x:null};
-const detail: SiteItemDetail = {...item,x:null,originalTitle:'Fixture article',links:{original:'https://example.org/article'},discoveredAt:at,story:null,readingMode:'full',author:null,body:{zh:'<p>固定正文</p>',original:null,zhKind:'translation',complete:true},outline:[],relatedStories:[],topics:[],indexable:true,markdownAvailable:true,group:null,hasTranslation:true,bodyLanguage:'zh'};
+const detail: SiteItemDetail = {...item,x:null,originalTitle:'Fixture article',links:{original:'https://example.org/article'},discoveredAt:at,story:null,readingMode:'full',author:null,body:{zh:'<p>固定正文</p>',original:null,zhKind:'translation',complete:true},outline:[],relatedStories:[],topics:[],markdownAvailable:true,group:null,hasTranslation:true,bodyLanguage:'zh'};
 const codeSource='import json\n\nwith open("data.json") as file:\n    data = json.load(file)\n\nfor record in data:\n    print(record["title"])\n';
 const readerBody=Array.from({length:30},(_,i)=>`<p>阅读段落 ${i}：先阅读文章，再查看后面的代码和图片。正文保持可读，图片和代码在需要时增强。</p>`).join('')
   +`<pre><code>${codeSource}</code></pre><pre><code>x = 1</code></pre>`
@@ -42,7 +41,7 @@ const api=createServer((req,res)=>{
   if(p===failing){res.statusCode=503;return res.end(JSON.stringify({code:'unavailable'}));}
   if(p==='/api/health')return res.end('{}');
   if(p==='/api/site/search/suggestions')return res.end(JSON.stringify({topics:[{slug:'openai',name:'OpenAI',group:'company'}],hot:[{rank:1,title:'建议版本 '+suggestionsVersion,to:'/story/fixture'}]}));
-  if(p==='/api/site/topics')return res.end(JSON.stringify({groups:[],topics:[{slug:'openai',name:'OpenAI',group:'company',definition:'Fixture',brand:null,total:0,recent:0,indexable:false,latest:null}]}));
+  if(p==='/api/site/topics')return res.end(JSON.stringify({groups:[],topics:[{slug:'openai',name:'OpenAI',group:'company',definition:'Fixture',brand:null,total:0,recent:0,latest:null}]}));
   if(p==='/api/site/hot')return res.end(JSON.stringify({computedAt:at,windowHours:48,entries:[{rank:1,story:{publicId:'fixture',title:'建议版本 '+suggestionsVersion},heat:10,trend:'flat',trendPct:0,badges:[],participantCount:0,sourceCount:0,sourceNames:[],participants:[],spark:[],summary:null,latest:null,cover:null}]}));
   if(p==='/api/site/timeline'){
     res.setHeader('X-Accel-Expires','@'+(Math.floor(Date.now()/1000)+ttl));
@@ -196,33 +195,6 @@ test('SSR freshness spent in an upstream cache is not renewed by HTML hydration'
     await page.goBack();await expect(page.getByRole('link',{name:'性能检查文章',exact:true})).toBeVisible();
     assert.equal(hits.slice(start).filter(x=>x.startsWith('/api/site/timeline')).length,1);
   }finally{ttl=60;await context.close();}
-});
-
-test('Agent tabs finish offline with matching canonical; invalid direct tabs and anchored links keep a panel',async()=>{
-  const context=await chrome.newContext();const page=await context.newPage();
-  try{
-    await page.goto(origin+'/agent');
-    await context.setOffline(true);
-    await page.getByRole('tablist',{name:'接入方式'}).getByRole('tab',{selected:true}).click();
-    await expect(page.locator('#agent-panel')).not.toBeEmpty();
-    for(const [tab,name] of [['mcp',/^MCP/],['rss',/^RSS/],['api',/^REST API/]] as const){
-      const choice=page.getByRole('tab',{name});
-      // The active track was exercised above; compare navigation through every remaining track.
-      if(await choice.getAttribute('aria-selected')==='true')continue;
-      const target=await choice.getAttribute('href');
-      await choice.click();
-      await expect(page).toHaveURL(origin+target,{timeout:1500});
-      await expect(page.locator('link[rel=canonical]')).toHaveAttribute('href',origin+target);
-      await expect(page.locator('#agent-panel')).toHaveAttribute('aria-labelledby','agent-tab-'+tab);
-      await expect(page.locator('#agent-panel')).not.toBeEmpty();
-    }
-    await context.setOffline(false);
-    await page.goto(origin+'/agent?tab=unknown');
-    await expect(page.getByRole('tab').first()).toHaveAttribute('aria-selected','true');
-    await expect(page.locator('#agent-panel')).not.toBeEmpty();
-    await page.goto(origin+'/agent#agent-api-recovery');
-    await expect(page.locator('#agent-api-recovery')).toBeVisible();
-  }finally{await context.close();}
 });
 
 test('phone suggestions load only on opening, use one small read, retry failures and update on reopening',async()=>{

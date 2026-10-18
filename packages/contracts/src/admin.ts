@@ -50,7 +50,7 @@ export const REPLACEABLE_SOURCE_KINDS = ["rss", "web_list", "json_list"] as cons
 export type ReplaceableSourceKind = typeof REPLACEABLE_SOURCE_KINDS[number];
 
 export interface AdminSourceUpdate {
-  patch: Partial<Pick<AdminSource, "name" | "enabled" | "interval_minutes" | "tier" | "participation_mode" | "signal_group_id" | "first_party" | "owner_entity_id" | "site_fulltext" | "syndicate_fulltext" | "tags">> & (
+  patch: Partial<Pick<AdminSource, "name" | "enabled" | "interval_minutes" | "tier" | "participation_mode" | "signal_group_id" | "first_party" | "owner_entity_id" | "site_fulltext" | "tags">> & (
     { kind?: never; config?: Record<string, unknown> } | { kind: ReplaceableSourceKind; config: Record<string, unknown> }
   );
   version: string;
@@ -95,7 +95,6 @@ export interface AdminSource {
   signal_group_id: string | null;
   interval_minutes: number;
   site_fulltext: boolean;
-  syndicate_fulltext: boolean;
   enabled: boolean;
   health: string;
   fail_count: number;
@@ -179,10 +178,6 @@ export interface AdminPublication {
   selected_ready_at: Timestamp | null;
   visible_after: Timestamp | null;
   body_mode: string;
-  syndicate: boolean;
-  indexable: boolean;
-  seo_indexed_at: Timestamp | null;
-  seo_excluded_at: Timestamp | null;
   story_id: number | null;
   fact_id: number | null;
   updated_at: Timestamp;
@@ -194,7 +189,7 @@ export interface AdminContentChain {
     id: string; source_id: string; url: string; identity_key: string; title: string; author: string | null; language: string | null;
     published_at: Timestamp | null; published_at_claim: string | null; discovered_at: Timestamp; timeline_at: Timestamp; backfill: boolean;
     body_status: string; revision: number; processing_state: string; processing_error: string | null; grouped_at: Timestamp | null; body_chars: number | null;
-    source_name: string; source_kind: string; tier: string; participation_mode: string; site_fulltext: boolean; syndicate_fulltext: boolean;
+    source_name: string; source_kind: string; tier: string; participation_mode: string; site_fulltext: boolean;
   };
   discoveries: Array<{ source_id: string; via: string; discovered_at: Timestamp }>;
   revisions: Array<{ revision: number; title: string; content_hash: string | null; created_at: Timestamp }>;
@@ -205,7 +200,6 @@ export interface AdminContentChain {
   }>;
   publication: AdminPublication | null;
   override: { fields: Record<string, unknown>; visibility: string | null; reason: string | null; version: number; updated_by: string; updated_at: Timestamp } | null;
-  ledger: Array<{ seq: number; op: string; visible_at: Timestamp; changed_at: Timestamp }>;
   membership: Array<{ fact_id: number; role: string; manual: boolean; fact_public_id: string; fact_title: string; story_id: number | null; story_public_id: string | null; story_title: string | null }>;
   decisions: Array<{ verdict: string; fact_id: number | null; story_id: number | null; receipt_id: number | null; candidates: unknown; created_at: Timestamp }>;
   history: AdminAuditEntry[];

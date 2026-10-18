@@ -13,7 +13,6 @@ import { computeHotRanking, snapshotHeat } from "@aihot/backend/events/hot";
 import { linkRelatedStories } from "@aihot/backend/events/consolidate";
 import { composeDueReports } from "@aihot/backend/reports/compose";
 import { dailyRetention } from "@aihot/backend/operations/retention";
-import { submitIndexNow } from "@aihot/backend/operations/indexnow";
 import { recoverStaleWork } from "@aihot/backend/operations/recover";
 
 const collecting = process.env.COLLECT_ENABLED === "true";
@@ -30,8 +29,6 @@ const ENGINE_SCHEDULES: Scheduled[] = [
   { name: "reports.compose", cron: "0,30 * * * *", missed: "once", run: () => composeDueReports() },
   // The deletions the privacy notice promises, once their retention periods are over.
   { name: "ops.retention", cron: "30 3 * * *", missed: "once", run: () => dailyRetention() },
-  // IndexNow for added, changed and removed discovery URLs (off unless INDEXNOW_SUBMIT_ENABLED).
-  { name: "seo.indexnow", cron: "50 5 * * *", missed: "once", run: () => submitIndexNow() },
   // Work a stopped process left half way becomes visible, and unknown paid requests get their one
   // automatic release.
   { name: "ops.recover", cron: "*/10 * * * *", run: () => recoverStaleWork() },

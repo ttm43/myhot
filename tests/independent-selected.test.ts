@@ -1,8 +1,8 @@
 // Failure cases: an independent source loses its card to an official report; its early arrival moves
 // the ordinary reading group; enabling the policy rejudges history or changes event membership;
 // another channel/name match inherits it; an unselected/pending/low-value item bypasses admission;
-// ordinary duplicates point to the independent item instead of their representative; outlets or
-// cursors lose one of the cards; withdrawal leaves a stale selected/sync entry.
+// ordinary duplicates point to the independent item instead of their representative; outlets lose one
+// of the cards; withdrawal leaves a stale selected entry.
 import { tag } from './setup.ts';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -12,6 +12,7 @@ import { installModules } from '@aihot/backend/modules';
 import { upsertMaterial } from '@aihot/backend/content/materials';
 import { publishArticle, republishSource } from '@aihot/backend/publication/publish';
 import { loadTimeline } from '@aihot/backend/publication/timeline';
+import { v1Items } from '@aihot/backend/publication/v1';
 import { setVisibility } from '@aihot/backend/admin/content';
 import { stopBoss } from '@aihot/backend/jobs/queue';
 import { buildApp } from '../apps/api/src/app.ts';
@@ -51,13 +52,12 @@ test('independent selected sources retain identity and their own cards across pu
   const lowValue = await add(own, 30_000, {adds:false});
   const before = await sql`SELECT article_id,fact_id,role,manual FROM fact_articles WHERE fact_id=${fact!.id} ORDER BY article_id`;
   const analysisCount = (await sql`SELECT count(*) AS n FROM analyses`)[0]!.n;
-  const snapshot = (await get('/api/v1/selected/snapshot?limit=1000')).json();
 
   installModules([{name:'test-presentation', independentSelectedSources:[own]}]);
   await republishSource(own);
   await publishArticle(official,{now});
   await publishArticle(other,{now});
-  const selected = (await get(`/api/v1/items?mode=selected&window=24h&q=${T}&limit=100`)).json().items;
+  const selected = (await v1Items({mode:'selected',window:'24h',by:'timeline',category:null,q:T,limit:100,cursor:null})).items;
   assert.deepEqual(new Set(selected.map((x: {id:string})=>x.id)),new Set([firstOwn,laterOwn,official]));
   assert.equal((await sql`SELECT count(*) AS n FROM analyses`)[0]!.n,analysisCount,'republication reuses the judgement');
   assert.deepEqual(await sql`SELECT article_id,fact_id,role,manual FROM fact_articles WHERE fact_id=${fact!.id} ORDER BY article_id`,before);
@@ -77,14 +77,12 @@ test('independent selected sources retain identity and their own cards across pu
   }
   assert.equal((await get(`/api/site/items/${other}`)).json().sameEvent.id,official);
   for (const id of [rejected,pending,lowValue]) assert.equal((await get(`/api/site/items/${id}`)).json().selected,false);
-  for (const url of ['/feed.xml','/api/v1/agent/latest?limit=30','/api/v1/selected/snapshot?limit=1000','/api/site/topics/openai']) {
+  for (const url of ['/api/site/topics/openai']) {
     const body=(await get(url)).body;
     for (const id of [firstOwn,laterOwn,official]) assert.ok(body.includes(id),`${url}: ${id}`);
   }
-  const changes=(await get(`/api/v1/selected/changes?cursor=${encodeURIComponent(snapshot.cursor)}`)).json().changes;
-  for (const id of [firstOwn,laterOwn]) assert.ok(changes.some((c: {op:string;item?:{id:string}})=>c.op==='upsert'&&c.item?.id===id));
   await setVisibility(laterOwn,{visibility:'withdrawn',reason:'test withdrawal',version:0},'test');
-  const remaining=(await get(`/api/v1/items?mode=selected&q=${T}&limit=100`)).json().items;
+  const remaining=(await v1Items({mode:'selected',window:'24h',by:'timeline',category:null,q:T,limit:100,cursor:null})).items;
   assert.deepEqual(new Set(remaining.map((x:{id:string})=>x.id)),new Set([firstOwn,official]));
   assert.equal((await get(`/api/site/items/${other}`)).json().sameEvent.id,official);
 });

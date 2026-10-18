@@ -10,10 +10,7 @@ import { registerOg } from "./routes/og.ts";
 import { registerAdminAuth } from "./routes/admin-auth.ts";
 import { registerAdmin } from "./routes/admin.ts";
 import { registerIngest } from "./routes/ingest.ts";
-import { registerV1, registerV1Fallbacks } from "./routes/v1.ts";
-import { registerAgent } from "./routes/agent.ts";
 import { registerMedia } from "./routes/media.ts";
-import { registerFeeds } from "./routes/feeds.ts";
 import { registerStatic } from "./routes/static.ts";
 import { registerMcp } from "./routes/mcp.ts";
 import { sendProblem } from "./http/respond.ts";
@@ -94,14 +91,10 @@ export async function buildApp(): Promise<FastifyInstance> {
   registerAdminAuth(app);
   registerAdmin(app);
   registerIngest(app);
-  registerV1(app);
-  registerAgent(app);
   registerMedia(app);
-  registerFeeds(app);
   registerStatic(app);
   registerMcp(app);
   for (const m of serverModules()) m.http?.(app);
-  registerV1Fallbacks(app);
 
   app.setNotFoundHandler((req, reply) => {
     if ((req.raw.url ?? "").startsWith("/api/")) {

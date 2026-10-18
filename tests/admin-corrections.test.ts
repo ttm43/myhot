@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { sql, closeDb } from "@aihot/backend/db";
 import { createSource, updateSource } from "@aihot/backend/admin/sources";
-import { overrideFields, rerun, setSeoIndexed, setVisibility } from "@aihot/backend/admin/content";
+import { overrideFields, rerun, setVisibility } from "@aihot/backend/admin/content";
 import { upsertMaterial } from "@aihot/backend/content/materials";
 import { publishArticle } from "@aihot/backend/publication/publish";
 import { getBoss, stopBoss } from "@aihot/backend/jobs/queue";
@@ -108,34 +108,6 @@ test("repeating a completed command returns its job without resetting newer proc
     assert.equal((await sql`SELECT 1 FROM grouping_overrides WHERE article_id = ${id}`).length, 1);
     assert.equal((await sql`SELECT 1 FROM audit_log WHERE request_id = ${key}`).length, 1);
   }
-});
-
-test("a rejected SEO correction leaves both the decision and public indexing unchanged", async () => {
-  const id = await article();
-  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, summary_zh, selected)
-            VALUES (${id}, 1, 'rule', 'pass', '可收录的正文摘要', false)`;
-  await publishArticle(id);
-  const [before] = await sql`SELECT seo_indexed_at, seo_excluded_at, indexable FROM publications WHERE article_id = ${id}`;
-  await sql.unsafe(`CREATE FUNCTION refuse_admin_seo_audit() RETURNS trigger LANGUAGE plpgsql AS $$
-    BEGIN IF NEW.actor = 'test-refuse-seo' THEN RAISE EXCEPTION 'audit unavailable'; END IF; RETURN NEW; END $$`);
-  await sql.unsafe("CREATE TRIGGER refuse_admin_seo_audit BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION refuse_admin_seo_audit()");
-  try {
-    await assert.rejects(setSeoIndexed(id, { indexed: true, reason: "人工收录" }, "test-refuse-seo"), /audit unavailable/);
-    const [after] = await sql`SELECT seo_indexed_at, seo_excluded_at, indexable FROM publications WHERE article_id = ${id}`;
-    assert.deepEqual(after, before);
-  } finally {
-    await sql.unsafe("DROP TRIGGER refuse_admin_seo_audit ON audit_log; DROP FUNCTION refuse_admin_seo_audit()");
-  }
-  await setSeoIndexed(id, { indexed: true, reason: "人工收录" }, "test");
-  const [indexed] = await sql`SELECT seo_indexed_at, seo_excluded_at, indexable FROM publications WHERE article_id = ${id}`;
-  assert.ok(indexed!.seo_indexed_at);
-  assert.equal(indexed!.seo_excluded_at, null);
-  assert.equal(indexed!.indexable, true);
-  await setSeoIndexed(id, { indexed: false, reason: "取消收录" }, "test");
-  const [excluded] = await sql`SELECT seo_indexed_at, seo_excluded_at, indexable FROM publications WHERE article_id = ${id}`;
-  assert.equal(excluded!.seo_indexed_at, null);
-  assert.ok(excluded!.seo_excluded_at);
-  assert.equal(excluded!.indexable, false);
 });
 
 test("bad admin input is a client error and never starts processing", async () => {

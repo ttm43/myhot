@@ -20,7 +20,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
 export const meta: Route.MetaFunction = ({ loaderData }) => [{ title: `${loaderData?.source.name ?? "信源"} · ${SITE.name} 后台` }];
 
-type Draft = Pick<AdminSource, "name" | "kind" | "interval_minutes" | "tier" | "participation_mode" | "signal_group_id" | "first_party" | "owner_entity_id" | "site_fulltext" | "syndicate_fulltext"> & { tags: string; config: string };
+type Draft = Pick<AdminSource, "name" | "kind" | "interval_minutes" | "tier" | "participation_mode" | "signal_group_id" | "first_party" | "owner_entity_id" | "site_fulltext"> & { tags: string; config: string };
 
 function draftOf(s: AdminSource): Draft {
   return {
@@ -33,7 +33,6 @@ function draftOf(s: AdminSource): Draft {
     first_party: s.first_party,
     owner_entity_id: s.owner_entity_id,
     site_fulltext: s.site_fulltext,
-    syndicate_fulltext: s.syndicate_fulltext,
     tags: s.tags.join(", "),
     config: JSON.stringify(s.config, null, 2),
   };
@@ -196,7 +195,6 @@ export default function SourceDetail({ loaderData }: Route.ComponentProps) {
               <div className="flex flex-col justify-end gap-2 text-[13px] text-ink-2">
                 {([
                   ["site_fulltext", "站内可展示全文"],
-                  ["syndicate_fulltext", "对外接口可带全文"],
                 ] as const).map(([k, label]) => (
                   <label key={k} className="inline-flex items-center gap-2">
                     <input type="checkbox" className="size-4 accent-[var(--accent)]" checked={draft[k]} onChange={(e) => setDraft({ ...draft, [k]: e.target.checked })} />

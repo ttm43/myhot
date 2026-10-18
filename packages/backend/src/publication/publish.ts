@@ -1,20 +1,16 @@
 // Publishing: derive the public projection of one article from its material, the latest judgement,
-// manual overrides and grouping, then record selected-set changes in the sync ledger.
+// manual overrides and grouping.
 // Rebuilding only re-reads stored results; it never calls a model.
-import { toPublicApiCategory } from "@aihot/contracts/taxonomy";
-import { SITE } from "@aihot/site";
 import { one, sql, type Tx } from "../db.ts";
-import { audit } from "../audit.ts";
-import { sha256, stableJson } from "../lib/ids.ts";
+import { stableJson } from "../lib/ids.ts";
 import { collapseWhitespace } from "../lib/text.ts";
 import type { XPostData } from "../content/materials.ts";
 import { originalPostCopy } from "../content/posts.ts";
-import { itemUrl } from "./links.ts";
 import { pickRepresentative, REPRESENTATIVE_COLUMNS, type RepresentativeIdentity } from "./representative.ts";
 import { enqueue, QUEUES, shutdownSignal } from "../jobs/queue.ts";
 import { emit } from "../modules.ts";
 import {
-  bodyModeOf, channelOf, displayTags, isIndexable, isPoolEligible, isSelectable, isIndependentSelectedSource, mayRedistribute, publicSourceName, type SourceFacts,
+  bodyModeOf, channelOf, displayTags, isPoolEligible, isSelectable, isIndependentSelectedSource, publicSourceName, type SourceFacts,
 } from "./rules.ts";
 import { foldableSelectionCondition, latestCompositeCondition, ownFactEvidenceCondition } from "./scope.ts";
 
@@ -72,7 +68,6 @@ interface PublicationRow {
   tags: string[];
   score: number | null;
   body_mode: string;
-  syndicate: boolean;
   url: string;
   channel: string;
   published_at: Date | null;
@@ -84,25 +79,6 @@ interface PublicationRow {
   fact_id: number | null;
   selected_ready_at: Date | null;
   visible_after: Date | null;
-  indexable: boolean;
-  seo_indexed_at: Date | null;
-  seo_excluded_at: Date | null;
-}
-
-export interface V1ItemPayload {
-  id: string;
-  title: string;
-  originalTitle: string | null;
-  summary: string | null;
-  source: { name: string };
-  links: { aihot: string; original: string };
-  publishedAt: string | null;
-  discoveredAt: string;
-  category: string | null;
-  score: number | null;
-  selected: boolean;
-  reason: string | null;
-  attribution: { name: string; url: string };
 }
 
 export interface PublishOptions {
@@ -118,7 +94,6 @@ export interface PublishResult {
   changeKind: "detail" | "content";
   selected: boolean;
   visibility: string;
-  ledger: "upsert" | "remove" | null;
   /** Something that was public is now shown less (withdrawn, out of the pool or selection, full text revoked). */
   reduced: boolean;
 }
@@ -131,49 +106,16 @@ function round1(n: number | null): number | null {
   return n === null || n === undefined ? null : Math.round(Number(n) * 10) / 10;
 }
 
-export function v1Payload(p: {
-  articleId: string; title: string; originalTitle: string | null; summary: string | null; sourceName: string; url: string;
-  publishedAt: Date | null; discoveredAt: Date; category: string | null; score: number | null; selected: boolean; reason: string | null;
-}): V1ItemPayload {
-  const aihot = itemUrl(p.articleId);
-  return {
-    id: p.articleId,
-    title: p.title,
-    originalTitle: p.originalTitle,
-    summary: p.summary,
-    source: { name: p.sourceName },
-    links: { aihot, original: p.url },
-    publishedAt: p.publishedAt ? p.publishedAt.toISOString() : null,
-    discoveredAt: p.discoveredAt.toISOString(),
-    category: toPublicApiCategory(p.category),
-    score: p.score === null ? null : Math.round(p.score),
-    selected: p.selected,
-    reason: p.selected ? p.reason : null,
-    attribution: { name: SITE.name, url: aihot },
-  };
-}
-
-/** Allocates the next ledger sequence under a transaction lock so sequence order equals commit order. */
-async function appendLedger(tx: Tx, articleId: string, op: "upsert" | "remove", payload: V1ItemPayload | null, now: Date): Promise<number> {
-  await tx`SELECT pg_advisory_xact_lock(hashtext('selected_ledger'))`;
-  const { next } = one(await tx<{ next: number }[]>`SELECT coalesce(max(seq), 0) + 1 AS next FROM selected_ledger`);
-  await tx`INSERT INTO selected_ledger (seq, article_id, op, changed_at, visible_at, payload)
-           VALUES (${next}, ${articleId}, ${op}, ${now}, ${now}, ${payload ? tx.json(payload as never) : null})`;
-  return next;
-}
-
 /**
  * Ordinary reports share one selected seat per fact: among the fact's selected public reports,
- * the representative (first-party, full text, higher score, earliest) takes it, and a
- * change of representative removes the old one and adds the new one.
+ * the representative (first-party, full text, higher score, earliest) takes it.
  * The website folds the same reports into reading groups instead. An article outside any fact keeps
- * its own seat, as does each selected article from an independent source. Returns the ledger change
- * of `self` when this settling made one. Fact membership is unaffected.
+ * its own seat, as does each selected article from an independent source. Fact membership is unaffected.
  */
-async function settleSeats(tx: Tx, factId: number | null, self: string | null, now: Date): Promise<"upsert" | "remove" | null> {
+async function settleSeats(tx: Tx, factId: number | null, self: string | null): Promise<void> {
   if (factId === null) {
     if (self) await tx`UPDATE publications SET seat = true WHERE article_id = ${self} AND NOT seat`;
-    return null;
+    return;
   }
   const members = await tx<Array<Pick<PublicationRow, "article_id" | "score" | "source_id"> & RepresentativeIdentity & { body_mode: "full" | "summary"; timeline_at: Date; seat: boolean; holds: boolean }>>`
     SELECT p.article_id, p.source_id, p.body_mode, p.score, p.timeline_at, p.seat, ${REPRESENTATIVE_COLUMNS},
@@ -181,57 +123,11 @@ async function settleSeats(tx: Tx, factId: number | null, self: string | null, n
     FROM publications p JOIN sources s ON s.id = p.source_id JOIN facts f ON f.id = p.fact_id WHERE p.fact_id = ${factId}`;
   const candidates = members.filter((m) => m.holds && !isIndependentSelectedSource(m.source_id)).map((m) => ({ ...m, score: m.score === null ? null : Number(m.score) }));
   const rep = candidates.length ? pickRepresentative(candidates) : null;
-  let own: "upsert" | "remove" | null = null;
   for (const m of members) {
     const seat = !m.holds || isIndependentSelectedSource(m.source_id) || m.article_id === rep?.article_id;
     if (seat === m.seat) continue;
     await tx`UPDATE publications SET seat = ${seat} WHERE article_id = ${m.article_id}`;
-    const change = await syncLedger(tx, m.article_id, now);
-    if (m.article_id === self) own = change;
   }
-  return own;
-}
-
-/** Brings one article's place in the selected sync ledger in line with its publication. */
-async function syncLedger(tx: Tx, articleId: string, now: Date): Promise<"upsert" | "remove" | null> {
-  const [p] = await tx<Array<{ selected: boolean; visibility: string; seat: boolean; title: string; original_title: string | null; summary: string | null;
-    url: string; published_at: Date | null; discovered_at: Date; category: string | null; score: string | number | null; reason: string | null;
-    source_name: string }>>`
-    SELECT p.selected, p.visibility, p.seat, p.title, p.original_title, p.summary, p.url, p.published_at, p.discovered_at, p.category,
-           p.score, p.reason, s.name AS source_name
-    FROM publications p JOIN sources s ON s.id = p.source_id WHERE p.article_id = ${articleId}`;
-  if (!p) return null;
-  const [state] = await tx<{ in_set: boolean; payload_hash: string | null }[]>`SELECT in_set, payload_hash FROM selected_state WHERE article_id = ${articleId}`;
-  if (p.selected && p.visibility === "public" && p.seat) {
-    const payload = v1Payload({
-      articleId, title: p.title, originalTitle: p.original_title, summary: p.summary, sourceName: p.source_name, url: p.url,
-      publishedAt: p.published_at, discoveredAt: p.discovered_at, category: p.category, score: p.score === null ? null : Number(p.score), selected: true, reason: p.reason,
-    });
-    const payloadHash = sha256(stableJson(payload));
-    if (state?.in_set && state.payload_hash === payloadHash) return null;
-    const seq = await appendLedger(tx, articleId, "upsert", payload, now);
-    await tx`INSERT INTO selected_state (article_id, in_set, payload_hash, last_seq) VALUES (${articleId}, true, ${payloadHash}, ${seq})
-             ON CONFLICT (article_id) DO UPDATE SET in_set = true, payload_hash = EXCLUDED.payload_hash, last_seq = EXCLUDED.last_seq`;
-    return "upsert";
-  }
-  if (!state?.in_set) return null;
-  const seq = await appendLedger(tx, articleId, "remove", null, now);
-  await tx`UPDATE selected_state SET in_set = false, payload_hash = NULL, last_seq = ${seq} WHERE article_id = ${articleId}`;
-  return "remove";
-}
-
-/** Refresh a saved sync payload after a public-format change, without rerunning editorial decisions. */
-export async function refreshSelectedPayload(articleId: string, actor: string, reason: string): Promise<"upsert" | "remove" | null> {
-  return sql.begin(async (tx) => {
-    await tx`SELECT 1 FROM articles WHERE id = ${articleId} FOR UPDATE`;
-    const [before] = await tx`SELECT in_set, payload_hash, last_seq FROM selected_state WHERE article_id = ${articleId}`;
-    const op = await syncLedger(tx, articleId, new Date());
-    if (op) {
-      const [after] = await tx`SELECT in_set, payload_hash, last_seq FROM selected_state WHERE article_id = ${articleId}`;
-      await audit(actor, "content.refresh-selected-payload", `content:${articleId}`, reason, before, after, { db: tx });
-    }
-    return op;
-  });
 }
 
 export async function publishArticle(articleId: string, options: PublishOptions = {}): Promise<PublishResult | null> {
@@ -259,7 +155,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     article.grouping_status = "complete";
   }
   const [source] = await tx<SourceFacts[]>`
-    SELECT id, name, kind, tier, participation_mode, first_party, site_fulltext, syndicate_fulltext FROM sources WHERE id = ${article.source_id}`;
+    SELECT id, name, kind, tier, participation_mode, first_party, site_fulltext FROM sources WHERE id = ${article.source_id}`;
   if (!source) return null;
   const [analysis] = await tx<AnalysisRow[]>`
     SELECT id, relevance, category, tags, subjects, title_zh, summary_zh, reason_zh, score, selected
@@ -310,7 +206,6 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   const channel = channelOf(source.kind, hasXPost);
   const hasBody = !!article.body_text || !!article.x_post?.text || !!article.x_post?.media?.length || !!article.x_post?.quoted?.text;
   const bodyMode = bodyModeOf(source, article.body_status, hasBody);
-  const syndicate = mayRedistribute(source, bodyMode);
   const originalTitle = isChineseTitle && title === collapseWhitespace(article.title) ? null : collapseWhitespace(article.title);
 
   // Waiting candidates are readable in the pool, with no selected seat, sync entry or push.
@@ -318,9 +213,6 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   const selectedReadyAt = previous?.selected_ready_at ?? (selectionCandidate ? options.releasedAt ?? now : null);
   const visibleAfter = selected ? (previous?.selected && previous.visible_after ? previous.visible_after : options.releasedAt ?? now) : null;
 
-  const indexable = isIndexable({
-    visibility, sourceMode: source.participation_mode, hasSummary: !!summary, selected, seoIndexedAt: previous?.seo_indexed_at ?? null, seoExcludedAt: previous?.seo_excluded_at ?? null,
-  });
   const searchText = collapseWhitespace(
     [title, originalTitle, summary, publicSourceName(source.name), ...displayTags(tags), ...(analysis?.subjects ?? [])].filter(Boolean).join(" "),
   ).toLowerCase();
@@ -340,14 +232,14 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     source_id: source.id, first_party: source.tier === "T1",
     visibility, eligible, selected, selection_candidate: selectionCandidate, title: title ?? collapseWhitespace(article.title), original_title: originalTitle, summary, reason,
     category, tags, score: round1(score), body_mode: bodyMode, story_id: membership?.story_id ?? null, fact_id: membership?.fact_id ?? null,
-    indexable, url: article.url, channel, syndicate, published_at: article.published_at, discovered_at: article.discovered_at,
+    url: article.url, channel, published_at: article.published_at, discovered_at: article.discovered_at,
     timeline_at: article.timeline_at, backfill: article.backfill, sort_at: sortAt, visible_after: visibleAfter,
   };
   const before = previous ? { ...previous, tags: [...previous.tags].sort(), score: previous.score === null ? null : Number(previous.score) } : null;
   const after = { ...next, tags: [...next.tags].sort() };
   const changedFields = (Object.keys(after) as Array<keyof typeof after>).filter((key) => !before || stableJson(after[key]) !== stableJson(before[key]));
   const changed = changedFields.length > 0;
-  const admissionFields = new Set<keyof typeof after>(["selected", "reason", "indexable", "story_id", "fact_id", "sort_at", "visible_after"]);
+  const admissionFields = new Set<keyof typeof after>(["selected", "reason", "story_id", "fact_id", "sort_at", "visible_after"]);
   const admission = previous && !previous.selected && selected
     && (previous.story_id === null || previous.story_id === next.story_id)
     && (previous.fact_id === null || previous.fact_id === next.fact_id)
@@ -362,18 +254,18 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   const firstIdentity = previous && !previous.selected && previous.fact_id === null && previous.story_id === null
     && previous.visibility === "public" && visibility === "public" && eligible && next.story_id !== null
     && changedFields.every((key) => admissionFields.has(key));
-  const initial = (admission || firstAnalysis || firstIdentity) && !(await tx`SELECT 1 FROM selected_state WHERE article_id = ${articleId}`).length;
+  const initial = admission || firstAnalysis || firstIdentity;
   const changeKind = initial ? "detail" : "content";
   const revision = previous ? previous.revision + (changed ? 1 : 0) : 1;
 
   await tx`
     INSERT INTO publications (article_id, analysis_id, revision, visibility, eligible, selected, selection_candidate, title, original_title, summary,
       reason, category, tags, score, source_id, channel, first_party, url, published_at, discovered_at, timeline_at, backfill,
-      selected_ready_at, visible_after, body_mode, syndicate, indexable, story_id, fact_id, search_text, sort_at, updated_at)
+      selected_ready_at, visible_after, body_mode, story_id, fact_id, search_text, sort_at, updated_at)
     VALUES (${articleId}, ${analysis?.id ?? null}, ${revision}, ${visibility}, ${eligible}, ${selected}, ${selectionCandidate}, ${next.title},
       ${originalTitle}, ${summary}, ${reason}, ${category}, ${tags}, ${next.score}, ${source.id}, ${channel}, ${source.tier === "T1"},
       ${article.url}, ${article.published_at}, ${article.discovered_at}, ${article.timeline_at}, ${article.backfill},
-      ${selectedReadyAt}, ${visibleAfter}, ${bodyMode}, ${syndicate}, ${indexable}, ${next.story_id}, ${next.fact_id}, ${searchText}, ${sortAt}, now())
+      ${selectedReadyAt}, ${visibleAfter}, ${bodyMode}, ${next.story_id}, ${next.fact_id}, ${searchText}, ${sortAt}, now())
     ON CONFLICT (article_id) DO UPDATE SET
       analysis_id = EXCLUDED.analysis_id, revision = EXCLUDED.revision, visibility = EXCLUDED.visibility,
       eligible = EXCLUDED.eligible, selected = EXCLUDED.selected, selection_candidate = EXCLUDED.selection_candidate, title = EXCLUDED.title, original_title = EXCLUDED.original_title,
@@ -381,24 +273,24 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
       score = EXCLUDED.score, source_id = EXCLUDED.source_id, channel = EXCLUDED.channel, first_party = EXCLUDED.first_party,
       url = EXCLUDED.url, published_at = EXCLUDED.published_at, discovered_at = EXCLUDED.discovered_at,
       timeline_at = EXCLUDED.timeline_at, backfill = EXCLUDED.backfill, selected_ready_at = EXCLUDED.selected_ready_at,
-      visible_after = EXCLUDED.visible_after, body_mode = EXCLUDED.body_mode, syndicate = EXCLUDED.syndicate,
-      indexable = EXCLUDED.indexable, story_id = EXCLUDED.story_id, fact_id = EXCLUDED.fact_id,
+      visible_after = EXCLUDED.visible_after, body_mode = EXCLUDED.body_mode,
+      story_id = EXCLUDED.story_id, fact_id = EXCLUDED.fact_id,
       search_text = EXCLUDED.search_text, sort_at = EXCLUDED.sort_at, updated_at = now()
     WHERE (publications.analysis_id, publications.revision, publications.visibility, publications.eligible,
         publications.selected, publications.selection_candidate, publications.title, publications.original_title, publications.summary,
         publications.reason, publications.category, publications.tags, publications.score,
         publications.source_id, publications.channel, publications.first_party, publications.url,
         publications.published_at, publications.discovered_at, publications.timeline_at, publications.backfill,
-        publications.selected_ready_at, publications.visible_after, publications.body_mode, publications.syndicate,
-        publications.indexable, publications.story_id, publications.fact_id, publications.search_text,
+        publications.selected_ready_at, publications.visible_after, publications.body_mode,
+        publications.story_id, publications.fact_id, publications.search_text,
         publications.sort_at)
       IS DISTINCT FROM (EXCLUDED.analysis_id, EXCLUDED.revision, EXCLUDED.visibility, EXCLUDED.eligible,
         EXCLUDED.selected, EXCLUDED.selection_candidate, EXCLUDED.title, EXCLUDED.original_title, EXCLUDED.summary,
         EXCLUDED.reason, EXCLUDED.category, EXCLUDED.tags, EXCLUDED.score,
         EXCLUDED.source_id, EXCLUDED.channel, EXCLUDED.first_party, EXCLUDED.url,
         EXCLUDED.published_at, EXCLUDED.discovered_at, EXCLUDED.timeline_at, EXCLUDED.backfill,
-        EXCLUDED.selected_ready_at, EXCLUDED.visible_after, EXCLUDED.body_mode, EXCLUDED.syndicate,
-        EXCLUDED.indexable, EXCLUDED.story_id, EXCLUDED.fact_id, EXCLUDED.search_text,
+        EXCLUDED.selected_ready_at, EXCLUDED.visible_after, EXCLUDED.body_mode,
+        EXCLUDED.story_id, EXCLUDED.fact_id, EXCLUDED.search_text,
         EXCLUDED.sort_at)`;
 
   // The pool search row follows eligibility; its body part only covers full text the site may show.
@@ -417,10 +309,9 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     await enqueue(QUEUES.prepareMedia, { articleId }, { singletonKey: `media:${articleId}` }, tx);
   }
 
-  // Seats of the fact this article reports (and of the one it left), then its place in the sync ledger.
-  let ledger = await settleSeats(tx, membership?.fact_id ?? null, articleId, now);
-  if (previous?.fact_id && previous.fact_id !== membership?.fact_id) await settleSeats(tx, previous.fact_id, null, now);
-  ledger = (await syncLedger(tx, articleId, now)) ?? ledger;
+  // Seats of the fact this article reports (and of the one it left).
+  await settleSeats(tx, membership?.fact_id ?? null, articleId);
+  if (previous?.fact_id && previous.fact_id !== membership?.fact_id) await settleSeats(tx, previous.fact_id, null);
 
   const wasPublic = !!previous && previous.visibility !== "withdrawn" && previous.eligible;
   const reduced =
@@ -429,17 +320,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
       (previous!.visibility === "public" && visibility !== "public") ||
       (previous!.selected && !selected) ||
       (previous!.body_mode === "full" && bodyMode !== "full"));
-  return { articleId, changed, changeKind, selected, visibility, ledger, reduced };
-}
-
-/**
- * An editor's search-index decision: marking indexes the page; unmarking excludes it, so a
- * selected page is not indexed again automatically. The decision and projection commit with the audit.
- */
-export async function setSeoDecision(tx: Tx, articleId: string, indexed: boolean): Promise<PublishResult | null> {
-  await tx`UPDATE publications SET seo_indexed_at = CASE WHEN ${indexed} THEN coalesce(seo_indexed_at, now()) ELSE NULL END,
-              seo_excluded_at = CASE WHEN ${indexed} THEN NULL ELSE now() END WHERE article_id = ${articleId}`;
-  return publishArticleTx(tx, articleId);
+  return { articleId, changed, changeKind, selected, visibility, reduced };
 }
 
 /**

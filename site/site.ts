@@ -17,7 +17,7 @@ export const EDITION_WHEN = {
 };
 
 export const SITE = {
-  /** 站名：导航、页面标题、分享图、RSS、MCP、后台都用它。 */
+  /** 站名：导航、页面标题、分享图、MCP、后台都用它。 */
   name: "MyHOT",
   /**
    * 行业词：拼进默认说法里，比如“AI 日报”“AI 动态”。
@@ -28,10 +28,8 @@ export const SITE = {
   homeTitle: "MyHOT — AI 行业动态 · 每日精选与日报",
   /** 主题目录页（/topics）的标题。 */
   topicsTitle: "AI 主题：公司与模型、技术方向、内容形态的最新动态",
-  /** 一句话介绍：搜索引擎、分享卡片、RSS、llms.txt 会用。 */
+  /** 一句话介绍：搜索引擎、分享卡片、PWA 清单会用。 */
   description: `从一批 AI 信源里挑出值得看的动态，把同一件事的多篇报道归到一起，${EDITION_WHEN.daily} 出一份日报。`,
-  /** llms.txt 里一句话介绍下面的一段详细介绍（选填）。 */
-  llmsIntro: null as string | null,
   /** 一行小字：分享图、海报下方。 */
   tagline: "值得关注的 AI 动态",
   /** 搜索引擎读到的关键词（首页结构化数据）。 */
@@ -50,12 +48,10 @@ export const SITE = {
    */
   mcpPrefix: "myhot",
   /**
-   * 公开接口（MCP、OpenAPI、llms.txt）的版本号，只升不降。
+   * MCP 接口的版本号，只升不降。
    * 改了接口里已有的字段或含义时升主版本，并在部署说明里写清。
    */
-  interfaceVersion: "4.0.0",
-  /** 对外联系邮箱（选填）：llms.txt 和给 Agent 的使用说明里会写。 */
-  contactEmail: null as string | null,
+  interfaceVersion: "5.0.0",
   /** 中国大陆网站的 ICP 备案号（选填），填了就显示在侧栏底部和“我的”页底部，并链接到工信部备案系统。 */
   icp: null as string | null,
   /** 源码的 GitHub 仓库地址（选填），填了就在侧栏底部和“我的”页底部显示“GitHub 开源”。 */
@@ -70,27 +66,8 @@ export const SITE = {
   crawlerName: "MyHOTBot/1.0",
 } as const;
 
-/** 使用规则（公开接口的响应头和说明会引用它）与 X 帖子的全文规则。 */
+/** X 帖子的全文规则。 */
 export const POLICY = {
-  terms: {
-    /** 页面名：导航、页脚、页面标题都用它。 */
-    name: "使用规则",
-    description: "本站网页、RSS、公开 API 与 MCP 的使用规则。",
-    /** llms.txt 里对这一页的一句说明（选填）。 */
-    covers: null as string | null,
-    /** Agent 接入页的 RSS、API 两栏各自提醒的使用规则（选填）。 */
-    notes: null as null | { rss: string; api: string },
-    /**
-     * 讲清哪些用途要先取得授权的话（选填）：llms 接在 llms.txt“使用说明”的版权说明后面，
-     * agent 写在给 Agent 的使用说明“使用规则”一节的开头。
-     */
-    license: null as null | { llms: string; agent: string },
-    /**
-     * 公开 API、RSS 和 OpenAPI 文件声明使用规则的响应头（选填）：原样附上，再加一个指向这一页的
-     * Link 头（rel="terms-of-service"）；浏览器里的调用方也读得到它们。
-     */
-    headers: null as null | Record<string, string>,
-  },
   /**
    * X 帖子本身的文字和图片算不算全文：算的话，只在这篇允许站内全文时显示（信源允许全文、正文也取到了）；
    * 不算的话总是显示，和标题、摘要一样。
@@ -109,9 +86,9 @@ export const NAV = {
 
 /** 条目卡片和详情页上的几处说法和显示。 */
 export const ITEM_COPY = {
-  /** 模型写的那句理由叫什么：卡片、详情页、Markdown 导出、给 Agent 的回答和群推送都用它。 */
+  /** 模型写的那句理由叫什么：卡片、详情页、Markdown 导出和 MCP 的回答都用它。 */
   reasonLabel: "推荐理由",
-  /** 读者在网页和分享图上看不看得到 AI 评分。只管显示：公开 API 和 MCP 的数据照样带 score，后台照常显示。 */
+  /** 读者在网页和分享图上看不看得到 AI 评分。只管显示：MCP 的数据照样带 score，后台照常显示。 */
   showScore: true,
 };
 
@@ -121,19 +98,13 @@ export const ADMIN = {
   budgetNote: null as string | null,
 };
 
-/** Agent 接入页的示例。 */
-export const AGENT = {
-  /** MCP 工具表里“搜索”一行：能搜什么、可以怎么问。 */
-  search: { scope: "按公司、产品、人物或话题搜最近 7 天", ask: "这家公司最近发了什么？" },
-};
-
 /** 日报、周报、月报版面上的说法。 */
 export const REPORTS = {
   /** 报头下面的出版者一行。 */
   imprint: SITE.name.toUpperCase(),
   /** 报头旁边的一个词。 */
   motto: SITE.subject as string,
-  /** 每种报告页面的描述（搜索结果、分享卡片），不带句号；llms.txt 介绍周报、月报时也用它。 */
+  /** 每种报告页面的描述（搜索结果、分享卡片），不带句号。 */
   descriptions: {
     daily: `${SITE.name} ${subjectAfter(`${EDITION_WHEN.daily}（北京时间）发布的`, "行业精编日报")}`,
     weekly: subjectAfter("每周", "行业综合回顾"),
@@ -175,15 +146,6 @@ export const CARDS: Record<string, { kicker: string; title: string; subtitle: st
   daily: { kicker: withSubject("日报"), title: subjectAfter(`每天 ${spokenTime(EDITION_TIMES.daily)}，一份读得完的`, "日报"), subtitle: `${subjectAfter("前一天值得关注的", "动态")}。` },
   weekly: { kicker: withSubject("周报"), title: `一周${REPORTS.entry.noun}，一次看清`, subtitle: "本周的主线、重要发布与值得回看的讨论。" },
   monthly: { kicker: withSubject("月报"), title: "一个月的变化", subtitle: "月度主线与关键事件回顾。" },
-  agent: { kicker: "Agent 接入", title: `把 ${SITE.name} 接进你的 Agent`, subtitle: "MCP、RSS、API 三种方式，匿名只读，无需 API Key。" },
-};
-
-/** 公开接口的访问约定里随部署而变的几处：给 Agent 的使用说明、llms.txt 会写。 */
-export const ACCESS = {
-  /** 同一 IP 每分钟大约能请求多少次，超过会收到 429 并带 Retry-After（选填，由部署的反向代理限流）；null 表示不限流，说明里不提。 */
-  ratePerMinute: null as number | null,
-  /** 请写程序同步数据的人报上的 User-Agent（选填），写在 JSON 接口的说明后面。 */
-  userAgent: null as string | null,
 };
 
 /** 这个部署自己的几处安排（选填）。 */
@@ -215,20 +177,12 @@ export const DEPLOYMENT = {
   selectionGold: null as null | { file: string; sample: number; split: string; sweep: [number, number] },
 };
 
-/** RSS 订阅源的说明里随站点而变的说法。 */
-export const FEED_COPY = {
-  /** “全部动态”源的说明里，除了未审内容、低相关条目和已合并重复条目，还写明不含的内容（选填）。 */
-  allLeavesOut: [] as string[],
-};
-
 /**
- * 公开接口（API、RSS、MCP）里和网页不同的类别（选填）。上线后不要改：接口参数和订阅地址里有类别的 key。
- * merge：并进另一类发布的类别，key 是行业包里的类别，值是它并进的类别（公开接口比网页少一类时用）；
- * feedLabels：分类 RSS 标题里的名字，替换行业包里的 feedLabel（并进了别的类别时，名字常常也要跟着改）。
+ * MCP 里和网页不同的类别（选填）。上线后不要改：工具参数里有类别的 key。
+ * merge：并进另一类发布的类别，key 是行业包里的类别，值是它并进的类别（MCP 比网页少一类时用）。
  */
 export const PUBLIC_CATEGORIES = {
   merge: {},
-  feedLabels: {},
 } as const;
 
 /** “AI 日报”这类说法：行业词和名词之间，英文词加空格，中文词不加。 */

@@ -15,8 +15,6 @@ export function kindFromPath(pathname: string): ReportKind {
   return "daily";
 }
 
-/** The kind's RSS feed, announced in the page head so a reader given the page finds it. */
-export const feedLink = (kind: ReportKind) => ({ tagName: "link", rel: "alternate", type: "application/rss+xml", title: `${SITE.name} ${KIND_LABEL[kind]}`, href: `/feed/${kind}.xml` }) as const;
 
 export function reportPath(kind: ReportKind, key: string): string {
   return `${KIND_PATH[kind]}/${key}`;

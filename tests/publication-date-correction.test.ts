@@ -59,8 +59,6 @@ test('verified old dates correct publication and its existing date-based sort wi
   for(const date of Object.values(a!))assert.equal(date.toISOString(),corrected);
   const [p]=await sql`SELECT published_at,timeline_at,sort_at FROM publications WHERE article_id=${id}`;
   for(const date of Object.values(p!))assert.equal(date.toISOString(),corrected);
-  const [ledger]=await sql`SELECT payload FROM selected_ledger WHERE article_id=${id} ORDER BY seq DESC LIMIT 1`;
-  assert.equal(ledger!.payload.publishedAt,corrected);
   assert.equal((await sql`SELECT 1 FROM settings WHERE key=${`date-hook:${id}`}`).length,1);
 });
 
@@ -99,7 +97,7 @@ test('malformed, recent or future dates and stale material metadata are refused'
 
 test('a failed audit or a changed publication decision rolls back the entire correction',async()=>{
   const id=await fixture();const plan=(await previewPublicationDateCorrection(id,corrected))!;
-  const snapshot=async()=>({a:await sql`SELECT * FROM articles WHERE id=${id}`,p:await sql`SELECT * FROM publications WHERE article_id=${id}`,ledger:await sql`SELECT * FROM selected_ledger WHERE article_id=${id}`});
+  const snapshot=async()=>({a:await sql`SELECT * FROM articles WHERE id=${id}`,p:await sql`SELECT * FROM publications WHERE article_id=${id}`});
   const before=await snapshot();
   await sql.unsafe(`CREATE FUNCTION refuse_date_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.actor='refuse-date' THEN RAISE EXCEPTION 'audit unavailable'; END IF; RETURN NEW; END $$`);
   await sql.unsafe('CREATE TRIGGER refuse_date_audit BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION refuse_date_audit()');

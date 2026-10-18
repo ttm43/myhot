@@ -57,11 +57,11 @@ test("packages never import the apps, and nothing below the admin imports it", (
   assert.deepEqual(found, [], "admin/ is the top layer: move what others need to the folder that owns it");
 });
 
-// Public routes read through the public read faces; the rest are the reader's own writes (feedback) and
-// the image proxy. Admin and ingest routes may call any backend use case.
+// Public routes read through the public read faces; the rest is the image proxy. Admin and ingest routes
+// may call any backend use case.
 const PRIVATE_ROUTES = new Set(["admin.ts", "admin-auth.ts", "ingest.ts"]);
 const PUBLIC_READS = [
-  /^publication\//, /^site\//, /^lib\//, /^config\.ts$/, /^operations\/feedback\.ts$/, /^media\//, /^jobs\/queue\.ts$/, /^modules\.ts$/,
+  /^publication\//, /^lib\//, /^config\.ts$/, /^media\//, /^jobs\/queue\.ts$/, /^modules\.ts$/,
 ];
 
 test("public routes read content only through the public read layer", () => {
@@ -73,10 +73,10 @@ test("public routes read content only through the public read layer", () => {
   assert.deepEqual(found, [], "a public route imports backend internals; add or reuse a function in publication/");
 });
 
-// Tables whose rules must not be rewritten elsewhere: the public projection and its sync ledger, paid
-// receipts, grouping, and the audit trail. Other code reads them freely.
+// Tables whose rules must not be rewritten elsewhere: the public projection, paid receipts, grouping,
+// and the audit trail. Other code reads them freely.
 const OWNERS: Record<string, string> = {
-  publications: "publication/", selected_ledger: "publication/", selected_state: "publication/", pool_search: "publication/",
+  publications: "publication/", pool_search: "publication/",
   receipts: "providers/receipts.ts", receipt_attempts: "providers/receipts.ts",
   facts: "events/", fact_articles: "events/", stories: "events/", story_signals: "events/", story_aliases: "events/", story_links: "events/",
   story_digests: "events/", grouping_decisions: "events/", grouping_overrides: "events/",

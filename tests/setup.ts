@@ -1,7 +1,7 @@
 // Shared setup for the invariant tests (node --test tests/). They write rows, so they refuse to run
 // unless DATABASE_URL names a throwaway database ending in _test or _ci.
 // Secrets are test values set here, never real credentials; paid providers are pointed at local stubs
-// by the tests that need them, and the push valves stay off. npm test gives each database test file its own copy of
+// by the tests that need them. npm test gives each database test file its own copy of
 // the database (databases.ts).
 import { createHash } from "node:crypto";
 import http from "node:http";
@@ -16,7 +16,6 @@ if (!/_(test|ci)$/.test(database)) {
 process.env.AIHOT_CREDENTIALS_DIR = "/nonexistent-test-credentials";
 process.env.SESSION_SECRET ??= "test-session-secret-0123456789";
 process.env.IMG_PROXY_SIGN_SECRET ??= "test-img-secret-0123456789";
-process.env.INDEXNOW_SUBMIT_ENABLED = "false";
 process.env.LOG_LEVEL ??= "error";
 // Paid providers are local stubs in these tests: calls and collection may run (the valves default off).
 process.env.MODEL_CALLS_ENABLED ??= "true";

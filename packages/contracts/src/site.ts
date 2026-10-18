@@ -146,7 +146,6 @@ export interface SiteItemDetail extends ItemSummary {
   relatedStories: StoryRef[];
   /** The topics the report belongs to. */
   topics: TopicLink[];
-  indexable: boolean;
   markdownAvailable: boolean;
   group: GroupInfo | null;
   hasTranslation: boolean;

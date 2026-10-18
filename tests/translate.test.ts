@@ -57,8 +57,8 @@ async function detail(id: string) {
 }
 
 before(async () => {
-  await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, site_fulltext, syndicate_fulltext, next_fetch_at)
-            VALUES (${SOURCE}, 'Test translate', 'rss', 'T1', 'editorial', true, false, '2100-01-01')`;
+  await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, site_fulltext, next_fetch_at)
+            VALUES (${SOURCE}, 'Test translate', 'rss', 'T1', 'editorial', true, '2100-01-01')`;
 });
 after(async () => {
   await app.close();
