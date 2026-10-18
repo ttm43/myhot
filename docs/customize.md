@@ -51,14 +51,12 @@
 
 | 字段 | 含义 |
 |---|---|
-| `kind` | `rss`、`web_list`（网页列表，配选择器）、`json_list`（JSON 接口）、`x_search`（X 账号，需要 SocialData）、`mp_account`（公众号，需要极致了）、`external`（外部推送） |
+| `kind` | `rss`、`web_list`（网页列表，配选择器）、`json_list`（JSON 接口）、`external`（外部推送） |
 | `config` | 每种信源的配置，见 [信源](sources.md) |
 | `tier` | 信源分级：`T1` 官方一手、`T1_5` 官方账号与准官方、`T2` 媒体与个人、`EXCLUDE_MP` 不参与精选。不同分级的入选门槛不同。`T1` 就是“一手”，不用另外标 |
 | `owner_entity_id` | 可选，这个信源属于哪家公司（`ENTITIES` 的 id）。`T1_5` 的官方账号要当代表报道，要填它（见 [信源](sources.md)） |
 | `participation_mode` | `editorial` 进精选和全部动态；`hot_signal` 只收下存着，不分析、不归组、不公开；`isolated` 不进任何公开页面 |
 | `site_fulltext` | 站内能不能展示全文。**默认关**：只展示摘要和原文链接。只有来源明确允许时才打开 |
-
-中国大陆的很多行业，一手信息在公众号上。公众号信源需要极致了（Dajiala）的 key，按请求计费，有预算熔断。
 
 ## 4. 精选标准：`industry/prompts/`
 

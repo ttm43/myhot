@@ -17,7 +17,6 @@ import { assertSupportedConfig, UnsupportedConfig } from "../sources/config-keys
 import { admitListing, filterPublicationWindow } from "../sources/filters.ts";
 import type { SourceRow } from "../sources/types.ts";
 import { fetchDetail, fetchWebList } from "../sources/web-list.ts";
-import { fetchXSearch } from "../sources/x.ts";
 
 
 export interface SourceListFilters {
@@ -61,7 +60,7 @@ export async function sourceDetail(id: string): Promise<BeforeJson<AdminSourceDe
   const [source] = await sql<BeforeJson<AdminSource>[]>`SELECT *, (tier = 'T1') AS first_party FROM sources WHERE id = ${id}`;
   if (!source) return null;
   const [runs, items, [stats], history, [republish]] = await Promise.all([
-    sql<BeforeJson<AdminSourceDetail["runs"][number]>[]>`SELECT id, started_at, finished_at, status, found_count, new_count, error, detail FROM fetch_runs WHERE source_id = ${id} ORDER BY started_at DESC LIMIT 30`,
+    sql<BeforeJson<AdminSourceDetail["runs"][number]>[]>`SELECT id, started_at, finished_at, status, found_count, new_count, error FROM fetch_runs WHERE source_id = ${id} ORDER BY started_at DESC LIMIT 30`,
     sql<BeforeJson<AdminSourceDetail["items"][number]>[]>`
     SELECT a.id, a.title, a.url, a.discovered_at, a.published_at, a.processing_state, p.selected, p.visibility, p.title AS title_zh
     FROM articles a LEFT JOIN publications p ON p.article_id = a.id WHERE a.source_id = ${id} ORDER BY a.discovered_at DESC LIMIT 30`,
@@ -89,7 +88,6 @@ export async function previewSource(draft: Pick<SourceRow, "id" | "kind" | "conf
   if (source.kind === "rss") candidates = (await fetchRss(source, { force: true })).candidates;
   else if (source.kind === "web_list") candidates = await fetchWebList(source);
   else if (source.kind === "json_list") candidates = await fetchJsonList(source);
-  else if (source.kind === "x_search") candidates = (await fetchXSearch(source)).candidates;
   else throw new Error(`preview is not available for ${source.kind} sources`);
   candidates = admitListing(candidates, source);
   // A publication boundary depends on the article's date, including when only its detail page has
@@ -220,7 +218,7 @@ const CreateSchema = z
   .object({
     id: z.string().regex(/^[a-z0-9][a-z0-9-]{2,79}$/),
     name: z.string().min(1).max(200),
-    kind: z.enum(["rss", "web_list", "json_list", "x_search", "mp_account", "external"]),
+    kind: z.enum(["rss", "web_list", "json_list", "external"]),
     config: z.record(z.string(), z.unknown()),
     tier: z.enum(["T1", "T1_5", "T2", "EXCLUDE_MP"]).default("T2"),
     participation_mode: z.enum(["editorial", "hot_signal", "isolated"]).default("editorial"),
@@ -234,17 +232,8 @@ const CreateSchema = z
 /** The address a source collects from, used to find duplicates before creating one. */
 export function sourceIdentity(kind: string, config: Record<string, unknown>): string | null {
   const raw = (config.feedUrl ?? config.url ?? config.listUrl ?? config.endpoint ?? null) as string | null;
-  if (kind === "x_search") {
-    const m = /from:([A-Za-z0-9_]{1,15})/.exec(String(config.query ?? ""));
-    return m ? `x:${m[1]!.toLowerCase()}` : null;
-  }
-  // A WeChat account is one account whichever id names it.
-  if (kind === "mp_account") {
-    const id = String(config.ghid ?? config.wxid ?? "").trim().toLowerCase();
-    return id ? `mp:${id}` : null;
-  }
   if (!raw) return null;
-  return normalizeUrl(String(raw).replace(/^https:\/\/r\.jina\.ai\//, "")) ?? String(raw);
+  return normalizeUrl(String(raw)) ?? String(raw);
 }
 
 export async function findDuplicateSource(kind: string, config: Record<string, unknown>, exceptId?: string, db: Db = sql) {
@@ -281,10 +270,7 @@ export async function fetchNow(id: string, actor: string) {
     await audit(actor, "source.fetch", `source:${id}`, null, null, await own(s));
     return { jobId: null };
   }
-  const jobId =
-    s.kind === "mp_account"
-      ? await enqueue(QUEUES.mpCheck, { sourceId: id, reason: "manual" }, { singletonKey: `mp:${id}` })
-      : await enqueue(QUEUES.fetchSource, { sourceId: id, force: true }, { singletonKey: `manual:${id}` });
+  const jobId = await enqueue(QUEUES.fetchSource, { sourceId: id, force: true }, { singletonKey: `manual:${id}` });
   await audit(actor, "source.fetch", `source:${id}`, null, null, { jobId });
   return { jobId };
 }

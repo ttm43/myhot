@@ -19,7 +19,7 @@ test("a publication boundary rejects missing zones, incomplete and impossible da
 });
 
 test("channels that do not apply the publication boundary refuse it instead of ignoring it", () => {
-  for (const kind of ["x_search", "mp_account", "external"] as const) {
+  for (const kind of ["external"] as const) {
     assert.deepEqual(unsupportedConfig(kind, { publishedAfter: "2026-09-28T00:00:00Z" }), ["publishedAfter"]);
   }
 });

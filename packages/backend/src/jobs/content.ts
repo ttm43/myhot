@@ -32,8 +32,8 @@ interface Route {
 
 /**
  * The article's next step: its body first while none is confirmed and the source asks for full text,
- * when there is only a title or a feed summary (the analysis judges the whole article), or when an X
- * post links an X Article (fetched before judging). Non-editorial posts are kept as collected.
+ * when there is only a title or a feed summary (the analysis judges the whole article). Non-editorial
+ * posts are kept as collected.
  */
 async function route(articleId: string, db: Db): Promise<Route | null> {
   const [row] = await db<{ body_status: string; participation_mode: string; kind: string; config: Record<string, unknown>; url: string; bare: boolean; backfill: boolean; published_at: Date | null; discovered_at: Date }[]>`
@@ -45,9 +45,8 @@ async function route(articleId: string, db: Db): Promise<Route | null> {
   const signal = row.participation_mode !== "editorial";
   const pending = row.body_status === "pending";
   const wantsBody = row.config.fetchPublicContent === true || !!row.config.detail || row.kind === "web_list";
-  const needsPage = !signal && pageFetchable(row.url, row.kind) && (wantsBody || row.bare);
-  const needsXArticle = row.kind === "x_search" && !signal;
-  return { step: pending && (needsPage || needsXArticle) ? "extract" : "analyze", historical };
+  const needsPage = !signal && pageFetchable(row.url) && (wantsBody || row.bare);
+  return { step: pending && needsPage ? "extract" : "analyze", historical };
 }
 
 /**

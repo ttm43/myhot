@@ -28,7 +28,7 @@ pointModels(provider.url);
 const app = await buildApp();
 before(async () => {
   await sql`INSERT INTO sources (id,name,kind,tier,participation_mode,site_fulltext,next_fetch_at)
-    VALUES (${source},'Original post test','x_search','T1','editorial',true,'2100-01-01')`;
+    VALUES (${source},'Original post test','rss','T1','editorial',true,'2100-01-01')`;
 });
 after(async () => { await app.close(); await provider.close(); await stopBoss(); await closeDb(); });
 

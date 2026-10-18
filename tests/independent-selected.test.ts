@@ -26,9 +26,9 @@ const get = async (url: string) => { const r = await app.inject({ method: 'GET',
 
 test('independent selected sources retain identity and their own cards across publication outlets', async () => {
   await sql`INSERT INTO sources(id,name,kind,tier,participation_mode,next_fetch_at) VALUES
-    (${own},'Shared author','mp_account','T1_5','editorial','2100-01-01'),
+    (${own},'Shared author','rss','T1_5','editorial','2100-01-01'),
     (${officialSource},'Official','rss','T1','editorial','2100-01-01'),
-    (${xSource},'Shared author','x_search','T1_5','editorial','2100-01-01')`;
+    (${xSource},'Shared author','rss','T1_5','editorial','2100-01-01')`;
   const [story] = await sql<{id:number}[]>`INSERT INTO stories(public_id,title) VALUES (${randomUUID()},${T}) RETURNING id`;
   const [fact] = await sql<{id:number}[]>`INSERT INTO facts(public_id,story_id,title) VALUES (${T},${story!.id},${T}) RETURNING id`;
   let n = 0;

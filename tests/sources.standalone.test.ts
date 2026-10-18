@@ -1,4 +1,4 @@
-// Listing parsers on the page shapes Jina returns for real sites: card links that wrap an image, a title
+// Listing parsers on the page shapes real sites have: card links that wrap an image, a title
 // attribute, http links under https prefixes, and navigation that is no post. Also what made articles
 // flip between versions: in-page anchors of an HTML listing and
 // promotions a feed rotates inside its posts.
@@ -52,7 +52,7 @@ const site = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 config.allowPrivateNetworkFetch = true;
 after(() => new Promise<void>((resolve) => server.close(() => resolve())));
 
-test("Jina card links become posts with their own titles", () => {
+test("Markdown card links become posts with their own titles", () => {
   const md = [
     "[Skip to main content](http://example.org/blog/#main)",
     "[![Image 1: hero](https://cdn.example.org/a.jpg) ##### 智元发布GE-Act 2.0 新闻资讯 | 2026-09-20](https://example.org/blog/220.html \"智元发布GE-Act 2.0\")",
@@ -61,7 +61,7 @@ test("Jina card links become posts with their own titles", () => {
     "# [Introducing v6](http://example.org/blog/introducing-v6)",
     "[2026](http://example.org/blog/2026) [Algorithms & Theory](http://example.org/blog/label/algorithms) [Next page](http://example.org/blog/page/2)",
   ].join("\n\n");
-  const out = fromMarkdown(md, "https://example.org", source({ url: "https://r.jina.ai/http://example.org/blog/", allowUrlPrefixes: ["https://example.org/blog/"] }));
+  const out = fromMarkdown(md, "https://example.org", source({ url: "http://example.org/blog/", allowUrlPrefixes: ["https://example.org/blog/"] }));
   assert.deepEqual(out, [
     { url: "https://example.org/blog/220.html", title: "智元发布GE-Act 2.0" },
     { url: "https://example.org/blog/784.html", title: "小米18 Pro Max 测评 尾巴视频" },
@@ -89,7 +89,7 @@ test("posts addressed by a query on the listing's path are posts, its pages and 
   const md = links.map(([href, text]) => `[${text}](https://example.org${href})`).join("\n\n");
   const posts = ["https://example.org/?p=123", "https://example.org/?p=456&lang=en"];
   assert.deepEqual(fromHtml(html, "https://example.org/", source({ url: "https://example.org/" })).map((c) => c.url), posts);
-  assert.deepEqual(fromMarkdown(md, "https://example.org/", source({ url: "https://r.jina.ai/https://example.org/" })).map((c) => c.url), posts);
+  assert.deepEqual(fromMarkdown(md, "https://example.org/", source({ url: "https://example.org/" })).map((c) => c.url), posts);
   // The listing's own query in another order, with tracking and a page number, is still the listing.
   const filtered = source({ url: "https://example.org/news?lang=en&kind=ai" });
   const out = fromHtml('<a href="/news?kind=ai&lang=en&utm_medium=x&page=2">Next page of news</a><a href="/news?kind=ai&lang=en&id=7">A news post</a>', "https://example.org/", filtered);
@@ -113,7 +113,7 @@ test("promotions a feed rotates inside its posts are left out of the body", () =
 });
 
 test("a listing that links other articles in its teasers takes only the links that begin a line", () => {
-  // Axios Technology through Jina: each headline stands on its own line; its teaser links older stories inline.
+  // Axios Technology as Markdown: each headline stands on its own line; its teaser links older stories inline.
   const md = [
     "### [Amodei critics target Trump with hit piece before White House dinner](https://example.org/2026/09/27/amodei)",
     "[![Image 3: Scoop](https://example.org/a.jpg)](https://example.org/2026/09/27/dinner)",
@@ -123,7 +123,7 @@ test("a listing that links other articles in its teasers takes only the links th
     "**Why it matters:** AI is energy-hungry. [Political divides](https://example.org/2026/09/24/climate-politics) can slow progress.",
     "[Go deeper (3 min. read)](https://example.org/2026/09/25/sheeran)",
   ].join("\n\n");
-  const config = { url: "https://r.jina.ai/https://example.org/technology", allowUrlPrefixes: ["https://example.org/2"], linksStartLine: true };
+  const config = { url: "https://example.org/technology", allowUrlPrefixes: ["https://example.org/2"], linksStartLine: true };
   assert.deepEqual(fromMarkdown(md, "https://example.org", source(config)).map((c) => c.title), [
     "Amodei critics target Trump with hit piece before White House dinner",
     "Scoop: Anthropic's Dario Amodei to have White House dinner",

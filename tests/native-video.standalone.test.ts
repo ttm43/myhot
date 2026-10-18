@@ -5,7 +5,7 @@ import { test } from "node:test";
 import * as cheerio from "cheerio";
 import { readable } from "@aihot/backend/content/extract";
 import { sanitizeBody } from "@aihot/backend/content/sanitize";
-import { bodyToMarkdown, markdownBody } from "@aihot/backend/content/markdown";
+import { bodyToMarkdown } from "@aihot/backend/content/markdown";
 import { shield, unshield } from "@aihot/backend/editorial/translate";
 import { proxyBodyImages } from "@aihot/backend/media/imgproxy";
 import { stripTags } from "@aihot/backend/lib/text";
@@ -94,12 +94,10 @@ test("translation, Markdown and public image outputs retain cleaned video candid
   const sources = ($: cheerio.CheerioAPI) => $("video").eq(1).children("source").toArray().map((el) => [$(el).attr("src"), $(el).attr("type")]);
   const protectedBody = shield(html);
   assert.equal(sanitizeBody(unshield(protectedBody.html, protectedBody)!, base), html);
-  const markdown = bodyToMarkdown(html, base);
-  const restored = cheerio.load(markdownBody(markdown, base));
-  assert.equal(restored("video").length, 2);
-  assert.equal(restored("video").first().attr("src"), "https://publisher.example/clip.mp4?token=example&quality=high");
-  assert.equal(restored("video").first().attr("poster"), "https://publisher.example/cover.jpg?token=poster&frame=1");
-  assert.deepEqual(sources(restored), expectedSources);
+  // Markdown keeps the players as HTML.
+  const kept = cheerio.load(bodyToMarkdown(html, base));
+  assert.equal(kept("video").length, 2);
+  assert.deepEqual(sources(kept), expectedSources);
   const output = cheerio.load(proxyBodyImages(html));
   assert.equal(output("video").length, 2);
   assert.deepEqual(sources(output), expectedSources);

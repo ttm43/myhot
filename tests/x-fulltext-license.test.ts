@@ -27,7 +27,7 @@ after(async () => {
 });
 
 async function fixture(options: {
-  full?: boolean; kind?: "x_search" | "rss"; summary?: boolean;
+  full?: boolean; kind?: "x" | "rss"; summary?: boolean;
   shape?: "missing" | "quote-only"; bodyStatus?: "ok" | "unconfirmed" | "none";
   translation?: "missing" | "stale" | "same"; mode?: "editorial" | "hot_signal" | "isolated";
 } = {}) {
@@ -42,8 +42,8 @@ async function fixture(options: {
   const quotedZh = options.translation === "same" ? quoted : `X-QUOTED-ZH-${key}`;
   const media = `X-MEDIA-${key}`;
   const summary = options.summary === false || options.shape === "quote-only" ? null : `摘要-${key}`;
-  const kind = options.kind ?? "x_search";
-  const url = kind === "x_search" ? `https://x.com/license/status/${tweet}` : `https://example.org/${key}`;
+  const kind = options.kind ?? "x";
+  const url = kind === "x" ? `https://x.com/license/status/${tweet}` : `https://example.org/${key}`;
   const xPost: XPostData | null = kind === "rss" || options.shape === "missing" ? null : {
     tweetId: tweet, authorName: "许可测试作者", handle: "license", avatarUrl: "https://example.org/avatar.png",
     text: options.shape === "quote-only" ? "" : main,
@@ -54,7 +54,7 @@ async function fixture(options: {
     ],
   };
   await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, site_fulltext, icon_url, next_fetch_at)
-    VALUES (${source}, '许可测试来源', ${kind}, 'T1', ${options.mode ?? "editorial"}, ${options.full ?? false}, 'https://example.org/source.png', '2100-01-01')`;
+    VALUES (${source}, '许可测试来源', 'rss', 'T1', ${options.mode ?? "editorial"}, ${options.full ?? false}, 'https://example.org/source.png', '2100-01-01')`;
   const { articleId: id } = await upsertMaterial({ sourceId: source, url, title: `Original title ${key}`, language: "en",
     bodyText: options.bodyStatus === "none" ? null : main, bodyHtml: options.bodyStatus === "none" ? null : `<p>${main}</p>`,
     bodyStatus: options.bodyStatus ?? "ok", xPost, via: "fetch", publishedAt: new Date() });
@@ -164,9 +164,9 @@ test("R04: revoking only site fulltext keeps editorial summaries after republish
   await summaryLists(f);
 });
 
-for (const kind of ["x_search", "rss"] as const) {
+for (const kind of ["x", "rss"] as const) {
   for (const full of [false, true]) {
-    test(`R06/R07: ${kind} licence matrix site=${full}`, kind === "x_search" && !full ? hidesPosts : {}, async () => {
+    test(`R06/R07: ${kind} licence matrix site=${full}`, kind === "x" && !full ? hidesPosts : {}, async () => {
       const f = await fixture({ kind, full });
       if (full) {
         const normal = (await get(`/api/site/items/${f.id}`)).json();
@@ -177,7 +177,7 @@ for (const kind of ["x_search", "rss"] as const) {
         assert.equal(normal.body.original, null);
         assert.ok(original.body.original.includes(f.main));
         assert.equal(original.body.zh, null);
-        if (kind === "x_search") {
+        if (kind === "x") {
           assert.equal(normal.x.quoted.text, f.quoted);
           assert.equal(normal.x.quoted.translation, f.quotedZh);
           assert.equal(normal.x.media.length, 2);
@@ -187,7 +187,7 @@ for (const kind of ["x_search", "rss"] as const) {
           assert.equal(normal.x.media[1].kind, "video");
         }
         const md = (await get(`/items/${f.id}/markdown`, 200, /text\/markdown/)).body;
-        for (const marker of kind === "x_search" ? [f.main, f.zh, f.quoted, f.quotedZh] : [f.main, f.zh]) assert.ok(md.includes(marker));
+        for (const marker of kind === "x" ? [f.main, f.zh, f.quoted, f.quotedZh] : [f.main, f.zh]) assert.ok(md.includes(marker));
       } else {
         await summaryDetail(f);
         await summaryMarkdown(f);

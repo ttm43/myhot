@@ -219,7 +219,7 @@ const isContentFilter = (error: unknown) => error instanceof ProviderRejectedErr
 
 /** Only a title or a feed summary, and a page to fetch: the article is judged on the page. */
 export function waitsForPage(a: AnalyzeInputArticle): boolean {
-  return a.bodyStatus === "pending" && !a.bodyText && !a.xPost && pageFetchable(a.url, a.source.kind);
+  return a.bodyStatus === "pending" && !a.bodyText && !a.xPost && pageFetchable(a.url);
 }
 
 type StepOpts = { attemptTag?: string; scoreModel?: string };

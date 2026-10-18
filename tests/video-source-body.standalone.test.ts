@@ -75,15 +75,15 @@ test("actual textual feed content stays usable, while a video summary never beco
 
 test("known video pages cannot pass the generic body reader or page-fetch policy", () => {
   for (const url of videoUrls) {
-    assert.equal(pageFetchable(url, "rss"), false, url);
+    assert.equal(pageFetchable(url), false, url);
     assert.equal(readable(playerHtml, url), null, url);
   }
-  for (const url of ["https://publisher.example/watch?v=article", "https://blog.youtube/news-and-events/article", "https://vimeo.com/blog/post", "https://youtube.com.example/article"]) assert.equal(pageFetchable(url, "rss"), true, url);
+  for (const url of ["https://publisher.example/watch?v=article", "https://blog.youtube/news-and-events/article", "https://vimeo.com/blog/post", "https://youtube.com.example/article"]) assert.equal(pageFetchable(url), true, url);
   assert.ok(readable(`<html><body><article><p>${feedBody}</p><iframe src="${watch}"></iframe></article></body></html>`, "https://publisher.example/article"));
 });
 
 test("manual extraction makes no video request, and an ordinary link redirected to a player cannot save its controls", async () => {
-  for (const url of videoUrls) assert.equal(await extractFromUrl(url, "test-video"), null, url);
-  assert.equal(videoReads, 0, "video pages are rejected before a network request or paid fallback");
-  assert.equal(await extractFromUrl("https://publisher.example/video-link", "test-redirect"), null);
+  for (const url of videoUrls) assert.equal(await extractFromUrl(url), null, url);
+  assert.equal(videoReads, 0, "video pages are rejected before a network request");
+  assert.equal(await extractFromUrl("https://publisher.example/video-link"), null);
 });

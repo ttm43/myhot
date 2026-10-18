@@ -54,9 +54,9 @@ test("collector replacement refuses incomplete, incompatible, duplicate or speci
     { kind: "json_list" }, { kind: "json_list", config: {} },
     { kind: "json_list", config: { feedUrl: "https://example.com/feed" } },
     { kind: "json_list", config: { url: "https://example.com/list" } },
-    ...["x_search", "mp_account", "external"].map(kind => ({ kind, config: {} })),
+    ...["external"].map(kind => ({ kind, config: {} })),
   ]) await assert.rejects(edit(row.id, patch));
-  for (const kind of ["x_search", "mp_account", "external"]) {
+  for (const kind of ["external"]) {
     const special = await source(kind, {});
     await assert.rejects(edit(special.id, { kind: "rss", config: { feedUrl: "https://example.com/feed" } }));
   }

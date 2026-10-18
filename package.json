@@ -30,6 +30,7 @@
     "@types/node": "26.6.3",
     "@types/sanitize-html": "2.16.1",
     "@types/turndown": "5.0.6",
+    "marked": "18.0.14",
     "typescript": "7.0.2"
   }
 }

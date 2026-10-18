@@ -2,7 +2,7 @@
 
 ```mermaid
 flowchart LR
-  S["信源<br/>RSS · 网页 · JSON · X · 公众号 · 外部推送"] --> C["采集<br/>判重 · 抓原文"]
+  S["信源<br/>RSS · 网页 · JSON · 外部推送"] --> C["采集<br/>判重 · 抓原文"]
   C --> J["判断与写作<br/>预筛 · 评分 · 标题摘要 · 结构化"]
   J --> G["归组<br/>事实 · 事件"]
   J --> P["公开读取层<br/>publication/"]
@@ -25,7 +25,7 @@ flowchart LR
 - **一个公开读取层**：网页和 MCP 读的都是 `packages/backend/src/publication/`。公开范围、精选席位（机器出口每条新闻只出一条）与事实证据条件只在 `publication/scope.ts` 定义；新增出口也遵循当前的撤回和全文许可。
 - **缓存不延长旧内容的寿命**：可变内容按响应的 `Cache-Control` 到期重新验证；MCP 的 HTTP 响应使用 `no-store`。自建代理或 CDN 同样要遵守，配置要求见 [部署](deploy.md#配域名和-https) 的“配域名和 HTTPS”。
 - **页面不调模型**：读者打开页面只读数据库里已经有的结果；模型只在 worker 的任务里调用。
-- **花钱的请求有回执**：每个付费请求（模型、X、公众号、Jina）先记一张回执，拿到结果先存再用。进程重启、任务重试时，复用已经付过钱的结果，不重复花钱（`providers/receipts.ts`）。结果不明的回执超过 30 分钟后自动放行一次；因它停在失败状态的文章会重新入队，继续未完成的正文提取或分析。再次结果不明时，由管理员在“运行”页核对后放行。
+- **花钱的请求有回执**：每个付费请求（模型）先记一张回执，拿到结果先存再用。进程重启、任务重试时，复用已经付过钱的结果，不重复花钱（`providers/receipts.ts`）。结果不明的回执超过 30 分钟后自动放行一次；因它停在失败状态的文章会重新入队，继续未完成的正文提取或分析。再次结果不明时，由管理员在“运行”页核对后放行。
 - **预算熔断**：每个付费服务有每分钟、每小时、每天的上限，超过就暂停（后台“设置 → 付费请求上限”）。
 - **安全阀**：`COLLECT_ENABLED`、`MODEL_CALLS_ENABLED`、`INDEXNOW_SUBMIT_ENABLED` 只决定“发不发出去”，不决定走哪套逻辑；只有设成 `true` 才打开，没写就是关。`scripts/init-env.ts` 生成的 `.env` 会打开采集和模型调用，只调界面时可以改成 `false`；测试里推送一直关着，采集和模型调用只连本地假服务。
 - **公开内容匿名**：管理员和访客看到的一样；读者的已读存在浏览器里。后台只允许管理员。
@@ -48,7 +48,7 @@ flowchart LR
 | `packages/backend/src/editorial/` | 判断与写作：`analyze.ts`（流程）、`prompts.ts`（读提示词）、`models.ts`（每一步用哪个模型） |
 | `packages/backend/src/events/` | 事件归组、合并和人工更正 |
 | `packages/backend/src/publication/` | 公开读取层 |
-| `packages/backend/src/providers/` | 模型、向量、X、公众号、Jina 的调用，回执与预算 |
+| `packages/backend/src/providers/` | 模型和向量的调用，回执与预算 |
 | `packages/backend/src/operations/` | 恢复、清理、IndexNow |
 | `packages/backend/src/admin/` | 后台接口 |
 | `apps/web/app/routes/` | 每个页面一个文件，路由表在 `apps/web/app/routes.ts` |

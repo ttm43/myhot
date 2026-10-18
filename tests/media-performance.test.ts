@@ -381,12 +381,12 @@ test("tracking pixels are omitted from old and new bodies without removing artic
   }
 });
 
-// Extracted Markdown can mislabel a video page as an image. New ingestion and previously saved
-// bodies must both stop signing those pages; RSS, Markdown, responsive media and posters must agree.
+// A body can mislabel a video page as an image. New ingestion and previously saved bodies must both
+// stop signing those pages; Markdown, responsive media and posters must agree.
 // Real thumbnails/icons and existing video links or video elements must keep working.
 test("video pages mislabeled as images are excluded across ingestion and public image outputs", async () => {
   const { sanitizeBody } = await import("@aihot/backend/content/sanitize");
-  const { markdownBody, bodyToMarkdown } = await import("@aihot/backend/content/markdown");
+  const { bodyToMarkdown } = await import("@aihot/backend/content/markdown");
   const { proxiedImage, proxiedImageSet, proxyBodyImages } = await import("@aihot/backend/media/imgproxy");
   const pages = [
     "https://www.youtube.com/watch?v=example&t=1",
@@ -401,8 +401,7 @@ test("video pages mislabeled as images are excluded across ingestion and public 
     "https://youtube.com.example.org/watch?v=example",
   ];
   const stored = [...pages, ...pictures].map((url) => `<img src="${url.replaceAll("&", "&amp;")}" alt="Image" width="800" height="400">`).join("");
-  const markdown = [...pages, ...pictures].map((url) => `![Image](${url})`).join("\n\n");
-  for (const html of [sanitizeBody(stored), markdownBody(markdown, "https://example.org/post"), proxyBodyImages(stored)]) {
+  for (const html of [sanitizeBody(stored), proxyBodyImages(stored)]) {
     assert.equal((html.match(/<img\b/g) ?? []).length, pictures.length, html);
     assert.doesNotMatch(decodeURIComponent(html), /https:\/\/(?:www\.|m\.)?youtube\.com\/(?:watch|shorts)/);
   }

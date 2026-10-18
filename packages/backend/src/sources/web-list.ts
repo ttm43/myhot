@@ -1,4 +1,4 @@
-// Web list pages: HTML with selectors, Markdown through Jina Reader, and dated changelog sections.
+// Web list pages: HTML with selectors, Markdown links, and dated changelog sections.
 import * as cheerio from "cheerio";
 import { guardedFetch } from "../lib/http-fetch.ts";
 import { fetchListing } from "./listing-fetch.ts";
@@ -6,11 +6,8 @@ import { identityKeyForUrl, normalizeUrl } from "../lib/url.ts";
 import { collapseWhitespace, stripTags } from "../lib/text.ts";
 import { readable, type ExtractedBody } from "../content/extract.ts";
 import { sanitizeBody } from "../content/sanitize.ts";
-import { jinaRead } from "../providers/jina.ts";
 import { articleUtcOffset, parseLooseDate } from "./dates.ts";
 import { FetchError, type Candidate, type SourceRow } from "./types.ts";
-
-const JINA_PREFIX = "https://r.jina.ai/";
 
 /** A date rule names one element; unrelated tooltips must not hide its visible publication date. */
 function elementDate(el: ReturnType<cheerio.CheerioAPI>, utcOffset?: string): Date | null {
@@ -47,7 +44,7 @@ export function jsonLdPublished($: cheerio.CheerioAPI, html: string): string | n
   return /"datePublished"\s*:\s*"([^"]+)"/.exec(html)?.[1] ?? null;
 }
 
-/** Prefix rules ignore the scheme: a Jina listing of an http:// address links its posts over http. */
+/** Prefix rules ignore the scheme: a listing at an http:// address links its posts over http. */
 const overHttps = (url: string) => url.replace(/^http:\/\//i, "https://");
 
 export function allowed(url: string, source: SourceRow): boolean {
@@ -96,20 +93,12 @@ function absolute(href: string | undefined, base: string): string | null {
   }
 }
 
-async function fetchListingText(source: SourceRow): Promise<{ text: string; viaJina: boolean; base: string }> {
+async function fetchListingText(source: SourceRow): Promise<{ text: string; base: string }> {
   const url = String(source.config.url ?? "");
   if (!url) throw new FetchError("url missing");
-  if (url.startsWith(JINA_PREFIX)) {
-    const target = url.slice(JINA_PREFIX.length);
-    // A listing parsed with selectors asks Jina for the rendered HTML (a site our resolver cannot reach
-    // still gets its dates and titles from the markup); otherwise Jina's Markdown.
-    const format = source.config.parseMode === "html" ? "html" : undefined;
-    const page = await jinaRead(target, { purpose: "source_listing", subject: `source:${source.id}`, cacheToleranceSeconds: source.config.cacheToleranceSeconds, format, perRead: true });
-    return { text: page.markdown, viaJina: true, base: source.config.baseUrl ?? target };
-  }
   const res = await fetchListing(url, { headers: { accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8" }, timeoutMs: 25_000 });
   if (res.status !== 200) throw new FetchError(`HTTP ${res.status}`, res.status);
-  return { text: res.text(), viaJina: false, base: source.config.baseUrl ?? res.url };
+  return { text: res.text(), base: source.config.baseUrl ?? res.url };
 }
 
 /** A listing title that is no headline: a label that swallowed its summary, or a call to action. */
@@ -119,7 +108,7 @@ export const needsTitle = (title: string) => title.length > 100 || isCallToActio
 export function fromMarkdown(md: string, base: string, source: SourceRow): Candidate[] {
   const seen = new Map<string, Candidate>();
   const out: Candidate[] = [];
-  const listing = String(source.config.url ?? base).replace(JINA_PREFIX, "");
+  const listing = String(source.config.url ?? base);
   // Card links wrap an image and the text, [![alt](img) ##### Title …](url "Title"): images go first so the
   // link text is plain; a bare image link is then left without a title and skipped, as are nav-length labels.
   const text = md.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
@@ -155,7 +144,7 @@ export function fromHtml(html: string, base: string, source: SourceRow): Candida
   const $ = cheerio.load(html);
   const out: Candidate[] = [];
   const seen = new Set<string>();
-  const listing = String(c.url ?? base).replace(JINA_PREFIX, "");
+  const listing = String(c.url ?? base);
   // Sections of the listing page are posts only for sources that keep fragments as identity.
   const sectionsArePosts = c.preserveUrlFragment === true;
   const itemSel: string | undefined = c.itemSelector;
@@ -337,8 +326,8 @@ async function fromMimoHome(html: string, base: string, source: SourceRow): Prom
 }
 
 export async function fetchWebList(source: SourceRow): Promise<Candidate[]> {
-  const { text, viaJina, base } = await fetchListingText(source);
-  const mode = source.config.adapter === "mimo_home" ? "mimo_home" : source.config.parseMode ?? (viaJina ? "markdown" : "html");
+  const { text, base } = await fetchListingText(source);
+  const mode = source.config.adapter === "mimo_home" ? "mimo_home" : source.config.parseMode ?? "html";
   let out: Candidate[];
   if (mode === "mimo_home") out = await fromMimoHome(text, base, source);
   else if (mode === "markdown") out = fromMarkdown(text, base, source);
@@ -358,21 +347,15 @@ export interface DetailNeed {
 }
 
 /**
- * What a listing's detail pages add (config.detail): the date, title and summary its rules find. Each
- * rule reads the rendering it was written for. For a listing read through Jina, regexes match Jina's
- * text ("Published Time: …", "# Heading"), so that paid rendering is bought only when such a rule is
- * needed; selectors and page metadata read the page's own HTML.
+ * What a listing's detail pages add (config.detail): the date, title and summary its rules find in the
+ * page's own HTML (selectors, regexes over the markup, page metadata).
  */
 export async function fetchDetail(url: string, source: SourceRow, need: DetailNeed): Promise<{ publishedAt: Date | null; title: string | null; summary: string | null; body: ExtractedBody | null }> {
   const d = source.config.detail ?? {};
   const offset = articleUtcOffset(source.config);
-  const jinaListing = String(source.config.url ?? "").startsWith(JINA_PREFIX);
-  const dateInJina = need.date && jinaListing && !!d.publishedAtRegex;
-  const titleInJina = need.title && jinaListing && !!d.titleRegex;
-  const jina = dateInJina || titleInJina ? (await jinaRead(url, { purpose: "source_detail", subject: `source:${source.id}` })).raw : null;
   let html: string | null = null;
   let body: ExtractedBody | null = null;
-  if ((need.date && !dateInJina) || (need.title && !titleInJina) || need.summary) {
+  if (need.date || need.title || need.summary) {
     const res = await guardedFetch(url, { timeoutMs: 20_000 });
     if (res.status !== 200) throw new FetchError(`HTTP ${res.status} for detail`, res.status);
     html = res.text();
@@ -384,17 +367,16 @@ export async function fetchDetail(url: string, source: SourceRow, need: DetailNe
   const $ = html === null ? null : cheerio.load(html);
 
   let publishedAt: Date | null = null;
-  const dateText = dateInJina ? jina : html;
-  if (need.date && dateText !== null) {
-    if ($ && !dateInJina && d.publishedAtSelector) {
+  if (need.date && html !== null) {
+    if ($ && d.publishedAtSelector) {
       const el = $(d.publishedAtSelector).first();
       publishedAt = elementDate(el, offset);
     }
-    if (!publishedAt && d.publishedAtRegex) publishedAt = parseLooseDate(new RegExp(d.publishedAtRegex).exec(dateText)?.[1], offset);
+    if (!publishedAt && d.publishedAtRegex) publishedAt = parseLooseDate(new RegExp(d.publishedAtRegex).exec(html)?.[1], offset);
     // An authoritative rule is the only source of the date: when its byline is missing, no other
     // timestamp on the page (an update time, a related post) stands in for it.
     const authoritative = d.publishedAtAuthoritative === true && !!(d.publishedAtSelector || d.publishedAtRegex);
-    if (!publishedAt && $ && !dateInJina && !authoritative) {
+    if (!publishedAt && $ && !authoritative) {
       const meta = $('meta[property="article:published_time"], meta[name="pubdate"], meta[itemprop="datePublished"]').attr("content");
       publishedAt = parseLooseDate(meta, offset) ?? parseLooseDate(jsonLdPublished($, html!), offset)
         ?? parseLooseDate($("time[datetime]").first().attr("datetime"), offset);
@@ -403,8 +385,7 @@ export async function fetchDetail(url: string, source: SourceRow, need: DetailNe
 
   let title: string | null = null;
   if (need.title) {
-    const titleText = titleInJina ? jina : html;
-    if (d.titleRegex && titleText !== null) title = collapseWhitespace(new RegExp(d.titleRegex, "m").exec(titleText)?.[1] ?? "") || null;
+    if (d.titleRegex && html !== null) title = collapseWhitespace(new RegExp(d.titleRegex, "m").exec(html)?.[1] ?? "") || null;
     else if (d.titleSelector && $) title = collapseWhitespace($(d.titleSelector).first().text()) || null;
   }
 

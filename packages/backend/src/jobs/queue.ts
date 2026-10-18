@@ -18,8 +18,6 @@ export interface JobData {
   "content.extract-body": { articleId: string };
   "events.group": { articleId: string };
   "sources.fetch": { sourceId: string; force?: boolean };
-  "sources.fetch-x": { key: string; sourceIds: string[] };
-  "sources.mp": { sourceId: string; reason?: "schedule" | "manual" };
   "publication.republish-source": { sourceId: string };
   "media.prepare": { articleId: string } | { url: string; mode: string };
 }
@@ -30,8 +28,6 @@ export const QUEUES = {
   extractBody: "content.extract-body",
   group: "events.group",
   fetchSource: "sources.fetch",
-  fetchXShard: "sources.fetch-x",
-  mpCheck: "sources.mp",
   republishSource: "publication.republish-source",
   prepareMedia: "media.prepare",
 } as const satisfies Record<string, QueueName>;
@@ -44,8 +40,6 @@ const QUEUE_OPTIONS: Record<QueueName, QueueOptions> = {
   [QUEUES.extractBody]: { policy: "short", retryLimit: 2, retryDelay: 120, expireInSeconds: 300 },
   [QUEUES.group]: { policy: "short", retryLimit: 4, retryDelay: 20, retryBackoff: true, expireInSeconds: 600 },
   [QUEUES.fetchSource]: { policy: "short", retryLimit: 0, expireInSeconds: 600 },
-  [QUEUES.fetchXShard]: { policy: "short", retryLimit: 0, expireInSeconds: 900 },
-  [QUEUES.mpCheck]: { policy: "short", retryLimit: 3, retryDelay: 60, retryBackoff: true, expireInSeconds: 600 },
   [QUEUES.republishSource]: { policy: "short", retryLimit: 2, retryDelay: 60, expireInSeconds: 3600 },
   [QUEUES.prepareMedia]: { policy: "short", retryLimit: 1, retryDelay: 120, expireInSeconds: 600 },
 };

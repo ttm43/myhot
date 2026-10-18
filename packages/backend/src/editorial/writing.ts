@@ -3,7 +3,6 @@
 // wording lives in the industry pack (industry/prompts/); a failed guard falls back without a repair call.
 import { IDENTITY_CONTEXT_ALIASES, IDENTITY_LEXICON, PUBLISHER_DOMAINS } from "@aihot/industry/taxonomy";
 import { stripTagMarkup } from "../lib/text.ts";
-import { onlyXArticleLink } from "../sources/x.ts";
 import type { AnalyzeInputArticle } from "./input.ts";
 import { promptText } from "./prompts.ts";
 
@@ -71,7 +70,12 @@ export function needsShortTweetTranslation(text: string): boolean {
 
 // The material as the prefilter and the content understanding read it
 
-/** The post is an X Article's link whose article could not be fetched. */
+const X_ARTICLE_LINK = /https?:\/\/(?:www\.)?(?:x|twitter)\.com\/i\/article\/\d+/gi;
+
+/** Nothing but an X Article's link: without the article there is nothing to judge (under 30 characters left). */
+const onlyXArticleLink = (text: string) => new RegExp(X_ARTICLE_LINK.source, "i").test(text) && text.replace(X_ARTICLE_LINK, "").trim().length < 30;
+
+/** The post is an X Article's link whose article was not fetched. */
 const unfetchedXArticle = (a: AnalyzeInputArticle) => !!a.xPost && a.bodyStatus !== "ok" && onlyXArticleLink(String(a.xPost.text ?? ""));
 
 function materialQuality(a: AnalyzeInputArticle): string {
@@ -168,7 +172,7 @@ export interface TranslateInput {
 }
 
 export function translateInputOf(a: AnalyzeInputArticle): TranslateInput {
-  const isX = a.source.kind === "x_search" || !!a.xPost;
+  const isX = !!a.xPost;
   const mainText = isX ? String(a.xPost?.text ?? a.title) : undefined;
   return {
     title: a.title,

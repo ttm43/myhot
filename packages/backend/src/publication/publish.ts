@@ -201,7 +201,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     && (f.selected === true || article.selection_adds_value !== false);
   const reason = selected ? pickString(f.reason, original ? null : analysis?.reason_zh ?? null) : null;
   const hasXPost = !!article.x_post;
-  const channel = channelOf(source.kind, hasXPost);
+  const channel = channelOf(hasXPost);
   const hasBody = !!article.body_text || !!article.x_post?.text || !!article.x_post?.media?.length || !!article.x_post?.quoted?.text;
   const bodyMode = bodyModeOf(source, article.body_status, hasBody);
   const originalTitle = isChineseTitle && title === collapseWhitespace(article.title) ? null : collapseWhitespace(article.title);

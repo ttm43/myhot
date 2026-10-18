@@ -1,4 +1,4 @@
-// Paid requests (models, SocialData, Jina; historical Dajiala records retained) go through here.
+// Paid requests (models; historical SocialData, Jina and Dajiala records retained) go through here.
 //
 // 1. A logical request has a stable key bound to task, input revision, provider, model, prompt and config.
 // 2. Before calling, a placeholder row and an attempt row are persisted; budgets count attempts.

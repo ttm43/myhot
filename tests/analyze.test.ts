@@ -66,7 +66,7 @@ pointModels(provider.url);
 before(async () => {
   await sql`INSERT INTO sources (id, name, kind, tier, participation_mode, next_fetch_at) VALUES
     (${SOURCE}, 'Test analyze source', 'rss', 'T1', 'editorial', '2100-01-01'),
-    (${X_SOURCE}, 'Test X account', 'x_search', 'T1', 'editorial', '2100-01-01')`;
+    (${X_SOURCE}, 'Test X account', 'rss', 'T1', 'editorial', '2100-01-01')`;
 });
 after(async () => {
   await provider.close();

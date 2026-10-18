@@ -20,8 +20,8 @@ export interface SourceFacts {
   site_fulltext: boolean;
 }
 
-export function channelOf(sourceKind: string, hasXPost: boolean): "x" | "news" {
-  return sourceKind === "x_search" || hasXPost ? "x" : "news";
+export function channelOf(hasXPost: boolean): "x" | "news" {
+  return hasXPost ? "x" : "news";
 }
 
 /** Public pool (/all): editorial sources, AI relevant, with usable copy or an original post. */

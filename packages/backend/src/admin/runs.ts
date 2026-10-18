@@ -56,7 +56,7 @@ export async function runsOverview(): Promise<Runs> {
     sql<Runs["lagging"]>`
       SELECT id, name, kind, health, fail_count, last_ok_at, last_fetch_at, next_fetch_at, interval_minutes, left(last_error, 200) AS last_error
       FROM sources
-      WHERE enabled AND kind NOT IN ('mp_account', 'external')
+      WHERE enabled AND kind <> 'external'
         AND (health = 'failing' OR next_fetch_at < now() - interval '30 minutes' OR last_ok_at < now() - make_interval(mins => greatest(interval_minutes * 6, 360)))
       ORDER BY health = 'failing' DESC, next_fetch_at, id LIMIT 60`,
     sql<{ status: string; n: number }[]>`SELECT status, count(*)::int AS n FROM receipts WHERE created_at > now() - interval '7 days' GROUP BY 1 ORDER BY 1`,

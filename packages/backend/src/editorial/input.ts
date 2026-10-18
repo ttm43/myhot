@@ -71,7 +71,7 @@ export async function loadAnalyzeInput(articleId: string): Promise<AnalyzeInputA
 }
 
 const KIND_LABEL: Record<string, string> = {
-  rss: "RSS", web_list: "网页", json_list: "网页接口", x_search: "X 帖子", mp_account: "微信公众号", external: "外部上报",
+  rss: "RSS", web_list: "网页", json_list: "网页接口", external: "外部上报",
 };
 
 /** The material as the structure step reads it (source facts, text, link). */
