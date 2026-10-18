@@ -2,7 +2,6 @@
 import net from "node:net";
 import { addAbortListener } from "node:events";
 import { Agent, Pool, ProxyAgent, fetch as undiciFetch, type Dispatcher } from "undici";
-import { lookup as dnsLookup } from "node:dns";
 import { config } from "../config.ts";
 import { assertPublicUrl, guardedLookup } from "./url.ts";
 import { createEgressProxy, createEgressResolver, OUTBOUND_HTTP_OPTIONS } from "./egress-proxy.ts";
@@ -40,12 +39,6 @@ function destinationPool(origin: string | URL, options: object): Pool {
   return new Pool(origin, { ...options, maxHeaderSize: limits?.[new URL(origin).hostname] });
 }
 
-/** Local patch: allowlisted sidecar hostnames (PRIVATE_FETCH_ALLOW_HOSTS) use the plain resolver; everything else stays guarded. */
-function allowlistedLookup(hostname: string, options: unknown, callback: unknown): void {
-  if (config.privateFetchAllowHosts.has(hostname.toLowerCase())) return (dnsLookup as never as (...a: unknown[]) => void)(hostname, options, callback);
-  return (guardedLookup as never as (...a: unknown[]) => void)(hostname, options, callback);
-}
-
 function dispatcherFor(viaProxy: boolean): Dispatcher | undefined {
   if (viaProxy) {
     proxyAgent ??= createEgressProxy(config.egressProxyUrl!, egressResolver(), destinationPool);
@@ -53,7 +46,7 @@ function dispatcherFor(viaProxy: boolean): Dispatcher | undefined {
   }
   if (config.allowPrivateNetworkFetch) return undefined;
   // Direct connections resolve through the guarded lookup: the address actually dialled is checked.
-  directAgent ??= new Agent({ ...OUTBOUND_HTTP_OPTIONS, connect: { lookup: allowlistedLookup as never }, factory: destinationPool });
+  directAgent ??= new Agent({ ...OUTBOUND_HTTP_OPTIONS, connect: { lookup: guardedLookup as never }, factory: destinationPool });
   return directAgent;
 }
 
@@ -88,7 +81,7 @@ export async function guardedFetch(input: string, opts: GuardedFetchOptions = {}
   const signal = AbortSignal.timeout(opts.timeoutMs ?? 20_000);
   const route = opts.route ?? "egress";
   const check = (target: string) => withinDeadline(assertPublicUrl(target, config.allowPrivateNetworkFetch,
-    proxied(new URL(target), route) ? egressResolver() : undefined, config.privateFetchAllowHosts), signal);
+    proxied(new URL(target), route) ? egressResolver() : undefined), signal);
   let url = await check(input);
   const maxRedirects = opts.maxRedirects ?? 5;
   const maxBytes = opts.maxBytes ?? 8 * 1024 * 1024;

@@ -35,10 +35,8 @@ AIHOT 的精选按热度、五个维度加权和来源分级门槛打分，个�
 |---|---|
 | 反馈模块：`marks`、`mark_events`、`ai_judgments` 三张表，`/api/mark` 接口，卡片上的按钮和 AI 判断 | `modules/mark/`，在 `site/modules/*.ts`、`site/package.json`、`Dockerfile` 里注册 |
 | 向量接口容忍缺 `index` 字段（Gemini 的 OpenAI 兼容接口不返回它） | `packages/backend/src/providers/embeddings.ts` |
-| 内网放行名单 `PRIVATE_FETCH_ALLOW_HOSTS`：只放行同一 compose 网络里的指定主机（自建 RSSHub），其余仍受 SSRF 防护 | `packages/backend/src/config.ts`、`lib/url.ts`、`lib/http-fetch.ts` |
 | 管理覆盖接口多一个 `relevance` 字段，让外部评价器能把预筛挡住的文章放进候选池 | `packages/backend/src/admin/content.ts` |
 | 推送接口的条目多一个 `body` 字段，作为正文存下（catbus 拿得到 X 帖子全文，x.com 页面抓不了） | `packages/backend/src/ingest/items.ts` |
-| 自建 RSSHub 服务（只监听 127.0.0.1，凭证在不进 git 的 `.env.rsshub`） | `docker-compose.yml` |
 | 推荐层脚本 | `recommender/` |
 
 框架代码里的改动都标了 `local patch`。起点是 AIHOT 2026-10 中旬的版本（提交 `652bd6b`），之后的上游改动没有跟进。

@@ -43,8 +43,6 @@ export const config = {
   siteUrl: str("SITE_URL", SITE.defaultUrl).replace(/\/+$/, ""),
   egressProxyUrl: env.EGRESS_PROXY_URL || null,
   allowPrivateNetworkFetch: bool("ALLOW_PRIVATE_NETWORK_FETCH", false),
-  /** Local patch: exact hostnames allowed to resolve to private addresses (sidecar services in the same compose network, e.g. a self-hosted RSSHub). Everything else keeps the SSRF guard. */
-  privateFetchAllowHosts: new Set((env.PRIVATE_FETCH_ALLOW_HOSTS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)),
   /** Optional directory of per-group dotenv files (models.env, collectors.env, …); normally everything is in .env. */
   credentialsDir: credentialsDir ? path.resolve(REPO_ROOT, credentialsDir) : null,
   dataDir: str("AIHOT_DATA_DIR", path.join(REPO_ROOT, ".data")),

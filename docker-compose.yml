@@ -84,18 +84,6 @@ services:
       api:
         condition: service_started
 
-  # Self-hosted RSSHub: feeds for sites without RSS (知乎 user activities). Credentials in .env.rsshub (gitignored).
-  rsshub:
-    image: diygod/rsshub:2026-10-15
-    restart: unless-stopped
-    env_file: .env.rsshub
-    environment:
-      NODE_ENV: production
-      CACHE_TYPE: memory
-      CACHE_EXPIRE: "900"
-    ports:
-      - "127.0.0.1:1200:1200"
-
   caddy:
     image: caddy:2-alpine
     profiles: ["https"]
