@@ -953,6 +953,46 @@ def find_secondhand_drops(want: dict[str, bool], model: str) -> dict[str, dict]:
     return dropped
 
 
+# 该留却卡住的文章补一步：预筛挡掉的（blocked）补归组——归组遇到没通过分析的会直接标完成，覆盖里的
+# relevance=pass 和摘要就让它够得上精选；没分析过的（skipped）补跑分析。每篇每天最多补一次。
+NUDGE_STEP = {"blocked": "group", "skipped": "analyze"}
+NUDGE_STATE = OUT / "nudge-state.json"
+
+
+def article_status(ids: list[str]) -> dict[str, dict]:
+    if not ids:
+        return {}
+    rows = psql_json(f"""select a.id, a.processing_state, a.grouping_status, coalesce(p.selected, false) as published
+                         from articles a left join publications p on p.article_id = a.id where a.id in ({sql_list(ids)})""")
+    return {r["id"]: r for r in rows}
+
+
+def nudge_stuck(admin, ids: list[str], status: dict[str, dict]) -> None:
+    import urllib.error
+    import urllib.request
+    import uuid
+
+    today = date.today().isoformat()
+    done = read_json(NUDGE_STATE, {})
+    sent = 0
+    for i in ids:
+        if done.get(i) == today:
+            continue
+        step = NUDGE_STEP[status[i]["processing_state"]]
+        req = urllib.request.Request(f"{AIHOT_URL}/api/admin/content/{i}/rerun", data=json.dumps({"step": step}).encode(), method="POST",
+                                     headers={"Content-Type": "application/json", "x-csrf-token": admin.csrf, "idempotency-key": str(uuid.uuid4())})
+        try:
+            admin.opener.open(req, timeout=60).read()
+        except urllib.error.HTTPError as exc:
+            log.warning("补 %s 失败 %s：%s", step, i, exc.code)
+            continue
+        done[i] = today
+        sent += 1
+    write_json(NUDGE_STATE, done)
+    if sent:
+        log.info("卡住的补了 %d 篇（预筛挡掉的补归组，没分析的补分析）", sent)
+
+
 def cmd_select(args) -> int:
     """对候选池里最近 N 天的文章设 selected 覆盖。--keep not-boring（默认）：无聊踢出、其余进精选；--keep niubi：只留牛逼。
     只对变化的篇目调接口，状态记在 select-state.json。
@@ -970,15 +1010,24 @@ def cmd_select(args) -> int:
         want.setdefault(row["article_id"], False)
     secondhand = {} if args.no_secondhand else find_secondhand_drops(want, args.model)
     want = {i: v and i not in secondhand for i, v in want.items()}
+    # 被 AIHOT 预筛判成「非 AI」挡掉的（多是 HN 上的泛技术文章）只放 judge 判牛逼的：收到也放的话精选会被挤满（用户 2026-10-19 定）
+    status = article_status(list(want))
+    want = {i: v and (status.get(i, {}).get("processing_state") != "blocked" or preds.get(i, {}).get("label") == "niubi")
+            for i, v in want.items()}
     state = read_json(SELECT_STATE, {})
     if args.force:
         state = {}
-    todo = {i: v for i, v in want.items() if state.get(i) != v}
-    log.info("精选同步（%s）：%d 篇在窗口内，留 %d，%d 篇需要改", args.keep, len(want), sum(want.values()), len(todo))
-    if not todo:
+    # 判了留、覆盖也写过、却还没进精选的，也重写一遍覆盖：入池条件（标题、摘要、相关）缺什么这次补上
+    todo = {i: v for i, v in want.items() if state.get(i) != v or (v and not status.get(i, {}).get("published")
+            and status.get(i, {}).get("grouping_status") == "complete")}
+    stuck = [i for i, v in want.items() if v and status.get(i, {}).get("grouping_status") != "complete"
+             and status.get(i, {}).get("processing_state") in NUDGE_STEP]
+    log.info("精选同步（%s）：%d 篇在窗口内，留 %d，%d 篇需要改，%d 篇该留但卡在分析或归组", args.keep, len(want), sum(want.values()), len(todo), len(stuck))
+    if not todo and not stuck:
         return 0
     admin = Admin()
     admin.login()
+    nudge_stuck(admin, stuck, status)
     changed, blocked, failed = 0, [], []
     for i, selected in todo.items():
         chain = admin.get(f"/api/admin/content/{i}")
@@ -991,6 +1040,9 @@ def cmd_select(args) -> int:
             if not (chain.get("publication") or {}).get("summary"):
                 # 小模型的预测文件带 summary_fallback（老师的理由或正文开头），它的 reason 是概率，不适合当摘要
                 fields["summary"] = (preds[i].get("summary_fallback") or preds[i].get("reason") or "")[:600]
+            if status.get(i, {}).get("processing_state") == "blocked":
+                # 预筛挡掉的没跑写作那一步，没有中文标题；入池只认中文标题或覆盖标题（卡片上回退显示的原文标题不算），用原文标题
+                fields["title"] = ((chain.get("article") or {}).get("title") or preds.get(i, {}).get("title") or "")[:300]
         label = preds.get(i, {}).get("label", "-")
         score = preds.get(i, {}).get("score", 0)
         reason = f"judge 二手稿，原稿 {secondhand[i]['of']}" if i in secondhand else f"judge {label} {score:.0f}"
