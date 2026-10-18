@@ -94,6 +94,8 @@ test('MCP item search allows terms to match direct text and body, retaining time
 });
 
 test('unchanged pool and timeline revalidate with 304 while a content change returns a new body', async () => {
+  // The edited item must be on both lists for its change to show.
+  await sql`UPDATE publications SET selected = true WHERE article_id = ${id(1)}`;
   for (const path of [`/api/site/pool?tag=${T}`, `/api/site/timeline?tag=${T}`]) {
     const first = await app.inject({ method: 'GET', url: path });
     assert.equal(first.statusCode, 200, path);
