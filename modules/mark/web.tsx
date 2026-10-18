@@ -66,7 +66,7 @@ const BOOT = String.raw`(function () {
   var STATE = {};
   function send(id, label) {
     fetch("/api/mark", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: id, label: label }) })
-      .then(function (r) { if (r.ok) { STATE[id] = STATE[id] || {}; STATE[id].user = label; var all = document.querySelectorAll('.mark-bar[data-mark-id="' + id + '"]'); for (var i = 0; i < all.length; i++) paint(all[i], label, STATE[id].ai); } })
+      .then(function (r) { if (r.status === 401 && !STATE.__askedLogin) { STATE.__askedLogin = 1; if (window.confirm("记反馈要先登录后台。现在去 /admin 登录？")) location.href = "/admin"; } if (r.ok) { STATE[id] = STATE[id] || {}; STATE[id].user = label; var all = document.querySelectorAll('.mark-bar[data-mark-id="' + id + '"]'); for (var i = 0; i < all.length; i++) paint(all[i], label, STATE[id].ai); } })
       .catch(function () {});
   }
   function bar(id) {

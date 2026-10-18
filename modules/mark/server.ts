@@ -1,12 +1,33 @@
 // /api/mark：记一条内容的反馈（niubi 牛逼 / received 收到 / boring 无聊）；查一批内容当前的反馈和 AI 判断；导出全部（给 autored 的 feedback.py --stats）。
 // /api/mark/judgments：autored 的 judge.py 把 AI 判断（档位、分数、理由、触发事实）批量写进来，卡片上显示，用户点按钮即覆盖。
-// 站点只在本机跑，接口不鉴权。
-import type { FastifyInstance } from "fastify";
+// 写入要鉴权（网页端口对局域网和 Tailscale 都开着）：脚本带 INGEST_TOKEN（和推送接口同一个），浏览器要先在 /admin 登录。
+// 读一批反馈和 AI 判断（卡片上显示）不鉴权，和公开内容一样。
+import { timingSafeEqual } from "node:crypto";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { sessionPrincipal } from "@aihot/backend/admin/auth";
+import { credential } from "@aihot/backend/config";
 import { sql } from "@aihot/backend/db";
 import type { ServerModule } from "@aihot/backend/modules";
 
 const LABELS = new Set(["niubi", "received", "boring"]);
 const ID = /^[a-z0-9]{10,40}$/;
+
+/** 和 apps/api 的推送接口同样的校验：常量时间比较，服务端 token 太短或是占位符就一律拒绝。 */
+function scriptToken(req: FastifyRequest): boolean {
+  const expected = credential("auth", "INGEST_TOKEN") ?? "";
+  if (expected.length < 16) return false;
+  const given = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? "")?.[1]?.trim() ?? "";
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** 脚本的 token，或者浏览器里的后台登录；scriptsOnly 时只认 token。不通过就回 401 并返回 false。 */
+async function allowed(req: FastifyRequest, reply: FastifyReply, scriptsOnly = false): Promise<boolean> {
+  if (scriptToken(req) || (!scriptsOnly && (await sessionPrincipal(req.headers.cookie)))) return true;
+  await reply.code(401).header("Cache-Control", "no-store").send({ ok: false, error: scriptsOnly ? "ingest token required" : "login at /admin first" });
+  return false;
+}
 
 interface MarkBody {
   id?: unknown;
@@ -27,6 +48,7 @@ export const server: ServerModule = {
   name: "mark",
   http(app: FastifyInstance) {
     app.post("/api/mark", async (req, reply) => {
+      if (!(await allowed(req, reply))) return;
       const body = (req.body ?? {}) as MarkBody;
       const id = String(body.id ?? "");
       const label = String(body.label ?? "");
@@ -44,6 +66,7 @@ export const server: ServerModule = {
     });
 
     app.delete("/api/mark/:id", async (req, reply) => {
+      if (!(await allowed(req, reply))) return;
       const id = String((req.params as { id?: string }).id ?? "");
       if (!ID.test(id)) return reply.code(400).send({ ok: false, error: "bad id" });
       await sql`DELETE FROM marks WHERE article_id = ${id}`;
@@ -68,6 +91,7 @@ export const server: ServerModule = {
 
     // judge.py 批量写入 AI 判断（最多 500 条一次）。
     app.post("/api/mark/judgments", async (req, reply) => {
+      if (!(await allowed(req, reply, true))) return;
       const body = (req.body ?? {}) as { items?: unknown };
       const items = Array.isArray(body.items) ? (body.items as JudgmentIn[]).slice(0, 500) : [];
       let written = 0;
@@ -90,7 +114,8 @@ export const server: ServerModule = {
       return reply.header("Cache-Control", "no-store").send({ ok: true, received: items.length, written });
     });
 
-    app.get("/api/mark/all", async (_req, reply) => {
+    app.get("/api/mark/all", async (req, reply) => {
+      if (!(await allowed(req, reply))) return;
       const rows = await sql`
         SELECT m.article_id AS id, m.label, m.note, m.updated_at, a.title, a.url, a.published_at, s.name AS source,
                j.label AS ai_label, j.score AS ai_score

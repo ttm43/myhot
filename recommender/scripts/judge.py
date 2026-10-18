@@ -72,6 +72,14 @@ def psql_json(sql: str) -> list[dict]:
     return json.loads(proc.stdout.strip() or "[]")
 
 
+def ingest_token() -> str:
+    """MyHOT 的 INGEST_TOKEN（写 /api/mark/judgments 要带），从 MyHOT 的 .env 读，不打印。"""
+    for line in (AIHOT_DIR / ".env").read_text(encoding="utf-8").splitlines():
+        if line.startswith("INGEST_TOKEN="):
+            return line.split("=", 1)[1].strip().strip('"')
+    raise SystemExit(f"{AIHOT_DIR / '.env'} 里没有 INGEST_TOKEN")
+
+
 def sql_list(values) -> str:
     return ",".join("'" + str(v).replace("'", "''") + "'" for v in values) or "''"
 
@@ -964,7 +972,8 @@ def cmd_sync(args) -> int:
     written = 0
     for i in range(0, len(items), 400):
         body = json.dumps({"items": items[i:i + 400]}).encode("utf-8")
-        req = urllib.request.Request(f"{AIHOT_URL}/api/mark/judgments", data=body, method="POST", headers={"Content-Type": "application/json"})
+        req = urllib.request.Request(f"{AIHOT_URL}/api/mark/judgments", data=body, method="POST",
+                                     headers={"Content-Type": "application/json", "Authorization": f"Bearer {ingest_token()}"})
         with urllib.request.urlopen(req, timeout=120) as resp:
             written += json.loads(resp.read().decode("utf-8")).get("written", 0)
     print(f"同步 {len(items)} 条 AI 判断到 MyHOT，写入 {written}")
