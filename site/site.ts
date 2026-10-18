@@ -101,11 +101,6 @@ export const DEPLOYMENT = {
    * 每次重定向重新按目标域名选路，直连仍检查实际连接地址。
    */
   directFetchHosts: [] as string[],
-  /**
-   * 精选评测（scripts/eval-selection.ts）不带参数时用的金标集：文件（相对仓库根目录）、抽样条数、只抽哪一份、门槛扫描范围。
-   * null 就用 .data/gold.jsonl 的全部样本（最多 200 条），在 40–90 之间扫描。
-   */
-  selectionGold: null as null | { file: string; sample: number; split: string; sweep: [number, number] },
 };
 
 /**

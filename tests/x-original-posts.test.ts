@@ -1,8 +1,7 @@
-// Failure cases: empty/image-only or link-only posts buy invented copy; high scores route them through
-// another writer; rebuilding keeps old model replies or loses pool membership or media; real prose and
-// fetched X Articles stop being written.
+// Failure cases: empty/image-only or link-only posts buy invented copy; rebuilding keeps old model replies
+// or loses pool membership or media; real prose and fetched X Articles stop being written.
 import { pointModels, stub, tag } from "./setup.ts";
-import { analysisStep, SELECTING_SCORE } from "./analysis-steps.ts";
+import { analysisStep } from "./analysis-steps.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
@@ -18,9 +17,7 @@ const provider = await stub((_hit, req) => {
   const step = analysisStep(req.body);
   requests.push(step);
   const content = step === "prefilter" ? { label: "UNKNOWN", reason: "No standalone text evidence" }
-    : step === "score" ? { attentionScore: req.body.includes("high-score") ? SELECTING_SCORE : 12 }
     : step === "structure" ? { category: "ai-products", tags: [], subjects: [], scope: "single", fact: null }
-    : step === "understand" ? { itemType: "product_update", authorRole: "principal", tags: [], editorialJudgment: "产品更新", titleZh: "实际正文标题", summaryZh: "这是实际正文的中文摘要。" }
     : "title_zh: 实际正文标题\nbody_zh: 这是实际正文的中文摘要。";
   return { choices: [{ message: { content: typeof content === "string" ? content : JSON.stringify(content) } }] };
 });
@@ -41,16 +38,16 @@ async function post(name: string, text: string) {
 }
 const released = () => ({ releasedAt: new Date(Date.now() - 60_000) });
 
-test("empty and link-only posts preserve originals without calling either writer, even above the selection threshold", async () => {
+test("empty and link-only posts preserve originals without calling the writer", async () => {
   for (const [name, text] of [
     ["empty", ""], ["whitespace", " \n\t "], ["link", "https://example.org/release"],
-    ["high-score-links", `https://example.org/${"a".repeat(600)}\n\nhttps://example.org/second`],
+    ["long-links", `https://example.org/${"a".repeat(600)}\n\nhttps://example.org/second`],
   ]) {
     const { id, url } = await post(name!, text!);
     const start = requests.length;
     await analyzeArticle(id);
     const steps = requests.slice(start);
-    assert.ok(!steps.includes("summarize") && !steps.includes("understand"), `${name}: no writing request`);
+    assert.ok(!steps.includes("summarize"), `${name}: no writing request`);
     const [analysis] = await sql`SELECT title_zh,summary_zh,relevance FROM analyses WHERE article_id=${id} ORDER BY id DESC LIMIT 1`;
     assert.equal(analysis!.title_zh, text!.trim() ? text!.replace(/\s+/g, " ").trim() : url);
     assert.equal(analysis!.summary_zh, text!.trim() ? text : "");
@@ -69,7 +66,7 @@ test("empty and link-only posts preserve originals without calling either writer
 test("rebuilding an image-only post replaces historical model replies across public outputs and preserves its image and address", async () => {
   const { id, url } = await post("historical-empty", "");
   await sql`INSERT INTO analyses (article_id,input_revision,origin,relevance,title_zh,summary_zh,score,selected)
-    VALUES (${id},1,'model','pass','请补充正文','抱歉，没有推文文字内容可供翻译。',${SELECTING_SCORE},true)`;
+    VALUES (${id},1,'model','pass','请补充正文','抱歉，没有推文文字内容可供翻译。',90,true)`;
   const before = provider.hits();
   await publishArticle(id, released());
   assert.equal(provider.hits(), before, "a projection rebuild buys no model response");

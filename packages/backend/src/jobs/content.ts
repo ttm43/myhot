@@ -233,7 +233,7 @@ export async function sweepUnprocessed(): Promise<{ enqueued: number }> {
  * The receipts of an article's analysis: an unknown outcome on any of them stops the article
  * ("failed"). Extraction never does: it retries, then judges the article on what it has.
  */
-const ARTICLE_STEPS = new Set(["prefilter_article", "score_article", "structure_article", "understand_article", "summarize_article", "mend_wording"]);
+const ARTICLE_STEPS = new Set(["prefilter_article", "structure_article", "summarize_article"]);
 
 /**
  * After a receipt is released (operations/recover.ts), the article that stopped on it goes straight

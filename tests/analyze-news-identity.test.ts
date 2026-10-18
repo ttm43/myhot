@@ -2,7 +2,7 @@
 // step: no separate writing request starts. The stub answers each step; semantic extraction is
 // checked on real samples.
 import { pointModels, stub, tag } from "./setup.ts";
-import { analysisStep, SELECTING_SCORE } from "./analysis-steps.ts";
+import { analysisStep } from "./analysis-steps.ts";
 import assert from "node:assert/strict";
 import { after, test } from "node:test";
 import { closeDb } from "@aihot/backend/db";
@@ -12,7 +12,7 @@ const steps: string[] = [];
 const provider = await stub((_hit, request) => {
   const step = analysisStep(request.body);
   steps.push(step);
-  const result = step === "prefilter" ? { label: "PASS", reason: "fixture" } : step === "score" ? { attentionScore: SELECTING_SCORE } : "invalid output";
+  const result = step === "prefilter" ? { label: "PASS", reason: "fixture" } : "invalid output";
   return { choices: [{ message: { content: typeof result === "string" ? result : JSON.stringify(result) } }] };
 });
 pointModels(provider.url);
@@ -24,5 +24,5 @@ test("an unresolved current identity does not start a separate writing request",
     publishedAt: new Date("2026-10-02T00:00:00Z"), bodyStatus: "ok", bodyText: text, excerpt: null, media: [], xPost: null,
     source: { name: "Fixture", kind: "rss", tier: "T1", firstParty: true } }));
   assert.ok(steps.includes("structure"));
-  assert.equal(steps.filter((s) => s === "understand" || s === "summarize").length, 0);
+  assert.equal(steps.filter((s) => s === "summarize").length, 0);
 });

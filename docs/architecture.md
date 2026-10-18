@@ -3,7 +3,7 @@
 ```mermaid
 flowchart LR
   S["信源<br/>RSS · 网页 · JSON · 外部推送"] --> C["采集<br/>判重 · 抓原文"]
-  C --> J["判断与写作<br/>预筛 · 评分 · 标题摘要 · 结构化"]
+  C --> J["判断与写作<br/>预筛 · 结构化 · 标题摘要"]
   J --> G["归组<br/>事实 · 事件"]
   J --> P["公开读取层<br/>publication/"]
   G --> P
@@ -18,7 +18,7 @@ flowchart LR
 | worker | `apps/worker/` | pg-boss 任务队列和定时任务：抓信源、调模型、归组、清理 |
 | web | `apps/web/` | React Router 服务端渲染的网页。只通过 HTTP 读 api，不碰数据库 |
 
-业务代码都在 `packages/backend/`，前后端共用的类型和常量在 `packages/contracts/`。这个站自己的名字、文案、品牌和页面在 `site/`，行业的分类、信源、提示词和门槛在 `industry/`，只属于这个站的功能在 `modules/`（见下文“模块”）。
+业务代码都在 `packages/backend/`，前后端共用的类型和常量在 `packages/contracts/`。这个站自己的名字、文案、品牌和页面在 `site/`，行业的分类、信源和提示词在 `industry/`，只属于这个站的功能在 `modules/`（见下文“模块”）。
 
 ## 几条不变的规则
 
@@ -41,7 +41,7 @@ flowchart LR
 | 位置 | 内容 |
 |---|---|
 | `site/` | 这个站自己的：站名文案、每一步的模型、品牌与 Logo、条款页、网站根目录的四个固定文件（`public/`，替换占位符后发布）、更新日志，以及启用哪些模块（`site/modules/`） |
-| `industry/` | 行业包：分类标签、搜索认得的公司、示范信源、提示词、门槛 |
+| `industry/` | 行业包：分类标签、搜索认得的公司、示范信源、提示词 |
 | `modules/` | 只属于这个站的功能，一个功能一个文件夹（见下文“模块”）；框架本身不带模块 |
 | `packages/backend/src/sources/` | 六种信源的读取器，抓取调度（`collect.ts`） |
 | `packages/backend/src/content/` | 资料入库、判重、正文提取和清洗 |

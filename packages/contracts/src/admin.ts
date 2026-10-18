@@ -283,36 +283,5 @@ export interface AdminModels {
   capabilities: Array<{ key: string; label: string; env: string; defaultModel: string; vision: boolean; current: { model: string; source: "admin" | "env" | "default" }; usage: AdminModelUsage[] }>;
   choices: Array<{ key: string; service: string; vision: boolean }>;
   history: Array<{ at: Timestamp; actor: string; subject: string; reason: string | null; before: { model: string; source: string } | null; after: { model: string; source: string } | null }>;
-  benches: Array<{ id: string; label: string; sample_size: number; prompt_version: string | null; models: string[]; created_at: Timestamp }>;
 }
 
-export interface AdminSelectBenchRun {
-  id: string;
-  label: string;
-  split: string | null;
-  sample_size: number;
-  prompt_version: string | null;
-  models: string[];
-  summary: Record<string, Record<string, number>>;
-  created_at: Timestamp;
-}
-
-export interface AdminSelectBenchRuns {
-  runs: Array<AdminSelectBenchRun & { imported_by: string | null; cases: number }>;
-}
-
-export interface AdminSelectBenchDecision {
-  decision: "select" | "reject" | null;
-  score: number | null;
-  relevance: string | null;
-  category: string | null;
-  reason: string | null;
-  error: string | null;
-  receiptId: number | null;
-}
-
-export interface AdminSelectBenchCases {
-  run: AdminSelectBenchRun;
-  rows: Array<{ case_id: string; title: string; stratum: string | null; gold: "select" | "reject" | "either"; by_model: Record<string, AdminSelectBenchDecision> }>;
-  strata: Array<{ stratum: string | null; n: number }>;
-}

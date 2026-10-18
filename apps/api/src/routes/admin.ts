@@ -5,7 +5,6 @@ import type { AdminSourceUpdate } from "@aihot/contracts/admin";
 import { actorOf } from "@aihot/backend/admin/auth";
 import { navCounts } from "@aihot/backend/admin/navigation";
 import { listAudit } from "@aihot/backend/audit";
-import { importSelectBenchRun, listSelectBenchRuns, selectBenchRun } from "@aihot/backend/admin/selectbench";
 import { modelsOverview, switchModel } from "@aihot/backend/admin/models";
 import { contentChain, overrideFields, rerun, searchContent, setVisibility } from "@aihot/backend/admin/content";
 import { detachFromFact, mergeStories } from "@aihot/backend/events/corrections";
@@ -72,17 +71,6 @@ export function registerAdmin(app: FastifyInstance) {
   app.post("/api/admin/models/:capability", adminHandler(async (req, _reply, admin) => {
     const b = body<{ model: string | null; reason: string }>(req);
     return switchModel(param(req, "capability"), b.model ?? null, String(b.reason ?? ""), actorOf(admin));
-  }));
-
-  // SelectBench
-  app.get("/api/admin/selectbench", adminHandler(async () => ({ runs: await listSelectBenchRuns() })));
-  app.get("/api/admin/selectbench/:id", adminHandler(async (req, reply) => {
-    const f = q(req);
-    return orNotFound(req, reply, await selectBenchRun(param(req, "id"), { model: f.model, outcome: f.outcome, stratum: f.stratum, disagree: f.disagree === "1" }));
-  }));
-  app.post("/api/admin/selectbench/import", adminHandler(async (req, _reply, admin) => {
-    const b = body<{ label: string; report: unknown }>(req);
-    return importSelectBenchRun(b.report, String(b.label || "导入的对比运行"), actorOf(admin));
   }));
 
   // Attention counts for the navigation, and the audit trail.

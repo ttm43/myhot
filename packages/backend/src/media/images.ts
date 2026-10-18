@@ -231,11 +231,6 @@ export function resizeImage(body: Buffer, upstreamType: string, mode: string): P
   return encodeImage(body, upstreamType, mode, true);
 }
 
-/** A bitmap for consumers that cannot read SVG, using the same dimensions and encoder. */
-export function rasterImage(body: Buffer, upstreamType: string, mode: string): Promise<{ body: Buffer; type: string }> {
-  return encodeImage(body, upstreamType, mode, false);
-}
-
 async function encodeImage(body: Buffer, upstreamType: string, mode: string, vectors: boolean): Promise<{ body: Buffer; type: string }> {
   const ico = decodeIco(body);
   const suppliedType = upstreamType.split(";")[0]!.trim().toLowerCase();

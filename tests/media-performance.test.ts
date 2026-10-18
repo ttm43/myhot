@@ -125,24 +125,6 @@ test("SVG preparation retains compact transfer and intrinsic display size", asyn
   }
 });
 
-test("a retained large SVG still supplies the model's raster thumbnail", async () => {
-  const { firstImagePart } = await import("@aihot/backend/editorial/input");
-  const url = `${base}/model-vector`;
-  const key = createHash("sha256").update(`thumb|${url}`).digest("hex");
-  const file = path.join(dir, "imgcache", key.slice(0, 2), key);
-  const body = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="180" height="34"><rect width="180" height="34" fill="#176b75"/><desc>${randomBytes(180000).toString("base64")}</desc></svg>`);
-  await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, body);
-  await writeFile(`${file}.type`, "image/svg+xml");
-  const before = imageHits;
-  const part = await firstImagePart({ media: [{ kind: "image", url }] } as Parameters<typeof firstImagePart>[0]);
-  assert.ok(part && part.type === "image_url");
-  const data = (part as { type: "image_url"; image_url: { url: string } }).image_url.url;
-  assert.match(data, /^data:image\/(jpeg|png|webp);base64,/);
-  assert.equal((await sharp(Buffer.from(data.split(",")[1]!, "base64")).metadata()).width, 720);
-  assert.equal(imageHits, before);
-});
-
 test("site media exposes responsive previews and full lightboxes while RSS retains thumb images", () => {
   const row = { x_post: { media: [{ url: "https://example.org/1.png" }, { url: "https://example.org/2.png", poster: "https://example.org/poster.png" }] } };
   assert.ok(xView(row, true)!.media.every((m) => m.url.includes("mode=card") && m.fullUrl?.includes("mode=full")));

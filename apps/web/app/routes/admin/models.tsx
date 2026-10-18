@@ -16,7 +16,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return adminGet<AdminModels>(request, `/api/admin/models?days=${encodeURIComponent(days)}`);
 }
 
-export const meta: Route.MetaFunction = () => [{ title: `模型与评测 · ${SITE.name} 后台` }];
+export const meta: Route.MetaFunction = () => [{ title: `模型 · ${SITE.name} 后台` }];
 
 const SOURCE_LABEL = { admin: "后台切换", env: "环境变量", default: "代码默认" } as const;
 
@@ -36,7 +36,7 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
 
   return (
     <AdminPage
-      title="模型与评测"
+      title="模型"
       subtitle="每项能力当前用哪个模型、来自哪里（后台切换 > 环境变量 > 代码默认），以及近期的成功率、耗时与费用。切换只影响之后的新任务，已有结果不重算；换精选模型前先看 SelectBench 同批对比。"
       actions={<FilterChips param="days" options={[{ value: "1", label: "24 小时" }, { value: "", label: "7 天" }, { value: "30", label: "30 天" }]} />}
     >
@@ -127,23 +127,6 @@ export default function ModelsAdmin({ loaderData: m }: Route.ComponentProps) {
             />
           ) : (
             <Empty>还没有在后台切换过模型</Empty>
-          )}
-        </Card>
-        <Card title="同批样本对比（SelectBench）" right={<Link to="/admin/selectbench" className="text-accent">全部运行</Link>} pad={false}>
-          {m.benches.length ? (
-            <DataTable
-              dense
-              rows={m.benches}
-              rowKey={(b) => b.id}
-              columns={[
-                { key: "l", label: "运行", render: (b) => <Link to={`/admin/selectbench/${b.id}`} className="text-ink hover:text-accent">{b.label}</Link> },
-                { key: "m", label: "模型", render: (b) => <span className="font-mono text-[11.5px] text-ink-3">{b.models.join("、")}</span> },
-                { key: "n", label: "样本", align: "right", render: (b) => num(b.sample_size) },
-                { key: "at", label: "时间", render: (b) => <span className="num whitespace-nowrap">{bj(b.created_at)}</span> },
-              ]}
-            />
-          ) : (
-            <Empty>还没有导入对比运行</Empty>
           )}
         </Card>
       </div>

@@ -1,15 +1,12 @@
-// Which step of the article analysis a model request is for, and a score that selects. Each step sends
-// its own system prompt, rendered from the industry pack, and the thresholds come from the pack too: a
-// test that recognises a request by its whole prompt and scores against the pack's threshold keeps
-// working when a site rewrites the prompts and recalibrates the thresholds for its own industry.
-import { MEND_SYSTEM, SCORE_SYSTEM, STRUCTURE_SYSTEM, tierThreshold } from "@aihot/backend/editorial/analyze";
-import { PREFILTER_SYSTEM, UNDERSTAND_SYSTEM } from "@aihot/backend/editorial/writing";
+// Which step of the article analysis a model request is for. Each step sends its own system prompt,
+// rendered from the industry pack: a test that recognises a request by its whole prompt keeps working
+// when a site rewrites the prompts for its own industry.
+import { STRUCTURE_SYSTEM } from "@aihot/backend/editorial/analyze";
+import { PREFILTER_SYSTEM } from "@aihot/backend/editorial/writing";
 
-export type AnalysisStep = "prefilter" | "score" | "structure" | "understand" | "summarize" | "wording";
+export type AnalysisStep = "prefilter" | "structure" | "summarize";
 
-const BY_SYSTEM = new Map<string, AnalysisStep>([
-  [PREFILTER_SYSTEM, "prefilter"], [SCORE_SYSTEM, "score"], [STRUCTURE_SYSTEM, "structure"], [UNDERSTAND_SYSTEM, "understand"], [MEND_SYSTEM, "wording"],
-]);
+const BY_SYSTEM = new Map<string, AnalysisStep>([[PREFILTER_SYSTEM, "prefilter"], [STRUCTURE_SYSTEM, "structure"]]);
 
 /** The step of a chat request, from its body as the provider receives it; the title/summary prompt comes without a system message. */
 export function analysisStep(body: string): AnalysisStep {
@@ -19,6 +16,3 @@ export function analysisStep(body: string): AnalysisStep {
   if (!step) throw new Error(`not a request of the article analysis: ${String(messages[0].content).slice(0, 80)}`);
   return step;
 }
-
-/** Both score calls at the T1 threshold: material from a T1 source is selected, with this mean score. */
-export const SELECTING_SCORE = tierThreshold("T1")!;

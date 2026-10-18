@@ -37,7 +37,7 @@ node --env-file=.env scripts/eval-relations.ts \
   --split development
 ```
 
-默认使用“归组复核”这一步当前的模型：后台“模型与评测”页切换过的优先，其次是环境变量 `GROUP_REVIEW_MODEL`，再其次是 `site/models.ts` 的 `DEFAULTS.groupReview`，都没有就用默认模型。也可以显式比较多个已配置的模型：
+默认使用“归组复核”这一步当前的模型：后台“模型”页切换过的优先，其次是环境变量 `GROUP_REVIEW_MODEL`，再其次是 `site/models.ts` 的 `DEFAULTS.groupReview`，都没有就用默认模型。也可以显式比较多个已配置的模型：
 
 ```bash
 node --env-file=.env scripts/eval-relations.ts \

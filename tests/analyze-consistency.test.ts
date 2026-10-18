@@ -1,7 +1,7 @@
 // Failure cases: a successful old response completes newer input; a failed business commit leaves
 // an analysis or completed receipts behind; retry buys responses already saved before that failure.
 import { gate, pointModels, stub, tag } from "./setup.ts";
-import { analysisStep, SELECTING_SCORE } from "./analysis-steps.ts";
+import { analysisStep } from "./analysis-steps.ts";
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
@@ -19,10 +19,9 @@ const provider = await stub(async (_hit, request) => {
     await waiting.release.promise;
   }
   const content = step === "prefilter" ? { label: "PASS", reason: "local fixture" }
-    : step === "score" ? { attentionScore: SELECTING_SCORE }
     : step === "structure" ? { category: "ai-models", tags: [], subjects: [], scope: "single", fact: null }
-    : { itemType: "model_release", authorRole: "principal", tags: ["模型发布"], editorialJudgment: "模型能力提升", titleZh: "实验室发布新模型", summaryZh: "实验室发布新模型，并公布了评测结果与价格。" };
-  return { choices: [{ message: { content: JSON.stringify(content) } }] };
+    : "title_zh: 实验室发布新模型\nsummary_zh: 实验室发布新模型，并公布了评测结果与价格。";
+  return { choices: [{ message: { content: typeof content === "string" ? content : JSON.stringify(content) } }] };
 });
 pointModels(provider.url);
 before(async () => {
@@ -87,5 +86,5 @@ test("a failed analysis commit rolls back its judgement and receipt completion; 
   assert.deepEqual(completed.map(r => r.id), received.map(r => r.id));
   assert.ok(completed.every(r => r.status === "completed"));
   assert.deepEqual({ ...(await sql`SELECT selected, selection_candidate FROM publications WHERE article_id=${articleId}`)[0] },
-    { selected: false, selection_candidate: true }, "saved analysis nominates a candidate while news identity is pending");
+    { selected: false, selection_candidate: false }, "the analysis nominates nothing: only an override selects");
 });

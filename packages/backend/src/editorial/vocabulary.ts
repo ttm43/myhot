@@ -1,7 +1,7 @@
 // Tag normalization and company identity over the industry pack's vocabulary (industry/taxonomy.ts).
 import { CATEGORIES, CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, TAG_SYNONYMS, TOPIC_TAGS } from "@aihot/industry/taxonomy";
 
-export { CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, ITEM_TYPES, TOPIC_TAGS } from "@aihot/industry/taxonomy";
+export { CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, TOPIC_TAGS } from "@aihot/industry/taxonomy";
 
 const ALLOWED_TAGS = new Set<string>([...CATEGORY_TAGS, ...TOPIC_TAGS, ...ENTITY_TAGS]);
 

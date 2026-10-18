@@ -1,5 +1,5 @@
-// The writing side of the analysis: the prefilter's and the content understanding's inputs, the
-// title/summary prompts for everything else, the output parsing and the deterministic guards. The
+// The writing side of the analysis: the prefilter's input, the title/summary prompts, the output
+// parsing and the deterministic guards. The
 // wording lives in the industry pack (industry/prompts/); a failed guard falls back without a repair call.
 import { IDENTITY_CONTEXT_ALIASES, IDENTITY_LEXICON, PUBLISHER_DOMAINS } from "@aihot/industry/taxonomy";
 import { stripTagMarkup } from "../lib/text.ts";
@@ -7,7 +7,6 @@ import type { AnalyzeInputArticle } from "./input.ts";
 import { promptText } from "./prompts.ts";
 
 export const PREFILTER_SYSTEM = promptText("prefilter");
-export const UNDERSTAND_SYSTEM = promptText("understand");
 
 /** A body longer than this is cut (whole bodies are sent; a few run past the context). */
 export const MAX_BODY_CHARS = 60_000;
@@ -68,7 +67,7 @@ export function needsShortTweetTranslation(text: string): boolean {
   return englishRuns.some((run) => run.replace(/\s+/g, "").length >= 10);
 }
 
-// The material as the prefilter and the content understanding read it
+// The material as the prefilter reads it
 
 const X_ARTICLE_LINK = /https?:\/\/(?:www\.)?(?:x|twitter)\.com\/i\/article\/\d+/gi;
 
@@ -86,8 +85,8 @@ function materialQuality(a: AnalyzeInputArticle): string {
   return "无有效文本";
 }
 
-/** The material as the prefilter and the content understanding read it. */
-export function renderContext(a: AnalyzeInputArticle, opts: { annotateQuoted?: boolean } = {}): string {
+/** The material as the prefilter reads it. */
+export function renderContext(a: AnalyzeInputArticle): string {
   const lines: string[] = [];
   lines.push(`【来源】${a.source.name}（${a.source.kind}，tier=${a.source.tier || "未分级"}）`);
   if (a.source.tags?.length) lines.push(`【来源标签】${a.source.tags.join(", ")}`);
@@ -105,15 +104,10 @@ export function renderContext(a: AnalyzeInputArticle, opts: { annotateQuoted?: b
   const quoted = a.xPost?.quoted?.text ? a.xPost.quoted : null;
   if (quoted) {
     const label = quoted.handle ? `@${quoted.handle}` : "原推";
-    if (opts.annotateQuoted) {
-      lines.push(`【引用 ${label}】（以下是作者转发/引用的**他人**内容，不是作者本人的产出）`);
-      lines.push(String(quoted.text));
-    } else {
-      lines.push(`【引用 ${label}】${quoted.text}`);
-    }
+    lines.push(`【引用 ${label}】${quoted.text}`);
   }
   lines.push("");
-  lines.push(opts.annotateQuoted && quoted ? "【正文（作者自己的内容）】" : "【正文】");
+  lines.push("【正文】");
   lines.push(capBody(a.xPost ? String(a.xPost.text ?? a.title) : (a.bodyText ?? a.excerpt ?? "(无正文)")));
   lines.push("");
   lines.push(`【材料质量】${materialQuality(a)}`);
@@ -127,9 +121,6 @@ export const prefilterUser = (a: AnalyzeInputArticle) => JSON.stringify(renderCo
 export function missingEvidence(a: AnalyzeInputArticle): boolean {
   return !a.bodyText?.trim() && !a.excerpt?.trim() && !String(a.xPost?.text ?? "").trim() && !String(a.xPost?.quoted?.text ?? "").trim();
 }
-
-export const understandUser = (a: AnalyzeInputArticle) =>
-  ["请按系统规则理解以下单篇材料，一次返回全部六个字段。", renderContext(a, { annotateQuoted: true })].join("\n\n");
 
 // Identity context and guard
 
@@ -274,7 +265,7 @@ export function finalizeCopy(input: TranslateInput, copy: { titleZh: string; sum
   return enforceIdentity(input, { titleZh: copy.titleZh, summaryZh });
 }
 
-// Title/summary prompts for items the content understanding does not write
+// Title/summary prompts
 
 const sourceName = (name?: string) => name?.trim() || "（未注明）";
 

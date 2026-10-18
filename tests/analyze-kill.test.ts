@@ -2,7 +2,7 @@
 // These are real processes and PostgreSQL transactions with a local model protocol substitute;
 // they do not test provider quality, machine power loss, or a browser journey.
 import { gate, pointModels, stub, tag } from "./setup.ts";
-import { analysisStep, SELECTING_SCORE, type AnalysisStep } from "./analysis-steps.ts";
+import { analysisStep, type AnalysisStep } from "./analysis-steps.ts";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
@@ -26,10 +26,9 @@ const provider = await stub(async (_hit, request) => {
     await held.answer.promise;
   }
   const content = step === "prefilter" ? { label: "PASS", reason: "AI model release" }
-    : step === "score" ? { attentionScore: SELECTING_SCORE }
-      : step === "structure" ? { category: "ai-models", tags: ["模型发布"], subjects: [], fact: { title: "新模型发布" } }
-        : { itemType: "model_release", authorRole: "principal", tags: ["模型发布"], editorialJudgment: "模型有明确的能力提升", titleZh: `新模型发布 ${T}`, summaryZh: "模型发布并提供了评测和价格。" };
-  return { id: `stub-${calls.length}`, choices: [{ message: { content: JSON.stringify(content) } }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } };
+    : step === "structure" ? { category: "ai-models", tags: ["模型发布"], subjects: [], fact: { title: "新模型发布" } }
+      : `title_zh: 新模型发布 ${T}\nsummary_zh: 模型发布并提供了评测和价格。`;
+  return { id: `stub-${calls.length}`, choices: [{ message: { content: typeof content === "string" ? content : JSON.stringify(content) } }], usage: { prompt_tokens: 10, completion_tokens: 10, total_tokens: 20 } };
 });
 
 type WorkerMessage = { result?: { state: string }; error?: { name: string; message: string } };
@@ -178,7 +177,7 @@ test("SIGKILL after responses are saved but before the business commit reuses al
   try {
     await locked.promise;
     const running = worker(articleId);
-    await until(async () => (await sql`SELECT 1 FROM receipts WHERE subject=${subject} AND status='received'`).length === 5, "all paid responses persisted");
+    await until(async () => (await sql`SELECT 1 FROM receipts WHERE subject=${subject} AND status='received'`).length === 3, "all paid responses persisted");
     assert.equal((await sql`SELECT 1 FROM analyses WHERE article_id=${articleId}`).length, 0);
     assert.equal((await sql`SELECT 1 FROM publications WHERE article_id=${articleId}`).length, 0);
     await kill(running);
@@ -186,16 +185,15 @@ test("SIGKILL after responses are saved but before the business commit reuses al
     unlock.open();
     await transaction;
   }
-  assert.deepEqual(calls.slice().sort(), ["prefilter", "score", "score", "structure", "understand"]);
+  assert.deepEqual(calls.slice().sort(), ["prefilter", "structure", "summarize"]);
   const receivedIds = (await sql`SELECT id FROM receipts WHERE subject=${subject} ORDER BY id`).map((r) => String(r.id));
   assert.equal((await finish(articleId)).result?.state, "pass");
-  assert.equal(calls.length, 5, "restart sent no additional model requests");
-  const [analysis] = await sql`SELECT selected,score,receipt_ids FROM analyses WHERE article_id=${articleId}`;
-  assert.equal(analysis?.selected, true);
-  assert.equal(Number(analysis?.score), SELECTING_SCORE);
+  assert.equal(calls.length, 3, "restart sent no additional model requests");
+  const [analysis] = await sql`SELECT title_zh,receipt_ids FROM analyses WHERE article_id=${articleId}`;
+  assert.equal(analysis?.title_zh, `新模型发布 ${T}`);
   assert.deepEqual(analysis!.receipt_ids.map(String).sort(), receivedIds.slice().sort());
-  assert.equal((await sql`SELECT 1 FROM receipts WHERE subject=${subject} AND status='completed'`).length, 5);
-  assert.equal((await sql`SELECT 1 FROM receipt_attempts a JOIN receipts r ON r.id=a.receipt_id WHERE r.subject=${subject}`).length, 5);
+  assert.equal((await sql`SELECT 1 FROM receipts WHERE subject=${subject} AND status='completed'`).length, 3);
+  assert.equal((await sql`SELECT 1 FROM receipt_attempts a JOIN receipts r ON r.id=a.receipt_id WHERE r.subject=${subject}`).length, 3);
   assert.deepEqual({ ...(await sql`SELECT selected, selection_candidate FROM publications WHERE article_id=${articleId}`)[0] },
-    { selected: false, selection_candidate: true }, "saved analysis nominates a candidate while news identity is pending");
+    { selected: false, selection_candidate: false }, "the analysis nominates nothing: only an override selects");
 });

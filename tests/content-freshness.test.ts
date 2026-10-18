@@ -10,7 +10,7 @@ import { config } from '@aihot/backend/config';
 import { sql, closeDb } from '@aihot/backend/db';
 import { upsertMaterial } from '@aihot/backend/content/materials';
 import { extractArticleBody } from '@aihot/backend/content/extract';
-import { buildScoreInput, loadAnalyzeInput } from '@aihot/backend/editorial/analyze';
+import { buildMaterial, loadAnalyzeInput } from '@aihot/backend/editorial/analyze';
 import { collectSource } from '@aihot/backend/sources/collect';
 import { groupArticle } from '@aihot/backend/events/group';
 import { publishArticle } from '@aihot/backend/publication/publish';
@@ -43,7 +43,7 @@ async function highScore(id:string){
   await publishArticle(id);
 }
 
-test('a previously unseen, undated tail cannot become selected news or heat',async()=>{
+test('a previously unseen, undated tail cannot become selected news',async()=>{
   const now=new Date();
   listing=Array.from({length:60},(_,i)=>({url:`${base}/known-${i}`,title:`Known ${i}`,date:now.toISOString(),summary:body}));
   await collectSource(SOURCE);
@@ -53,8 +53,8 @@ test('a previously unseen, undated tail cannot become selected news or heat',asy
   assert.equal(a!.published_at,null);
   assert.equal(a!.backfill,true,'unknown publication time does not establish recency');
   const input=await loadAnalyzeInput(a!.id);
-  const score=buildScoreInput(input!);
-  assert.ok(!score.includes(now.toISOString().slice(0,10)),'discovery must not be labelled publication');
+  const material=buildMaterial(input!);
+  assert.ok(!material.includes('发布时间'),'discovery must not be labelled publication');
   await highScore(a!.id);
   assert.equal((await groupArticle(a!.id)).verdict,'historical');
   assert.equal((await sql`SELECT selected FROM publications WHERE article_id=${a!.id}`)[0]!.selected,false);

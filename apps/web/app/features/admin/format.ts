@@ -51,7 +51,3 @@ export function duration(from: string | null, to: string | null): string {
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.round(ms / 60_000)}m`;
 }
-
-export function pct(v: number | null | undefined, digits = 1): string {
-  return v === undefined || v === null || !Number.isFinite(v) ? "—" : `${(v * 100).toFixed(digits)}%`;
-}

@@ -1,7 +1,6 @@
-// Admin "模型与评测": the model each capability uses and where that choice comes from,
-// the prompt versions in use, quality / latency / cost of the last days per model, the switch history
-// and the SelectBench runs that compare models on the same batch. A switch is audited and applies to
-// new work only.
+// Admin "模型": the model each capability uses and where that choice comes from,
+// the prompt versions in use, quality / latency / cost of the last days per model and the switch
+// history. A switch is audited and applies to new work only.
 import type { AdminModels, BeforeJson } from "@aihot/contracts/admin";
 import { sql } from "../db.ts";
 import { capabilities, capabilityAcceptsModel, invalidateModelCache, modelSources } from "../editorial/models.ts";
@@ -31,7 +30,7 @@ interface UsageRow {
 
 export async function modelsOverview(days = 7): Promise<BeforeJson<AdminModels>> {
   const since = new Date(Date.now() - days * 86400_000);
-  const [sources, usage, prices, history, benches] = await Promise.all([
+  const [sources, usage, prices, history] = await Promise.all([
     modelSources(),
     sql<UsageRow[]>`
       SELECT r.purpose, a.model, r.request->>'promptVersion' AS prompt_version, count(*)::int AS calls,
@@ -52,10 +51,6 @@ export async function modelsOverview(days = 7): Promise<BeforeJson<AdminModels>>
       SELECT service, model, currency, input_per_mtok, cached_per_mtok, output_per_mtok FROM service_prices`,
     sql<BeforeJson<AdminModels["history"][number]>[]>`
       SELECT created_at AS at, actor, subject, reason, before, after FROM audit_log WHERE action = 'models.switch' ORDER BY created_at DESC LIMIT 30`,
-    sql<{ id: string; label: string; sample_size: number; prompt_version: string | null; models: string[]; summary: unknown; created_at: Date }[]>`
-      SELECT id, label, sample_size, prompt_version, models,
-             (SELECT coalesce(jsonb_object_agg(key, value - 'sweep'), '{}'::jsonb) FROM jsonb_each(r.summary)) AS summary,
-             created_at FROM selectbench_runs r ORDER BY created_at DESC LIMIT 8`,
   ]);
   const serviceOf = (model: string) => Object.values(MODELS).find((m) => m.model === model || m.key === model)?.service ?? null;
   // Cached prompt tokens at the cache price, the rest at the input price; calls that carry their own cost
@@ -96,7 +91,7 @@ export async function modelsOverview(days = 7): Promise<BeforeJson<AdminModels>>
       })),
   }));
   const choices = Object.values(MODELS).map((m) => ({ key: m.key, service: m.service, vision: !!m.vision }));
-  return { days, capabilities: steps, choices, history, benches };
+  return { days, capabilities: steps, choices, history };
 }
 
 /** Switches a capability to another registered model (or back to the environment/default when null). */

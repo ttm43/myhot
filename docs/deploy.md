@@ -26,7 +26,7 @@ RSS、分享链接、站点地图和 Agent Markdown 中的绝对链接都使用�
 docker compose up -d --build
 ```
 
-启动后打开 `http://服务器地址:3000`，后台在 `/admin`，用管理员密码登录。第一次启动会导入示范信源，一两分钟后开始出现内容；第一次导入的一百多条资料大约半小时处理完（每条都要预筛、评分、结构化、写标题摘要，再归组）。
+启动后打开 `http://服务器地址:3000`，后台在 `/admin`，用管理员密码登录。第一次启动会导入示范信源，一两分钟后开始出现内容；第一次导入的一百多条资料大约半小时处理完（每条都要预筛、结构化、写标题摘要，再归组）。
 
 `docker compose` 会起五个容器：`db`（PostgreSQL 17）、`setup`（每次启动先跑数据库迁移和种子数据，然后退出）、`api`、`worker`（抓取、模型处理、定时任务）、`web`（网页）。`web` 只接收网站地址、API 地址等网页配置，通过 HTTP 读取 API；数据库、模型和管理员密钥，以及数据卷，只交给后端容器。
 
@@ -83,6 +83,7 @@ docker compose run --rm setup && docker compose up -d
 
 MyHOT 不再跟进上游，只留采集、预筛、摘要、归组和自己读的页面。下面每条是一项删掉的功能；迁移只删表，不调用模型，删掉的表里的数据找不回来，要留的先用下方 [备份](#备份) 导出。
 
+- **AIHOT 评分和 SelectBench**：程序不再给资料打分、不再判断入选（模型步骤“精选评分”`SCORE_MODEL`、“内容理解”`UNDERSTAND_MODEL`、“改用词”`WORDING_MODEL` 和它们的提示词 `selection-score.md`、`understand.md`、`content-understanding.md`、`mend-wording.md` 都去掉了），分析只剩预筛、结构化和标题摘要；精选和卡片上的分数只由人工覆盖决定（后台“内容诊断”或外部评价器写覆盖），见 [精选](selection.md)。`industry/selection.ts`、`industry/wording.ts`、`industry/gold.example.jsonl`、`industry/taxonomy.ts` 的 `ITEM_TYPES`、模型预设 `glm-5.3-flash-selection` 和 `site/site.ts` 的 `DEPLOYMENT.selectionGold` 删除；后台 SelectBench 页、`scripts/eval-selection.ts` 也去掉了，“模型与评测”页改名“模型”。迁移 `0117`、`0118` 删掉 `selectbench_results`、`selectbench_runs`。`analyses` 表的 `score`、`selected` 两列留着：硬分叉前按 AIHOT 评分选上的资料没有覆盖时还靠它们保持入选，之后的新分析不再写这两列。`.env` 里的 `SCORE_MODEL`、`UNDERSTAND_MODEL`、`WORDING_MODEL` 不再读；`settings` 表里的 `models.score`、`models.understand`、`models.wording`（如果设过）不再读。
 - **全文翻译**：精选全文和被引用帖子的中文翻译（`content.translate` 定时任务、模型步骤“精选全文翻译”和 `TRANSLATE_MODEL`、`industry/prompts/translate-*.md`）、文章页的“中文 / 原文”切换和 `/items/:id/original`（连同 `/api/site/items/:id/original`）都去掉了；文章页和 Markdown 导出只给原文。迁移 `0114`–`0116` 删掉 `translation_attempts`、`quote_translations`、`translations` 三张表，已有的译文找不回来。`.env` 里的 `TRANSLATE_MODEL` 不再读；`settings` 表里的 `models.translate`（如果设过）不再读。
 - **自建 RSSHub**：`docker-compose.yml` 里的 `rsshub` 服务和只为它开的内网放行名单（`PRIVATE_FETCH_ALLOW_HOSTS`）都去掉了，所有抓取重新一律经过内网地址防护。已经跑着的 `rsshub` 容器不会被 `docker compose up` 删掉，要手动删：`docker compose up -d --remove-orphans`，或 `docker rm -f <项目名>-rsshub-1`；`.env.rsshub` 和 `.env` 里的 `PRIVATE_FETCH_ALLOW_HOSTS` 可以删掉。指向 `http://rsshub:1200/...` 的信源会抓取失败，先在后台停用。
 - **X 搜索、公众号和 Jina**：`x_search`（SocialData）和 `mp_account`（极致了）两种信源、`sources.fetch-x` 和 `sources.mp` 队列、`sources.mp-reconcile` 定时任务、X Article 正文抓取，以及 Jina Reader（`r.jina.ai` 网页列表、正文抓不到时的兜底）都去掉了；采集只剩 `rss`、`web_list`、`json_list`、`external`，正文只读原网页，读不到就标“未确认”。后台新建信源不再有这两种类型，信源页不再显示 X 的续读标记。`.env` 里的 `SOCIALDATA_*`、`DAJIALA_*`、`JINA_*` 不再读，可以删掉。数据库里还有这两种类型的信源的，先在后台停用或改成别的类型。`budgets` 表里这三家的上限不再用，回执记录保留；要清掉上限：`DELETE FROM budgets WHERE service IN ('socialdata', 'dajiala', 'jina');`。没有迁移。

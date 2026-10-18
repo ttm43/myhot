@@ -1,6 +1,6 @@
 // Recovery must finish the same evaluation that failed, and commit the release, queue and audit together.
 import { gate, pointModels, Reply, stub, tag } from "./setup.ts";
-import { analysisStep, SELECTING_SCORE } from "./analysis-steps.ts";
+import { analysisStep } from "./analysis-steps.ts";
 import assert from "node:assert/strict";
 import { setTimeout as delay } from "node:timers/promises";
 import { after, afterEach, before, test } from "node:test";
@@ -16,7 +16,7 @@ import { ReceiptUnknownError } from "@aihot/backend/providers/receipts";
 const T = tag();
 const SOURCE = `recovery-${T}`;
 let original = true;
-let refuseScore = true;
+let refuseWriting = true;
 const calls: string[] = [];
 let heldFailure: { input: string; asked: ReturnType<typeof gate<void>>; release: ReturnType<typeof gate<void>> } | null = null;
 const provider = await stub(async (_hit, request) => {
@@ -27,15 +27,14 @@ const provider = await stub(async (_hit, request) => {
   }
   const step = analysisStep(request.body);
   calls.push(step);
-  if (step === "score" && refuseScore) {
-    refuseScore = false;
+  if (step === "summarize" && refuseWriting) {
+    refuseWriting = false;
     return new Reply(503, { error: "temporary outage" });
   }
   const content = step === "prefilter" ? { label: original ? "BLOCK" : "PASS", reason: "local fixture" }
-    : step === "score" ? { attentionScore: SELECTING_SCORE }
     : step === "structure" ? { category: "ai-models", tags: [], subjects: [], fact: null }
-    : { itemType: "model_release", authorRole: "principal", tags: ["模型发布"], editorialJudgment: "模型能力提升", titleZh: `新判断 ${T}`, summaryZh: "模型发布并提供评测和价格。" };
-  return { choices: [{ message: { content: JSON.stringify(content) } }] };
+    : `title_zh: 新判断 ${T}\nsummary_zh: 模型发布并提供评测和价格。`;
+  return { choices: [{ message: { content: typeof content === "string" ? content : JSON.stringify(content) } }] };
 });
 pointModels(provider.url);
 
@@ -72,7 +71,7 @@ test("a failed audit rolls back the receipt release and the processing job", asy
   const id = await article("atomic");
   await sql`UPDATE articles SET processing_state='failed',processing_error='unknown receipt' WHERE id=${id}`;
   const [receipt] = await sql<{ id: number }[]>`INSERT INTO receipts (logical_key,service,purpose,subject,status)
-    VALUES (${`atomic-${T}`},'deepseek','score_article',${`article:${id}@1`},'unknown') RETURNING id`;
+    VALUES (${`atomic-${T}`},'deepseek','structure_article',${`article:${id}@1`},'unknown') RETURNING id`;
   await sql.unsafe(`CREATE FUNCTION fail_release_audit() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN IF NEW.actor = 'test-release-atomic' THEN RAISE EXCEPTION 'injected audit failure'; END IF; RETURN NEW; END $$`);
   await sql.unsafe("CREATE TRIGGER fail_release_audit BEFORE INSERT ON audit_log FOR EACH ROW EXECUTE FUNCTION fail_release_audit()");
@@ -108,7 +107,7 @@ test("a manual re-evaluation survives extraction, a lost job, and receipt releas
   await boss.complete(QUEUES.analyze, afterBody!.id);
   await sql`UPDATE articles SET processing_state='failed' WHERE id=${id}`;
   const [r] = await sql<{ id: number }[]>`INSERT INTO receipts (logical_key,service,purpose,subject,status)
-    VALUES (${`identity-${T}`},'deepseek','score_article',${`article:${id}@1`},'unknown') RETURNING id`;
+    VALUES (${`identity-${T}`},'deepseek','structure_article',${`article:${id}@1`},'unknown') RETURNING id`;
   await releaseReceipt(r!.id, { billed: false, note: "verified" }, "test");
   const [afterRelease] = await boss.fetch(QUEUES.analyze);
   assert.deepEqual(afterRelease!.data, { articleId: id, attemptTag });
@@ -150,9 +149,9 @@ test("a temporary provider failure resumes the manual evaluation instead of rein
   await wakeAnalysis();
   await waitFor(async () => (await sql`SELECT 1 FROM pgboss.job WHERE name=${QUEUES.analyze} AND data->>'articleId'=${id} AND state<'completed'`).length === 0);
   assert.equal((await sql`SELECT processing_state FROM articles WHERE id=${id}`)[0]!.processing_state, "analyzed");
-  assert.equal((await sql`SELECT selection_candidate FROM publications WHERE article_id=${id}`)[0]!.selection_candidate, true);
+  assert.equal((await sql`SELECT eligible FROM publications WHERE article_id=${id}`)[0]!.eligible, true);
   assert.equal(calls.filter((s) => s === "prefilter").length, 2, "one original and one manual prefilter; recovery buys neither again");
-  assert.equal(calls.filter((s) => s === "structure").length, 1, "the paid structure response survives the score failure");
+  assert.equal(calls.filter((s) => s === "structure").length, 1, "the paid structure response survives the writing failure");
 });
 
 // Failure modes: an old paid call can fail after a new material revision has already finished;
@@ -189,7 +188,7 @@ test("historical analysis queues a free identity confirmation behind live news",
   const id = await article("historical-confirmation");
   await sql`UPDATE articles SET published_at=now()-interval '30 days',backfill=true WHERE id=${id}`;
   original = false;
-  refuseScore = false;
+  refuseWriting = false;
   await processArticle(id);
   const [job] = await sql`SELECT data,priority FROM pgboss.job WHERE name=${QUEUES.group} AND data->>'articleId'=${id} AND state='created'`;
   assert.ok(job, "history must receive a completed identity decision too");

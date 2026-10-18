@@ -31,7 +31,7 @@ async function fixture(independent=false){
   await sql`INSERT INTO analyses(article_id,input_revision,origin,relevance,title_zh,summary_zh,selected) VALUES(${id},1,'rule','pass','保留标题','保留既有判断',true)`;
   await sql`INSERT INTO editorial_overrides(article_id,fields,version,reason) VALUES(${id},'{"title":"人工标题","selected":true}'::jsonb,3,'Keep editorial judgement')`;
   await sql`INSERT INTO grouping_overrides(article_id,reason,actor) VALUES(${id},'Keep manual grouping','test')`;
-  await sql`INSERT INTO receipts(logical_key,service,purpose,subject,status,response) VALUES(${`date-${id}`},'test','score_article',${`article:${id}`},'completed','{"recorded":true}')`;
+  await sql`INSERT INTO receipts(logical_key,service,purpose,subject,status,response) VALUES(${`date-${id}`},'test','structure_article',${`article:${id}`},'completed','{"recorded":true}')`;
   await publishArticle(id);
   return id;
 }
