@@ -17,11 +17,11 @@ export function proxiedRenditions(answers: unknown[]): Array<{ url: string; mode
 }
 
 export async function prepareArticleMedia(articleId: string): Promise<{ renditions: number; failed: number; animatedSaved: number }> {
-  const [zh, original] = await Promise.all([loadItemDetail(articleId), loadItemDetail(articleId, "original")]);
-  if (zh.kind !== "found" || original.kind !== "found") return { renditions: 0, failed: 0, animatedSaved: 0 };
+  const detail = await loadItemDetail(articleId);
+  if (detail.kind !== "found") return { renditions: 0, failed: 0, animatedSaved: 0 };
   let failed = 0;
   let animatedSaved = 0;
-  const renditions = proxiedRenditions([toFeedItemSummary(zh.row), zh.item, original.item]);
+  const renditions = proxiedRenditions([toFeedItemSummary(detail.row), detail.item]);
   for (const { url, mode } of renditions) {
     try {
       const image = await produceImage(url, mode);

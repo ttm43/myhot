@@ -73,14 +73,6 @@ export function registerSite(app: FastifyInstance) {
     return sendJsonWithEtag(req, reply, result.item, { etagPrefix: "item", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
-  app.get("/api/site/items/:id/original", siteHandler(async (req, reply) => {
-    const id = (req.params as { id: string }).id;
-    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(id)) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "item not found" });
-    const result = await loadItemDetail(id, "original");
-    if (result.kind === "not_found") return sendProblem(req, reply, { status: 404, code: "not_found", detail: "item not found", cacheControl: "public, max-age=60" });
-    return sendJsonWithEtag(req, reply, result.item, { etagPrefix: "item-original", cacheControl: "public, max-age=60, s-maxage=60" });
-  }));
-
   app.get("/api/site/groups/:factId/reports", siteHandler(async (req, reply) => {
     const data = await loadGroupReports({ factPublicId: (req.params as { factId: string }).factId, ...parseFilters(looseQuery(req)) });
     if (!data) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "reading group unavailable" });

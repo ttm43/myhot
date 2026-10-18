@@ -13,7 +13,7 @@ import { startWebServer, type WebServer } from "../apps/web/tests/web-server.ts"
 
 const at = "2026-10-04T08:00:00.000Z";
 const item: FeedItemSummary = { id: "metadata-fixture", title: "可核实的测试报道", summary: "报道摘要", reason: null, source: { name: "Fixture" }, publishedAt: at, timelineAt: at, category: "ai-models", tags: [], score: 80, selected: true, channel: "news", x: null };
-const detail: SiteItemDetail = { ...item, x: null, originalTitle: null, links: { original: "https://example.org/report" }, discoveredAt: at, readingMode: "full", author: null, body: { zh: "<p>可核实的测试正文。</p>", original: null, zhKind: "original", complete: true }, outline: [], markdownAvailable: true, group: null, hasTranslation: false, bodyLanguage: "zh" };
+const detail: SiteItemDetail = { ...item, x: null, originalTitle: null, links: { original: "https://example.org/report" }, discoveredAt: at, readingMode: "full", author: null, body: "<p>可核实的测试正文。</p>", outline: [], markdownAvailable: true, group: null };
 let web: WebServer;
 const api = createServer((req, res) => {
   const url = new URL(req.url!, "http://local");

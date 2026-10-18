@@ -6,7 +6,6 @@ import * as cheerio from "cheerio";
 import { readable } from "@aihot/backend/content/extract";
 import { sanitizeBody } from "@aihot/backend/content/sanitize";
 import { bodyToMarkdown } from "@aihot/backend/content/markdown";
-import { shield, unshield } from "@aihot/backend/editorial/translate";
 import { proxyBodyImages } from "@aihot/backend/media/imgproxy";
 import { stripTags } from "@aihot/backend/lib/text";
 
@@ -25,7 +24,7 @@ test("article extraction preserves lazy video resources and makes playback manua
   assert.ok($("video").is("[controls][playsinline]"));
   assert.equal($("video").attr("preload"), "none");
   assert.doesNotMatch(body.html, /data-src|data-poster|autoplay|\bloop=/);
-  assert.equal(sanitizeBody(body.html, base), body.html, "translation and export can clean the body again");
+  assert.equal(sanitizeBody(body.html, base), body.html, "the export can clean the body again");
   const native = cheerio.load(sanitizeBody('<video src="/native.mp4" data-src="/other.mp4" poster="/native.jpg" data-poster="/other.jpg"></video>', base));
   assert.equal(native("video").attr("src"), "https://publisher.example/native.mp4");
   assert.equal(native("video").attr("poster"), "https://publisher.example/native.jpg");
@@ -85,15 +84,13 @@ test("a rejected poster never leaves an empty player or hides its fallback link"
   }
 });
 
-test("translation, Markdown and public image outputs retain cleaned video candidates", () => {
+test("Markdown and public image outputs retain cleaned video candidates", () => {
   const html = sanitizeBody(`<p>Before.</p>${video}<video><source data-src="/clip.webm?token=webm&amp;quality=high" type="video/webm"><source src="/clip.mp4?token=mp4&amp;quality=high" type="video/mp4"></video><p>After.</p>`, base);
   const expectedSources = [
     ["https://publisher.example/clip.webm?token=webm&quality=high", "video/webm"],
     ["https://publisher.example/clip.mp4?token=mp4&quality=high", "video/mp4"],
   ];
   const sources = ($: cheerio.CheerioAPI) => $("video").eq(1).children("source").toArray().map((el) => [$(el).attr("src"), $(el).attr("type")]);
-  const protectedBody = shield(html);
-  assert.equal(sanitizeBody(unshield(protectedBody.html, protectedBody)!, base), html);
   // Markdown keeps the players as HTML.
   const kept = cheerio.load(bodyToMarkdown(html, base));
   assert.equal(kept("video").length, 2);

@@ -76,22 +76,21 @@ test("manual score corrections, including no score, survive every public project
 
 // Export failures to guard before changing conversion: flattened table relationships, invented
 // headings/merged cells, lost numeric units, and full text leaking after a licence reduction.
-test("Markdown preserves a table's headings, caption, links, alignment and multiline cells in both languages", async () => {
+test("Markdown preserves a table's headings, caption, links, alignment and multiline cells", async () => {
   const id = await article();
   const table = '<table><caption>Benchmark results</caption><thead><tr><th>Model</th><th align="right">Score</th></tr></thead><tbody><tr><td><a href="https://example.com/model">A|B</a></td><td>90<br>±1</td></tr></tbody></table>';
   await sql`UPDATE articles SET language = 'en', body_html = ${table} WHERE id = ${id}`;
-  await sql`INSERT INTO translations (article_id, revision, body_html, body_text, origin) VALUES (${id}, 1, ${table.replace('Benchmark results', '基准结果').replace('Model', '模型').replace('Score', '分数')}, '基准结果', 'source')`;
   await publishArticle(id, released());
   const response = await get(`/items/${id}/markdown`);
   assert.equal(response.status, 200);
   const $ = cheerio.load(marked.parse(response.body, { async: false, gfm: true }));
-  assert.equal($('table').length, 2, 'both original and translated tables survive export');
-  assert.deepEqual($('table th').toArray().map((node) => $(node).text()), ['模型', '分数', 'Model', 'Score']);
+  assert.equal($('table').length, 1, 'the table survives export');
+  assert.deepEqual($('table th').toArray().map((node) => $(node).text()), ['Model', 'Score']);
   assert.equal($('table th').last().attr('align'), 'right');
   assert.equal($('table td a').last().text(), 'A|B');
   assert.equal($('table td a').last().attr('href'), 'https://example.com/model');
   assert.equal($('table td').last().find('br').length, 1);
-  assert.ok($.text().includes('基准结果') && $.text().includes('Benchmark results'));
+  assert.ok($.text().includes('Benchmark results'));
 });
 
 test("Markdown retains tables that cannot be represented without changing their meaning", async () => {
@@ -127,26 +126,17 @@ test("Markdown retains numeric superscripts, subscripts and fenced code while re
   await sql`UPDATE sources SET site_fulltext = true WHERE id = ${SOURCE}`;
 });
 
-test("site reading sends one language while exports retain both, including after withdrawal", async () => {
+test("site reading and the export carry the article as written, until it is withdrawn", async () => {
   const id = await article();
   await sql`UPDATE articles SET language = 'en', body_html = '<h2>Original heading</h2><p>Original full body</p>' WHERE id = ${id}`;
-  await sql`INSERT INTO translations (article_id, revision, body_html, body_text, origin) VALUES (${id}, 1, '<h2>译文标题</h2><p>中文完整正文</p>', '中文完整正文', 'source')`;
   await publishArticle(id, released());
-  const normal = JSON.parse((await get(`/api/site/items/${id}`)).body);
-  const original = JSON.parse((await get(`/api/site/items/${id}/original`)).body);
-  assert.equal(normal.bodyLanguage, 'zh');
-  assert.equal(normal.hasTranslation, true);
-  assert.equal(normal.body.original, null);
-  assert.ok(normal.body.zh.includes('中文完整正文'));
-  assert.equal(normal.outline[0].text, '译文标题');
-  assert.equal(original.bodyLanguage, 'original');
-  assert.equal(original.body.zh, null);
-  assert.ok(original.body.original.includes('Original full body'));
-  assert.equal(original.outline[0].text, 'Original heading');
+  const page = JSON.parse((await get(`/api/site/items/${id}`)).body);
+  assert.ok(page.body.includes('Original full body'));
+  assert.equal(page.outline[0].text, 'Original heading');
   const md = (await get(`/items/${id}/markdown`)).body;
-  assert.ok(md.includes('Original full body') && md.includes('中文完整正文'));
+  assert.ok(md.includes('Original full body'));
   await setVisibility(id, { visibility: 'withdrawn', reason: 'test', version: 0 }, 'test');
-  assert.equal((await get(`/api/site/items/${id}/original`)).status, 404);
+  assert.equal((await get(`/api/site/items/${id}`)).status, 404);
 });
 
 test("revoking a source's licence takes its articles off every exit", async () => {
@@ -218,14 +208,12 @@ test("summary-only detail keeps neutral metadata without a selected verdict", as
   const before = JSON.parse((await get(`/api/site/items/${id}`)).body);
   assert.equal(before.selected, true);
   await setVisibility(id, { visibility: "summary-only", reason: "neutral summary", version: 0 }, "test");
-  for (const suffix of ["", "/original"]) {
-    const item = JSON.parse((await get(`/api/site/items/${id}${suffix}`)).body);
-    assert.equal(item.title, before.title);
-    assert.equal(item.summary, before.summary);
-    assert.equal(item.links.original, before.links.original);
-    assert.equal(item.selected, false);
-    for (const field of ["score", "reason", "category", "body", "x"]) assert.equal(item[field], null, field);
-    assert.deepEqual(item.tags, []);
-    assert.equal(item.markdownAvailable, false);
-  }
+  const item = JSON.parse((await get(`/api/site/items/${id}`)).body);
+  assert.equal(item.title, before.title);
+  assert.equal(item.summary, before.summary);
+  assert.equal(item.links.original, before.links.original);
+  assert.equal(item.selected, false);
+  for (const field of ["score", "reason", "category", "body", "x"]) assert.equal(item[field], null, field);
+  assert.deepEqual(item.tags, []);
+  assert.equal(item.markdownAvailable, false);
 });

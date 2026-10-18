@@ -4,7 +4,6 @@ import { CATEGORY_KEYS, toPublicApiCategory, type CategoryKey, type ChannelKey, 
 import type { FeedItemSummary, ItemSummary, MediaView, XPostView } from "@aihot/contracts/site";
 import { POLICY } from "@aihot/site";
 import { sql, type Db } from "../db.ts";
-import { isEmptyOrLinkOnly } from "../content/posts.ts";
 import { proxiedImage, proxiedImageSet } from "../media/imgproxy.ts";
 import { displayTags, publicSourceName } from "./rules.ts";
 import { foldableSelectionCondition, seatedCondition } from "./scope.ts";
@@ -34,10 +33,6 @@ export interface ItemRow {
   source_mode: string;
   x_post: Record<string, any> | null;
   author: string | null;
-  language: string | null;
-  zh_text: string | null;
-  /** Chinese translation of the post an X post quotes. */
-  quoted_zh: string | null;
 }
 
 /** Columns every item listing selects. Internal judgement details never leave this layer. */
@@ -45,8 +40,7 @@ export const ITEM_COLUMNS = sql`
   p.article_id AS id, p.title, p.original_title, p.summary, p.reason, p.category, p.tags, p.score,
   p.selected, p.seat, p.channel, p.url, p.published_at, p.discovered_at, p.timeline_at, p.visibility,
   p.body_mode, p.fact_id, s.name AS source_name, s.participation_mode AS source_mode,
-  a.x_post, a.author, a.language,
-  CASE WHEN p.channel = 'x' THEN tr.body_text END AS zh_text, qt.text_zh AS quoted_zh`;
+  a.x_post, a.author`;
 
 /** MCP listings never render article bodies, X media or story metadata. */
 export type ApiItemRow = Pick<ItemRow, "id" | "title" | "original_title" | "summary" | "source_name" | "url" | "published_at" | "discovered_at" | "category" | "score" | "selected" | "reason">;
@@ -56,13 +50,10 @@ export const API_ITEM_COLUMNS = sql`
   p.published_at, p.discovered_at, p.category, p.score, (p.selected AND p.seat) AS selected, p.reason`;
 export const API_ITEM_FROM = sql`FROM publications p JOIN sources s ON s.id = p.source_id`;
 
-/** A translation of an older revision is left out: the original changed after it (the worker translates it again). */
 export const ITEM_FROM = sql`
   FROM publications p
   JOIN sources s ON s.id = p.source_id
-  JOIN articles a ON a.id = p.article_id
-  LEFT JOIN translations tr ON tr.article_id = p.article_id AND tr.lang = 'zh' AND tr.revision >= a.revision
-  LEFT JOIN quote_translations qt ON p.channel = 'x' AND qt.tweet_id = substring(a.x_post->'quoted'->>'url' from '/status/([0-9]+)')`;
+  JOIN articles a ON a.id = p.article_id`;
 
 export function channelCondition(channel: ChannelKey | null | undefined) {
   if (!channel || channel === "all") return sql``;
@@ -103,13 +94,12 @@ function mediaView(m: Record<string, any>, mode: "card" | "thumb" | "full" = "th
   };
 }
 
-export function xView(row: Pick<ItemRow, "x_post" | "zh_text"> & Partial<Pick<ItemRow, "quoted_zh">>, compact = false, responsive = compact): XPostView | null {
+export function xView(row: Pick<ItemRow, "x_post">, compact = false, responsive = compact): XPostView | null {
   const x = row.x_post;
   if (!x) return null;
   const quoted = x.quoted && typeof x.quoted === "object"
     ? {
       authorName: String(x.quoted.authorName ?? ""), handle: String(x.quoted.handle ?? ""), text: String(x.quoted.text ?? ""), url: String(x.quoted.url ?? ""),
-      translation: !isEmptyOrLinkOnly(String(x.quoted.text ?? "")) && row.quoted_zh && row.quoted_zh.trim() !== String(x.quoted.text ?? "").trim() ? row.quoted_zh : null,
     }
     : null;
   const media = ((x.media ?? []) as Array<Record<string, any>>)
@@ -123,7 +113,6 @@ export function xView(row: Pick<ItemRow, "x_post" | "zh_text"> & Partial<Pick<It
     avatarUrl: proxiedImage(avatarUrl, "avatar"),
     ...(avatarSrcSet ? { avatarSrcSet } : {}),
     text: String(x.text ?? ""),
-    translation: !isEmptyOrLinkOnly(String(x.text ?? "")) && row.zh_text && row.zh_text.trim() !== String(x.text ?? "").trim() ? row.zh_text : null,
     quoted,
     // A multi-image list grid is 112 CSS px wide; one image can be 240 px. Keep 3x pixels for both.
     // Detail retains full media for the lightbox; srcSet bounds the displayed image.
@@ -171,22 +160,9 @@ export function toFeedItemSummary(row: ItemRow): FeedItemSummary {
     x: x ? {
       authorName: x.authorName, handle: x.handle, avatarUrl: x.avatarUrl,
       ...(x.avatarSrcSet ? { avatarSrcSet: x.avatarSrcSet } : {}), media: x.media,
-      quoted: x.quoted ? { authorName: x.quoted.authorName, handle: x.quoted.handle, text: x.quoted.text, translation: x.quoted.translation } : null,
+      quoted: x.quoted ? { authorName: x.quoted.authorName, handle: x.quoted.handle, text: x.quoted.text } : null,
     } : null,
   };
-}
-
-/**
- * An article written in Chinese: its language says so, or its text opens in Chinese and it is not marked
- * English (the translator's rule, editorial/translate.ts). Every exit shows such a body as it is.
- */
-export function isChineseBody(a: { language?: string | null; body_text?: string | null }): boolean {
-  return a.language === "zh" || (/[一-鿿]/.test(a.body_text?.slice(0, 400) ?? "") && a.language !== "en");
-}
-
-/** The complete Chinese translation the Markdown export carries; a page also shows a partial one. */
-export function exportTranslation(a: { language?: string | null; body_text?: string | null; tr_html?: string | null; tr_complete?: boolean | null }): string | null {
-  return !isChineseBody(a) && a.tr_html && a.tr_complete ? a.tr_html : null;
 }
 
 /**

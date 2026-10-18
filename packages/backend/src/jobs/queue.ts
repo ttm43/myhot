@@ -66,7 +66,7 @@ export async function getBoss(): Promise<PgBoss> {
   return starting;
 }
 
-/** The longest single paid call (a translation batch, 180 s) plus margin; whatever stops the worker (systemd, Docker) waits longer. */
+/** The longest single paid call (180 s) plus margin; whatever stops the worker (systemd, Docker) waits longer. */
 export const STOP_TIMEOUT_MS = 195_000;
 
 export async function stopBoss(): Promise<void> {

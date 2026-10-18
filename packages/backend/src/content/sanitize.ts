@@ -254,7 +254,7 @@ function block(para: string): string {
 }
 
 /**
- * Plain text to HTML, for sources that only give text (X posts, translations): paragraphs and line
+ * Plain text to HTML, for sources that only give text (X posts): paragraphs and line
  * breaks, the few Markdown marks people type (code, bold, links, lists, quotes, headings) and safe
  * links for bare addresses. The text is never taken as HTML.
  */

@@ -1,6 +1,6 @@
-// Failure cases: empty/image-only or link-only posts buy invented translations; high scores route
-// them through another writer; rebuilding keeps old model replies or loses pool membership; stored
-// translations leak into detail/export or licensed full RSS drops media; real prose and fetched X Articles stop being written.
+// Failure cases: empty/image-only or link-only posts buy invented copy; high scores route them through
+// another writer; rebuilding keeps old model replies or loses pool membership or media; real prose and
+// fetched X Articles stop being written.
 import { pointModels, stub, tag } from "./setup.ts";
 import { analysisStep, SELECTING_SCORE } from "./analysis-steps.ts";
 import assert from "node:assert/strict";
@@ -62,7 +62,6 @@ test("empty and link-only posts preserve originals without calling either writer
     assert.equal(p!.body_mode, "full", "a source's full-text permission includes confirmed post media");
     const detail = (await app.inject({ method: "GET", url: `/api/site/items/${id}` })).json();
     assert.equal(detail.summary, text!.trim() ? text : null);
-    assert.equal(detail.hasTranslation, false);
     assert.equal(detail.x.media.length, 1);
   }
 });
@@ -71,8 +70,6 @@ test("rebuilding an image-only post replaces historical model replies across pub
   const { id, url } = await post("historical-empty", "");
   await sql`INSERT INTO analyses (article_id,input_revision,origin,relevance,title_zh,summary_zh,score,selected)
     VALUES (${id},1,'model','pass','请补充正文','抱歉，没有推文文字内容可供翻译。',${SELECTING_SCORE},true)`;
-  await sql`INSERT INTO translations (article_id,revision,body_text,body_html,complete,origin)
-    VALUES (${id},1,'错误译文','<p>错误译文</p>',true,'model')`;
   const before = provider.hits();
   await publishArticle(id, released());
   assert.equal(provider.hits(), before, "a projection rebuild buys no model response");
@@ -80,7 +77,6 @@ test("rebuilding an image-only post replaces historical model replies across pub
   assert.equal(detail.title, url);
   assert.equal(detail.summary, null);
   assert.equal(detail.body, null);
-  assert.equal(detail.hasTranslation, false);
   assert.equal(detail.x.media.length, 1);
   assert.equal(detail.links.original, url);
   const feed = (await app.inject({ method: "GET", url: "/api/site/pool" })).json();
@@ -89,7 +85,7 @@ test("rebuilding an image-only post replaces historical model replies across pub
     const res = await app.inject({ method: "GET", url: path });
     assert.equal(res.statusCode, 200, path);
     assert.ok(res.body.includes(url), `${path}: original address survives`);
-    assert.ok(!/请补充正文|错误译文|没有推文文字内容/.test(res.body), `${path}: no model reply survives`);
+    assert.ok(!/请补充正文|没有推文文字内容/.test(res.body), `${path}: no model reply survives`);
     if (path.endsWith("markdown")) {
       assert.ok(res.body.includes("screenshot.png"), "the image survives export");
       assert.match(res.body, /!\[\]\(https?:\/\//, "the downloaded image link works outside the website");

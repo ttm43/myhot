@@ -167,7 +167,7 @@ test("hidden page parts are dropped whole, and a news page's closing blocks are 
   );
   assert.ok(!/QUFB|chart label|mc\^2/.test(html), html);
   assert.ok(html.includes("most capable transcription model") && html.includes("Energy E matters"));
-  // A linked chart in a paragraph of its own survives, also when a translation is cleaned again.
+  // A linked chart in a paragraph of its own survives, also when the body is cleaned again.
   const chart = '<p><a href="https://example.org/chart.png"><img src="https://example.org/chart.png" alt="B200 prices"></a></p>';
   assert.ok(sanitizeBody(sanitizeBody(`<p>Prices doubled.</p>${chart}<p> </p>`)).includes('alt="B200 prices"'));
   assert.equal(sanitizeBody("<p>Text.</p><p> <br></p><p><a href=\"https://example.org/\"></a></p>"), "<p>Text.</p>");

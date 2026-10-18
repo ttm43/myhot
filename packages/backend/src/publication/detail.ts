@@ -6,7 +6,7 @@ import { sql } from "../db.ts";
 import { stripTagMarkup } from "../lib/text.ts";
 import { proxyBodyImages } from "../media/imgproxy.ts";
 import { textToHtml } from "../content/sanitize.ts";
-import { exportTranslation, isChineseBody, ITEM_COLUMNS, ITEM_FROM, seatHolders, showsPost, toItemSummary, xView, type ItemRow } from "./items.ts";
+import { ITEM_COLUMNS, ITEM_FROM, seatHolders, showsPost, toItemSummary, xView, type ItemRow } from "./items.ts";
 import { evidenceCondition, listedCondition } from "./scope.ts";
 import { itemUrl, siteUrl } from "./links.ts";
 import { hasItemPage, publicSourceName } from "./rules.ts";
@@ -15,8 +15,6 @@ interface DetailRow extends ItemRow {
   body_html: string | null;
   body_text: string | null;
   body_status: string;
-  tr_html: string | null;
-  tr_complete: boolean | null;
 }
 
 export type DetailResult =
@@ -39,41 +37,17 @@ function withOutline(html: string): { html: string; outline: OutlineEntry[] } {
 
 async function loadRow(id: string): Promise<DetailRow | null> {
   const [row] = await sql<DetailRow[]>`
-    SELECT ${ITEM_COLUMNS}, a.body_html, a.body_text, a.body_status, tr.body_html AS tr_html, tr.complete AS tr_complete
+    SELECT ${ITEM_COLUMNS}, a.body_html, a.body_text, a.body_status
     ${ITEM_FROM}
     WHERE p.article_id = ${id}`;
   return row ?? null;
 }
 
 /**
- * The body a page reads in `language` when it has it, else in the other: Chinese is the article's own text
- * or a translation (shown even before it is complete), the original only the article's own. `page` turns
- * the HTML shown into what is sent, with its outline.
+ * Public detail (rules.hasItemPage): items the lists leave out (low relevance, merged duplicates, no
+ * Chinese summary yet) keep a noindex page; withdrawn and hot_signal items are a 404.
  */
-function readingBody(
-  language: "zh" | "original",
-  zh: { html: string; kind: "translation" | "original" } | null,
-  original: string | null,
-  complete: boolean,
-  page: (html: string) => { html: string; outline: OutlineEntry[] },
-): Pick<SiteItemDetail, "body" | "outline" | "hasTranslation" | "bodyLanguage"> {
-  const bodyLanguage = language === "original" && original ? "original" : zh?.html ? "zh" : "original";
-  const shown = bodyLanguage === "zh" ? zh!.html : original;
-  const sent = shown ? page(shown) : { html: shown, outline: [] };
-  return {
-    body: { zh: bodyLanguage === "zh" ? sent.html : null, original: bodyLanguage === "original" ? sent.html : null, zhKind: zh?.kind ?? null, complete },
-    outline: sent.outline,
-    hasTranslation: zh?.kind === "translation" && !!zh.html && !!original,
-    bodyLanguage,
-  };
-}
-
-/**
- * Public detail (rules.hasItemPage) in one language, Chinese unless the original is asked for: items the
- * lists leave out (low relevance, merged duplicates, no Chinese summary yet) keep a noindex page;
- * withdrawn and hot_signal items are a 404.
- */
-export async function loadItemDetail(id: string, language: "zh" | "original" = "zh", now = new Date()): Promise<DetailResult> {
+export async function loadItemDetail(id: string, now = new Date()): Promise<DetailResult> {
   const row = await loadRow(id);
   if (!row || !hasItemPage({ visibility: row.visibility, sourceMode: row.source_mode })) return { kind: "not_found" };
 
@@ -93,28 +67,27 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
       outline: [],
       markdownAvailable: false,
       group: null,
-      hasTranslation: false,
-      bodyLanguage: "original",
     };
     return { kind: "found", item, row };
   }
 
   let x: SiteItemDetail["x"] = null;
-  let reading: Pick<SiteItemDetail, "body" | "outline" | "hasTranslation" | "bodyLanguage"> = { body: null, outline: [], hasTranslation: false, bodyLanguage: "original" };
+  let reading: Pick<SiteItemDetail, "body" | "outline"> = { body: null, outline: [] };
   if (showsPost(row)) {
     const post = xView(row, false, true);
     const text = String(row.x_post?.text ?? row.body_text ?? "");
     // A post's text is sent as written: its headings make the outline, without anchors.
-    if (post?.translation || text.trim()) reading = readingBody(language, post?.translation ? { html: textToHtml(post.translation), kind: "translation" } : null, text.trim() ? textToHtml(text) : null, true,
-      (html) => ({ html, outline: withOutline(html).outline }));
+    if (text.trim()) {
+      const html = textToHtml(text);
+      reading = { body: html, outline: withOutline(html).outline };
+    }
     if (post) {
-      const { text: _text, translation: _translation, ...shown } = post;
+      const { text: _text, ...shown } = post;
       x = shown;
     }
   } else if (row.body_mode === "full" && row.body_html) {
-    const chinese = isChineseBody(row);
-    const zh = chinese ? { html: row.body_html, kind: "original" as const } : row.tr_html ? { html: row.tr_html, kind: "translation" as const } : null;
-    reading = readingBody(language, zh, chinese ? null : row.body_html, chinese ? true : row.tr_complete ?? false, (html) => withOutline(proxyBodyImages(html)));
+    const page = withOutline(proxyBodyImages(row.body_html));
+    reading = { body: page.html, outline: page.outline };
   }
 
   let group: SiteItemDetail["group"] = null;
@@ -145,8 +118,6 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
     outline: reading.outline,
     markdownAvailable: markdownAvailable(row),
     group,
-    hasTranslation: reading.hasTranslation,
-    bodyLanguage: reading.bodyLanguage,
   };
   return { kind: "found", item, row };
 }
@@ -178,18 +149,14 @@ export async function exportMarkdown(id: string): Promise<{ filename: string; bo
   if (showsPost(row) && row.x_post) {
     const post = xView(row);
     if (post?.text) lines.push("## 正文", "", post.text, "");
-    if (post?.translation) lines.push("## 中文译文", "", post.translation, "");
     for (const media of post?.media ?? []) {
       const url = media.url.startsWith("/") ? siteUrl(media.url) : media.url;
       lines.push(media.kind === "image" ? `![${media.alt ?? ""}](${url})` : `[视频](${url})`, "");
     }
     const q = post?.quoted;
     if (q?.text) lines.push(`## 引用 @${q.handle ?? ""}`, "", ...String(q.text).split("\n").map((l) => `> ${l}`), "", ...(q.url ? [q.url, ""] : []));
-    if (q?.text && q.translation) lines.push("### 引用中文译文", "", ...q.translation.split("\n").map((l) => `> ${l}`), "");
   } else if (row.body_mode === "full" && row.body_html) {
-    const translation = exportTranslation(row);
-    if (translation) lines.push("## 正文 · 中文译文", "", bodyToMarkdown(translation, row.url), "");
-    lines.push(isChineseBody(row) ? "## 正文" : "## 正文 · 原文", "", bodyToMarkdown(row.body_html, row.url), "");
+    lines.push("## 正文", "", bodyToMarkdown(row.body_html, row.url), "");
   }
   return { filename: `${SITE.mcpPrefix}-${row.id}.md`, body: lines.join("\n").replace(/\n{3,}/g, "\n\n") };
 }

@@ -97,7 +97,7 @@ test("item detail counts the same fact evidence as its expanded group", async ()
   await report(other, g, { title: "只提及该事件", hours: 1, role: "mention" });
   const composite = await report(other, g, { title: "多个事件的综合稿", hours: 1 });
   await sql`UPDATE analyses SET output = output || '{"scope":"composite"}'::jsonb WHERE article_id = ${composite}`;
-  const detail = await loadItemDetail(main, "zh", now);
+  const detail = await loadItemDetail(main, now);
   assert.equal(detail.kind, "found");
   if (detail.kind !== "found") return;
   const expanded = (await loadGroupReports({ factPublicId: g.factPublicId, channel: "all", category: null, tag: null }, now))!;

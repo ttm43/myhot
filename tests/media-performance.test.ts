@@ -144,7 +144,7 @@ test("a retained large SVG still supplies the model's raster thumbnail", async (
 });
 
 test("site media exposes responsive previews and full lightboxes while RSS retains thumb images", () => {
-  const row = { zh_text: null, x_post: { media: [{ url: "https://example.org/1.png" }, { url: "https://example.org/2.png", poster: "https://example.org/poster.png" }] } };
+  const row = { x_post: { media: [{ url: "https://example.org/1.png" }, { url: "https://example.org/2.png", poster: "https://example.org/poster.png" }] } };
   assert.ok(xView(row, true)!.media.every((m) => m.url.includes("mode=card") && m.fullUrl?.includes("mode=full")));
   assert.ok(xView(row, true)!.media[1]!.poster!.includes("mode=card"));
   assert.ok(xView(row)!.media.every((m) => m.url.includes("mode=thumb") && m.fullUrl === undefined));
@@ -409,7 +409,7 @@ test("video pages mislabeled as images are excluded across ingestion and public 
   for (const url of pages) {
     assert.equal(proxiedImage(url, "full"), null);
     assert.equal(proxiedImageSet(url, "body"), null);
-    assert.equal(xView({ zh_text: null, x_post: { media: [{ url }] } }, true)!.media.length, 0);
+    assert.equal(xView({ x_post: { media: [{ url }] } }, true)!.media.length, 0);
   }
   for (const url of pictures) {
     assert.ok(proxiedImage(url, "full"));

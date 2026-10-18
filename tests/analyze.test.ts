@@ -142,7 +142,6 @@ test("structure retains grounded conditions, rejects invented or unseen quotes, 
   const input = (await loadAnalyzeInput(await article("CONDITIONS", {
     bodyText: "Preview is free for Pro users until October 10.\n" + "x".repeat(11000) + "\nOnly available in the US. " + "x".repeat(MAX_BODY_CHARS) + "This late detail was not sent.",
   })))!;
-  input.translationZh = "仅中文译文中出现的限制";
   const frame = { title: "预览上线", evidence: "Preview is free for Pro users until October 10.", conditions: [
     { text: "仅Pro用户，免费至10月10日", quote: "Preview is free for Pro users until October 10." },
     { text: "仅限美国", quote: "Only available in the US." },
@@ -163,9 +162,9 @@ test("structure retains grounded conditions, rejects invented or unseen quotes, 
   ] } }), input);
   assert.deepEqual(partial.fact?.conditions, [{ text: "Only available in the US.", quote: "Only available in the US." }],
     "an invalid sibling cannot discard a valid original condition; spliced quotes remain rejected");
-  const invented = normalizeStructure(StructureSchema.parse({ ...base, fact: { ...frame, evidence: input.source.name, conditions: [{ text: "翻译限制", quote: input.translationZh }] } }), input);
+  const invented = normalizeStructure(StructureSchema.parse({ ...base, fact: { ...frame, evidence: input.source.name, conditions: [{ text: "原文没有的限制", quote: "仅中文译文中出现的限制" }] } }), input);
   assert.equal(invented.fact?.evidence, null, "source metadata is not original evidence");
-  assert.deepEqual(invented.fact?.conditions, [], "a translation does not count as an original quote");
+  assert.deepEqual(invented.fact?.conditions, [], "a quote the original does not contain does not count");
   assert.equal(normalizeStructure(StructureSchema.parse({ ...base, scope: "composite" }), input).fact, null, "composite output cannot also claim one fact");
   const titleOnly = normalizeStructure(StructureSchema.parse({ ...base, scope: "single" }), { ...input, bodyText: null, excerpt: null });
   assert.equal(titleOnly.scope, "unknown", "a confident model cannot supply the missing original material");

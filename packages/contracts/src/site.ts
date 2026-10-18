@@ -25,9 +25,7 @@ export interface XPostView {
   avatarUrl: string | null;
   avatarSrcSet?: string;
   text: string;
-  translation: string | null;
-  /** translation: Chinese translation of the quoted post, when it is in another language. */
-  quoted: { authorName: string; handle: string; text: string; url: string; translation: string | null } | null;
+  quoted: { authorName: string; handle: string; text: string; url: string } | null;
   media: MediaView[];
 }
 
@@ -111,24 +109,19 @@ export interface OutlineEntry {
   level: number;
 }
 
-/**
- * An article page (/api/site/items/:id) in one language: Chinese (the article itself or its translation)
- * unless …/original asks for the original. Only the body shown is sent, with its outline.
- */
+/** An article page (/api/site/items/:id): its body as written, with its outline. */
 export interface SiteItemDetail extends ItemSummary {
   /** The post with all its media; its text is the body. */
-  x: Omit<XPostView, "text" | "translation"> | null;
+  x: Omit<XPostView, "text"> | null;
   /** Selected, but its fact's seat is held by this report: marked 同新闻, without a reason of its own. */
   sameEvent?: { id: string; title: string } | null;
   readingMode: "full" | "summary-only";
   author: string | null;
-  /** Whitelisted HTML of the language shown; the other one is null. */
-  body: { zh: string | null; original: string | null; zhKind: "translation" | "original" | null; complete: boolean } | null;
+  /** Whitelisted HTML. */
+  body: string | null;
   outline: OutlineEntry[];
   markdownAvailable: boolean;
   group: GroupInfo | null;
-  hasTranslation: boolean;
-  bodyLanguage: "zh" | "original";
 }
 
 /** A fact's public reports under the list's filters: what "另有 N 家信源报道" opens. */

@@ -5,7 +5,7 @@
 // - visits renew deadlines, expired/errors stay cached, or refresh stops working;
 // Reader work failures fixed before changing enhancement and return-position code:
 // - offscreen code downloads/runs immediately, visible code stays plain, or raw copying changes;
-// - tiny/linked pictures become zoom buttons, or language changes keep old handlers;
+// - tiny/linked pictures become zoom buttons;
 // - a deep return loses its anchor, or folded dates confuse the anchor search.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
@@ -16,7 +16,7 @@ import { startWebServer, type WebServer } from "./web-server.ts";
 
 const at = '2026-10-04T08:00:00.000Z';
 const item: FeedItemSummary = {id:'navigation-fixture',title:'性能检查文章',summary:'固定摘要',reason:'固定推荐理由',source:{name:'Fixture'},publishedAt:at,timelineAt:at,category:'ai-models',tags:[],score:80,selected:true,channel:'news',x:null};
-const detail: SiteItemDetail = {...item,x:null,originalTitle:'Fixture article',links:{original:'https://example.org/article'},discoveredAt:at,readingMode:'full',author:null,body:{zh:'<p>固定正文</p>',original:null,zhKind:'translation',complete:true},outline:[],markdownAvailable:true,group:null,hasTranslation:true,bodyLanguage:'zh'};
+const detail: SiteItemDetail = {...item,x:null,originalTitle:'Fixture article',links:{original:'https://example.org/article'},discoveredAt:at,readingMode:'full',author:null,body:'<p>固定正文</p>',outline:[],markdownAvailable:true,group:null};
 const codeSource='import json\n\nwith open("data.json") as file:\n    data = json.load(file)\n\nfor record in data:\n    print(record["title"])\n';
 const readerBody=Array.from({length:30},(_,i)=>`<p>阅读段落 ${i}：先阅读文章，再查看后面的代码和图片。正文保持可读，图片和代码在需要时增强。</p>`).join('')
   +`<pre><code>${codeSource}</code></pre><pre><code>x = 1</code></pre>`
@@ -52,9 +52,7 @@ const api=createServer((req,res)=>{
     return res.end(JSON.stringify({filters:{channel:'all',category:null,tag:null,q:null,tab:'time'},items:[{...item,title:'全部第 '+page+' 页'}],page,pageCount:3,total:3,todayCount:1,freshness:at}));
   }
   if(p==='/api/site/items/navigation-fixture')return res.end(JSON.stringify(detail));
-  if(p==='/api/site/items/navigation-fixture/original')return res.end(JSON.stringify({...detail,body:{zh:null,original:'<p>Original fixture</p>',zhKind:null,complete:true},bodyLanguage:'original'}));
-  if(p==='/api/site/items/reader-fixture')return res.end(JSON.stringify({...detail,id:'reader-fixture',title:'阅读增强检查',body:{...detail.body,zh:readerBody}}));
-  if(p==='/api/site/items/reader-fixture/original')return res.end(JSON.stringify({...detail,id:'reader-fixture',title:'阅读增强检查',body:{...detail.body,zh:null,original:'<p>Original reader text</p>'},bodyLanguage:'original'}));
+  if(p==='/api/site/items/reader-fixture')return res.end(JSON.stringify({...detail,id:'reader-fixture',title:'阅读增强检查',body:readerBody}));
   if(p.startsWith('/api/site/items/long-'))return res.end(JSON.stringify({...detail,id:p.split('/').at(-1),title:'长列表详情'}));
   res.statusCode=404;res.end(JSON.stringify({code:'not_found'}));
 });
@@ -211,9 +209,6 @@ test('reader enhancements wait for visible code and update only the picture that
     const tiny=page.locator('.prose img[alt="小图标"]');await tiny.scrollIntoViewIfNeeded();
     await expect(tiny).not.toHaveAttribute('role','button');
     await expect(page.locator('.prose a img')).not.toHaveAttribute('role','button');
-    await page.getByRole('navigation',{name:'正文语言'}).getByRole('link',{name:'原文',exact:true}).click();
-    await expect(page.getByText('Original reader text',{exact:true})).toBeVisible();
-    assert.equal(await page.locator('.code-block-copy').count(),0);
   }finally{await context.close();}
 });
 

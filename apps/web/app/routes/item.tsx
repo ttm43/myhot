@@ -10,7 +10,6 @@ import { fullDateTime, relativeTime } from "../lib/format";
 import { markRead } from "../lib/local-state";
 import { SameEventBadge, SelectedBadge } from "../components/ui/Badge";
 import { ScoreLabel, shownScore } from "../components/ui/Score";
-import { PillTabs } from "../components/ui/Tabs";
 import { ArticleLayout, RailSection } from "../components/ui/Page";
 import { Menu, MenuItem } from "../components/ui/Menu";
 import { GroupButton, GroupSources } from "../features/feed/ReadingGroup";
@@ -212,11 +211,11 @@ function Toast({ text }: { text: string | null }) {
 
 export default function ItemPage() {
   const data = useLoaderData<typeof clientLoader>() as { item: SiteItemDetail } | Preview;
-  if (data.item) return <ItemView key={`${data.item.id}:${data.item.bodyLanguage}`} item={data.item} />;
+  if (data.item) return <ItemView key={data.item.id} item={data.item} />;
   return (
     <Suspense fallback={<ItemPreview preview={data.preview} />}>
       <Await resolve={data.detail} errorElement={<ItemGone />}>
-        {(loaded) => <ItemView key={`${loaded.item.id}:${loaded.item.bodyLanguage}`} item={loaded.item} />}
+        {(loaded) => <ItemView key={loaded.item.id} item={loaded.item} />}
       </Await>
     </Suspense>
   );
@@ -298,8 +297,6 @@ function ItemGone() {
 
 function ItemView({ item }: { item: SiteItemDetail }) {
   const navigate = useNavigate();
-  const hasTranslation = item.hasTranslation;
-  const lang = item.bodyLanguage;
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [toast, setToast] = useToast();
@@ -327,8 +324,6 @@ function ItemView({ item }: { item: SiteItemDetail }) {
     }
   };
 
-  const bodyHtml = lang === "zh" ? (item.body?.zh ?? item.body?.original) : (item.body?.original ?? item.body?.zh);
-  const bodyLabel = !item.body ? null : lang === "zh" && item.body.zhKind === "translation" ? "正文 · AI 翻译" : lang === "original" && hasTranslation ? "正文 · 原文" : "正文";
   const isX = item.channel === "x" && !!item.x;
   // Without a reliable date from the original, the time shown is when it was collected, labelled as such.
   const shownAt = item.publishedAt ?? item.discoveredAt;
@@ -525,32 +520,17 @@ function ItemView({ item }: { item: SiteItemDetail }) {
 
           {summaryOnly && <p className="mt-7 rounded-control bg-bg-sunk px-4 py-3 text-[13.5px] leading-relaxed text-ink-3">应来源方要求，这里只提供摘要与原文入口。完整内容请阅读原文。</p>}
 
-          {item.body && bodyHtml && (
+          {item.body && (
             <section className="mt-9 border-t border-line pt-4 xl:mt-10">
               <div className="mb-6 flex items-center justify-between gap-3">
-                <span className="text-[12px] text-ink-4">{bodyLabel}</span>
-                {hasTranslation && (
-                  <PillTabs
-                    size="xs"
-                    layoutId="item-body-lang"
-                    label="正文语言"
-                    active={lang}
-                    items={[
-                      { key: "zh", label: "中文", prefetch: "intent", replace: true, to: `/items/${item.id}` },
-                      { key: "original", label: "原文", prefetch: "intent", replace: true, to: `/items/${item.id}/original` },
-                    ]}
-                  />
-                )}
+                <span className="text-[12px] text-ink-4">正文</span>
               </div>
-              {hasTranslation && lang === "zh" && !item.body.complete && (
-                <p className="mb-5 rounded-control bg-bg-sunk px-3 py-2 text-[13px] text-ink-3">译文尚不完整，完整内容请切换到原文。</p>
-              )}
-              <ArticleBody html={bodyHtml} />
+              <ArticleBody html={item.body} />
             </section>
           )}
 
           {isX && item.x!.media.length > 0 && <MediaGallery media={item.x!.media} postUrl={item.links.original} />}
-          {isX && item.x!.quoted?.text && <QuotedPost quoted={item.x!.quoted} original={lang === "original"} />}
+          {isX && item.x!.quoted?.text && <QuotedPost quoted={item.x!.quoted} />}
 
           <p className="mt-8 text-[13px] text-ink-4">
             来源：
