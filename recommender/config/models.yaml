@@ -1,5 +1,6 @@
-# autored 用到的模型（按 ~/.claude/rules/common/model-storage.md：项目只写 key，路径在 ../models/registry.yaml）
+# 推荐层用到的模型（按 ~/.claude/rules/common/model-storage.md：项目只写 key，路径在模型库的 registry.yaml）
 uses:
-  # 小模型打分用的本地向量（只用 CPU）。display 的结果写进 MyHOT，shadow 只在后台跑、攒数据做对比。
+  # 小模型打分用的本地向量（只用 CPU），结果写进 MyHOT。
+  # 0.6B 的后台对比（student_shadow）2026-10-18 停了：攒不够点击比不出结果，搬去的 Ubuntu 机器内存也可能只有 8 GB。
+  # 要恢复就加回一行 student_shadow: harrier-oss-v1-0.6b
   student_display: harrier-oss-v1-270m
-  student_shadow: harrier-oss-v1-0.6b

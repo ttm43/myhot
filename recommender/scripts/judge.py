@@ -38,7 +38,7 @@ LABELS_DIR = OUT / "labels"
 RECOMMENDED = OUT / "recommended.jsonl"
 PROFILE = ROOT / "configs" / "profile.md"
 
-PROMPT_VERSION = "v1.4"  # 牛逼定义放宽（画像 v5）。v1.3 是收窄版，v1.1/v1.2 只留作对照
+PROMPT_VERSION = "v1.4"  # 牛逼定义放宽（画像 v5）
 BODY_CAP = 40_000
 BATCH_CHARS = 120_000
 MIN_BODY = 500
@@ -47,7 +47,7 @@ DEV_SEED = 20261016
 FUZZY_THRESHOLD = 0.6
 LABELS = ("niubi", "received", "boring")
 LABEL_ZH = {"niubi": "牛逼", "received": "收到", "boring": "无聊"}
-ZH_TO_LABEL = {v: k for k, v in LABEL_ZH.items()} | {"keep": "received", "留": "received", "not_boring": "received"}  # 二分类门的「留」记成收到
+ZH_TO_LABEL = {v: k for k, v in LABEL_ZH.items()}
 # 六条金标准，按标题模式在库里找（不计指标，单独报名次）
 GOLDEN = {
     "Google 律师实验": ["Does better work always mean better workers"],
@@ -136,15 +136,8 @@ def feedback_hash(marks: list[dict]) -> str:
 
 
 # ---------- 提示词 ----------
-
-OLD_DEFS_V12 = """- niubi 牛逼：对他有用。读完会改变他的做法、给他一个能拿来用的机制或证据、或者是他下周就会亲手验证的东西。
-- received 收到：了解了。有信息，但目前没有很喜欢，也算不上反感；知道有这事即可。这是默认档，大多数正经文章落在这里。
-- boring 无聊：不关心。和他的工作与兴趣没有连接，或者他明确反感的那类内容。"""
-OLD_DEFS_V11 = """- niubi 牛逼：有意思，想深入读。质量信号，正。
-- received 收到：早知道了，没新意，知道有这事即可。质量信号，负。
-- boring 无聊：可能有价值，但他不关心。口味信号。"""
-RULE7_V12 = "7. 读者已经知道的东西（用户模型 L4）和入门级内容是 received，不是 boring。写得好、有数字、有机制，但读者不会拿它做任何事的文章，也是 received，不是 niubi。"
-RULE7_V11 = "7. 读者已经知道的东西（用户模型 L4）和入门级内容是 received，不是 boring。"
+# v1.4（画像 v5）：牛逼放宽到「明显的个人价值」+ 短规则 7。v1.1–v1.3 和只判无聊的二分类门（gate-v1~v3）
+# 2026-10-16/17 做过对照，结论记在 docs/recommender-experiment-design.md 和画像里，2026-10-18 删掉。
 
 JUDGE_PROMPT = """你是一个只为一位读者服务的个性化评价器。你的任务不是评价文章客观上好不好，而是预测这位读者读完之后的反应。
 
@@ -158,7 +151,7 @@ JUDGE_PROMPT = """你是一个只为一位读者服务的个性化评价器。�
 
 ## 三档反应的定义
 
-- niubi 牛逼：对他有用。读完会改变他的做法、给他一个能拿来用的机制或证据、或者是他下周就会亲手验证的东西。
+- niubi 牛逼：这篇文章让他获得明显的个人价值。价值可以是直接改变做法、获得可迁移的工程机制、发现重要的新能力或实验证据、或者形成新的认知和判断。不要求下周就能用，但必须有具体且足够强的信息增量。仅仅相关、复杂、或来自知名机构不够。
 - received 收到：了解了。有信息，但目前没有很喜欢，也算不上反感；知道有这事即可。这是默认档，大多数正经文章落在这里。
 - boring 无聊：不关心。和他的工作与兴趣没有连接，或者他明确反感的那类内容。
 
@@ -170,7 +163,7 @@ JUDGE_PROMPT = """你是一个只为一位读者服务的个性化评价器。�
 4. score 0 到 10 只用于排序：niubi 通常 7 到 10，received 通常 3 到 7，boring 通常 0 到 4，但以你对读者反应的判断为准。
 5. confidence：high / mid / low。历史反馈里有直接可比的案例给 high，只能靠用户模型推断给 mid，用户模型也没覆盖的领域给 low。
 6. 不同领域一视同仁：一篇 AI 文章可能无聊，一篇非 AI 文章可能牛逼。不要因为作者有名、公司大、技术复杂、Agent 数量多就加分。
-7. 读者已经知道的东西（用户模型 L4）和入门级内容是 received，不是 boring。写得好、有数字、有机制，但读者不会拿它做任何事的文章，也是 received，不是 niubi。
+7. 读者已经知道的东西（用户模型 L4）和入门级内容是 received，不是 boring。
 
 只输出 JSON 数组，不要其他文字，不要代码块。每个元素：
 {{"n": 编号, "label": "niubi|received|boring", "score": 0-10, "reason": "...", "trigger_fact": "原文原话", "confidence": "high|mid|low"}}
@@ -178,60 +171,7 @@ JUDGE_PROMPT = """你是一个只为一位读者服务的个性化评价器。�
 ## 本批文章
 
 {items}"""
-
-# v1.1：旧三档定义（想深入 / 早知道 / 有价值但不关心），其余相同。留着做对照。
-JUDGE_PROMPT_V11 = JUDGE_PROMPT.replace(OLD_DEFS_V12, OLD_DEFS_V11).replace(RULE7_V12, RULE7_V11)
-# v1.3：新三档定义（和画像一致）+ v1.1 的短规则 7。v1.2 规则 7 的第二句压召回，去掉。
-JUDGE_PROMPT_V13 = JUDGE_PROMPT.replace(RULE7_V12, RULE7_V11)
-# v1.4：牛逼定义放宽到「明显的个人价值」（和画像 v5 一致），其余同 v1.3。
-DEFS_V14 = """- niubi 牛逼：这篇文章让他获得明显的个人价值。价值可以是直接改变做法、获得可迁移的工程机制、发现重要的新能力或实验证据、或者形成新的认知和判断。不要求下周就能用，但必须有具体且足够强的信息增量。仅仅相关、复杂、或来自知名机构不够。
-- received 收到：了解了。有信息，但目前没有很喜欢，也算不上反感；知道有这事即可。这是默认档，大多数正经文章落在这里。
-- boring 无聊：不关心。和他的工作与兴趣没有连接，或者他明确反感的那类内容。"""
-JUDGE_PROMPT_V14 = JUDGE_PROMPT_V13.replace(OLD_DEFS_V12, DEFS_V14)
-PROMPTS = {"v1.1": JUDGE_PROMPT_V11, "v1.2": JUDGE_PROMPT, "v1.3": JUDGE_PROMPT_V13, "v1.4": JUDGE_PROMPT_V14}
-
-# 二分类门：只判「无聊 / 留」。精选 = 去掉无聊之后，三档评价器的无聊召回只有 0.38；试试把任务收窄成一个问题。
-# gate-v1 中性问法；gate-v2 明说错杀比漏放贵，拿不准就留。「留」在预测文件里记成 received，分数 = 值得留的程度，便于复用评测。
-GATE_PROMPT_V1 = """你是一个只为一位读者服务的过滤器。你只回答一个问题：这位读者会不会对这篇文章说「无聊」。不评价文章好不好，不分牛逼和收到。
-
-## 读者的用户模型
-
-{profile}
-
-## 读者的历史反馈（他亲手点的，带原因）
-
-{feedback}
-
-## 「无聊」的定义
-
-无聊 = 不关心。和他的工作与兴趣没有连接，或者他明确反感的那类内容（营销稿、功能罗列、公关式复盘、和他的规模和问题无关的超大规模基础设施复盘、纯消费和生活类内容）。
-不是无聊 = 他读了至少会说「了解了」，哪怕没有很喜欢。有信息、和他的工作或兴趣有连接、或者是他明确列为爱看的类型，就不是无聊。
-
-## 规则
-
-1. 判断依据是正文里的具体内容，不是标题和来源。
-2. reason 一句话，写清文章里的哪个事实让你判它无聊或不无聊，和用户模型里的哪一条相连。
-3. score 0 到 10 是「值得留下」的程度：无聊通常 0 到 3，留通常 5 到 10。
-4. confidence：high / mid / low。历史反馈里有直接可比的案例给 high，只能靠用户模型推断给 mid，用户模型没覆盖的领域给 low。
-5. 不要因为作者有名、公司大、技术复杂就留；也不要因为是 AI 话题就留。领域一视同仁。
-
-只输出 JSON 数组，不要其他文字，不要代码块。每个元素：
-{{"n": 编号, "label": "boring|keep", "score": 0-10, "reason": "...", "confidence": "high|mid|low"}}
-
-## 本批文章
-
-{items}"""
-GATE_PROMPT_V2 = GATE_PROMPT_V1.replace(
-    "5. 不要因为作者有名、公司大、技术复杂就留；也不要因为是 AI 话题就留。领域一视同仁。",
-    "5. 不要因为作者有名、公司大、技术复杂就留；也不要因为是 AI 话题就留。领域一视同仁。\n6. 这个过滤器的输出直接决定文章会不会从他的精选里消失。错杀一篇他想看的，比漏放一篇无聊的代价大得多。拿不准就留，只有确定他不关心才判无聊。")
-# gate-v3：定义里不把超大规模复盘列为无聊。TEST 上这类文章用户一半无聊一半不无聊，gate-v1 的 7 篇错杀里 5 篇是它；错杀比漏放贵，所以不默认杀。
-GATE_PROMPT_V3 = GATE_PROMPT_V1.replace(
-    "（营销稿、功能罗列、公关式复盘、和他的规模和问题无关的超大规模基础设施复盘、纯消费和生活类内容）",
-    "（营销稿、功能罗列、公关式复盘、纯消费和生活类内容）").replace(
-    "5. 不要因为作者有名、公司大、技术复杂就留；也不要因为是 AI 话题就留。领域一视同仁。",
-    "5. 不要因为作者有名、公司大、技术复杂就留；也不要因为是 AI 话题就留。领域一视同仁。" + "\n" +
-    "6. 超大规模基础设施的复盘（大厂的 serving、存储、调度、监控系统）不因为规模不是他的就判无聊：这类文章他一半会说了解了。只有当文章既没有可迁移的机制、也没有他爱看的特征（反直觉实测、失败复盘、有立场的经验）时才判无聊。")
-PROMPTS |= {"gate-v1": GATE_PROMPT_V1, "gate-v2": GATE_PROMPT_V2, "gate-v3": GATE_PROMPT_V3}
+PROMPTS = {"v1.4": JUDGE_PROMPT}
 
 DAILY_PROMPT = """下面是最近 {days} 天里评价器判为值得看的候选，每条有编号、档位、分数、标题、来源和理由。另外列出了最近 14 天已经推荐过的标题。
 
@@ -619,9 +559,11 @@ def cmd_score(args) -> int:
 def recent_recommended(days: int = 14) -> list[dict]:
     if not RECOMMENDED.exists():
         return []
+    today = date.today().isoformat()
     floor = (date.today() - timedelta(days=days)).isoformat()
     rows = [json.loads(line) for line in RECOMMENDED.read_text(encoding="utf-8").splitlines() if line.strip()]
-    return [r for r in rows if r.get("date", "") >= floor]
+    # 只看之前几天的：同一天重跑时今天这一份会整份替换，不能把它当成「已推荐」排除掉
+    return [r for r in rows if floor <= r.get("date", "") < today]
 
 
 def dedupe_events(candidates: list[tuple[str, dict]], threshold: float = 0.9) -> tuple[list[tuple[str, dict]], dict[str, list[str]]]:
@@ -707,10 +649,12 @@ def cmd_daily(args) -> int:
     lines += ["", "---", f"画像 {preds and next(iter(preds.values())).get('profile_hash')} · 反馈 {marks_n} 条 · 提示词 {PROMPT_VERSION}", ""]
     (out_dir / "judge.md").write_text("\n".join(lines), encoding="utf-8")
     if picks:
-        with RECOMMENDED.open("a", encoding="utf-8") as f:
-            for n in sorted(picks):
-                i, p = candidates[n - 1]
-                f.write(json.dumps({"date": day, "id": i, "title": p["title"], "why": picks[n]}, ensure_ascii=False) + "\n")
+        # 同一天重跑：替换当天那一份，不追加（以前每 2 小时追加一次，同一天同一篇会重复）
+        kept = [line for line in (RECOMMENDED.read_text(encoding="utf-8").splitlines() if RECOMMENDED.exists() else [])
+                if line.strip() and json.loads(line).get("date") != day]
+        fresh = [json.dumps({"date": day, "id": candidates[n - 1][0], "title": candidates[n - 1][1]["title"], "why": picks[n]}, ensure_ascii=False)
+                 for n in sorted(picks)]
+        RECOMMENDED.write_text("\n".join(kept + fresh) + "\n", encoding="utf-8")
     print(out_dir / "judge.md")
     return 0
 
@@ -1110,7 +1054,7 @@ def main() -> int:
     p.add_argument("--examples", default=str(LABELS_DIR / "dev.json"), help="反馈池补充：一份标签 json。默认 DEV 标签；TEST 标签永远不进来。传空串关闭")
     p.add_argument("--feedback", default="recent:20", help="反馈模式：all | none | recent:N | retrieved:K（按向量相似度每篇挑 K 条）。消融里 B/C 和 A 差距在噪声内，默认取最便宜的 recent:20")
     p.add_argument("--profile", default="", help="画像文件，默认 configs/profile.md")
-    p.add_argument("--prompt-version", default=PROMPT_VERSION, choices=["v1.1", "v1.2", "v1.3", "v1.4", "gate-v1", "gate-v2", "gate-v3"], help="v1.1 旧定义 / v1.2 新定义+长规则7 / v1.3 新定义+短规则7 / v1.4 牛逼放宽（默认）/ gate-v1、gate-v2 只判无聊的二分类门")
+    p.add_argument("--prompt-version", default=PROMPT_VERSION, choices=list(PROMPTS), help="提示词版本（只剩线上的 v1.4）")
     p.set_defaults(fn=cmd_score)
     p = sub.add_parser("daily")
     p.add_argument("--date", default="")
