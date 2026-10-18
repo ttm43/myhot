@@ -4,6 +4,7 @@
 
     python scripts/aihot_admin.py preview configs/anthropic.json      # 逐条预览，打印前几条标题/链接/日期
     python scripts/aihot_admin.py create  configs/anthropic.json      # 预览通过的才创建
+    python scripts/aihot_admin.py set s134-hacker-news participation_mode=editorial enabled=true   # 改已有信源
 """
 
 from __future__ import annotations
@@ -83,13 +84,44 @@ def show_preview(result: dict, n: int = 5) -> int:
     return len(items)
 
 
+def parse_value(raw: str):
+    """set 的值：true/false/数字按 JSON 解析，其余当字符串。"""
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return raw
+
+
+def set_fields(admin: "Admin", source_id: str, pairs: list[str], reason: str) -> int:
+    patch = {}
+    for pair in pairs:
+        key, sep, raw = pair.partition("=")
+        if not sep:
+            raise SystemExit(f"要写成 字段=值：{pair}")
+        patch[key] = parse_value(raw)
+    detail = admin.get(f"/api/admin/sources/{source_id}")
+    version = detail["source"]["updated_at"]
+    result = admin.post(f"/api/admin/sources/{source_id}", {"patch": patch, "version": version, "reason": reason}, method="PATCH")
+    if "_error" in result:
+        print(f"{source_id}: 错误 {result['_error']} {result['_body']}")
+        return 1
+    print(f"{source_id}: {patch}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["preview", "create"])
-    parser.add_argument("file", help="JSON 文件：{\"sources\": [ {id,name,kind,config,tier,...} ]}")
+    parser.add_argument("action", choices=["preview", "create", "set"])
+    parser.add_argument("file", help="preview/create：JSON 文件 {\"sources\": [...]}；set：信源 id")
+    parser.add_argument("fields", nargs="*", help="set 用：字段=值，例如 participation_mode=editorial enabled=false")
     parser.add_argument("--only", default="")
+    parser.add_argument("--reason", default="aihot_admin.py set")
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
+    if args.action == "set":
+        admin = Admin()
+        admin.login()
+        return set_fields(admin, args.file, args.fields, args.reason)
     only = {s for s in args.only.split(",") if s}
     sources = json.loads(Path(args.file).read_text(encoding="utf-8"))["sources"]
     admin = Admin()

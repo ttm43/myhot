@@ -1039,7 +1039,8 @@ def cmd_select(args) -> int:
     for i, selected in todo.items():
         chain = admin.get(f"/api/admin/content/{i}")
         version = (chain.get("override") or {}).get("version") or 0
-        fields: dict = {"selected": selected}
+        # 分数也写进覆盖：AIHOT 不再自己打分，代表文章挑选和各处排序就用 judge 的分数
+        fields: dict = {"selected": selected, "score": round(min(max(float(preds.get(i, {}).get("score", 0)), 0), 100))}
         if selected:
             # 被 AIHOT 预筛挡住（非 AI 相关）或还没中文摘要的，用 judge 的理由顶上，让它够得上入池条件
             fields["relevance"] = "pass"

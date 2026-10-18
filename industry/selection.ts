@@ -10,7 +10,9 @@ export const SELECTION = {
    *   T1 官方一手（官网、官方博客、机构）· T1_5 官方账号、准官方创作者 · T2 媒体与个人
    * 分级 EXCLUDE_MP 以及这里没有列出的分级，不参与精选评分（只进“全部动态”）。
    */
-  thresholds: { T1: 60, T1_5: 65, T2: 76 } as Record<string, number>,
+  // MyHOT 2026-10-18：不用 AIHOT 自己的评分（每篇两次调用，占模型花费三成），精选由 recommender/judge.py select
+  // 经人工覆盖决定，分数也由它写进覆盖。门槛清空后 tierThreshold() 一律返回 null：不打分，也不跑 understand。
+  thresholds: {} as Record<string, number>,
   /**
    * 没入选、但平均分高于这个数的资料，也用精选的写法（内容理解：标题、摘要、推荐理由）来写，
    * 其余用更便宜的“标题摘要翻译”。
