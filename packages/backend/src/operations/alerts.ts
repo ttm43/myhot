@@ -11,7 +11,6 @@ import { ALERTS, EDITION_TIMES } from "@aihot/site";
 import { sql } from "../db.ts";
 import { beijingDay, beijingStamp, duration, formatAlert, formatRecovery, sendAlert, type Finding, type Level } from "../notify/feishu.ts";
 import { stepsOnService } from "../editorial/models.ts";
-import { backupConfigured } from "./backup.ts";
 import { GROUPING_WARN_AFTER_MS, waitingSelectedNews } from "./grouping.ts";
 import { upstreamFindings } from "../media/upstream.ts";
 import { responder, serverModules } from "../modules.ts";
@@ -117,33 +116,6 @@ export async function collectFindings(now = Date.now()): Promise<Finding[]> {
       action: "转给 AI 处理；如果推送机器人被移出了群，需要你把它加回去",
       detail: refused!.response ?? "",
     });
-  }
-
-  if (backupConfigured()) {
-    const [b] = await sql<{ value: { at: string; uploaded: boolean; filesError?: string } }[]>`SELECT value FROM settings WHERE key = 'backup.last'`;
-    // A failed archive updates backup.last too. Reuse the run history so repeated failures cannot
-    // reset the age; before the first success, count from the first attempt rather than from now.
-    const [runs] = await sql<{ last_ok: Date | null; first_attempt: Date | null }[]>`
-      SELECT max(finished_at) FILTER (WHERE status = 'ok') AS last_ok, min(started_at) AS first_attempt
-      FROM job_runs WHERE job = 'ops.backup'`;
-    const lastOk = Math.max(runs?.last_ok?.getTime() ?? 0, b?.value.uploaded ? Date.parse(b.value.at) : 0);
-    const since = lastOk || runs?.first_attempt?.getTime() || now;
-    const age = now - since;
-    const state = b?.value.filesError ? `数据库已上传，附件打包失败：${b.value.filesError}` : b?.value.uploaded === false ? "未上传" : "";
-    if (age > 50 * 3600_000) {
-      out.push({
-        key: "backup.failed",
-        level: "today",
-        title: "数据库备份连续两天没成功",
-        impact: lastOk ? `万一服务器出事，最近 ${duration(age)} 的数据可能无法完整恢复` : "还没有成功的完整备份，服务器出事时可能无法恢复数据",
-        heals: "不会",
-        action: "转给 AI 处理",
-        detail: `${lastOk ? "最近一次成功" : "首次备份尝试"} ${beijingStamp(since)}${state ? `；${state}` : ""}；看 ops.backup 的运行记录`,
-        since: new Date(since),
-      });
-    } else if (!b || !b.value.uploaded || age > 30 * 3600_000) {
-      out.push({ key: "backup.stale", level: "later", title: "数据库备份超过一天没成功", detail: b ? `最近一次 ${beijingStamp(b.value.at)}${state ? `（${state}）` : ""}；看 ops.backup` : "还没有成功的备份记录" });
-    }
   }
 
   out.push(...(await upstreamFindings(now)));

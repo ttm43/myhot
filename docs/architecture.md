@@ -52,7 +52,7 @@ flowchart LR
 | `packages/backend/src/reports/` | 日报、周报、月报 |
 | `packages/backend/src/providers/` | 模型、向量、X、公众号、Jina 的调用，回执与预算 |
 | `packages/backend/src/notify/` | 飞书推送 |
-| `packages/backend/src/operations/` | 告警、备份、清理、IndexNow |
+| `packages/backend/src/operations/` | 告警、清理、IndexNow |
 | `packages/backend/src/admin/` | 后台接口 |
 | `apps/web/app/routes/` | 每个页面一个文件，路由表在 `apps/web/app/routes.ts` |
 | `database/migrations/` | 数据库迁移，按完整文件名排序执行和记账 |

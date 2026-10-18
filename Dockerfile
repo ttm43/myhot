@@ -2,9 +2,8 @@
 # Build arg NPM_REGISTRY switches the npm registry (e.g. https://registry.npmmirror.com in mainland China).
 FROM node:24-trixie-slim AS base
 WORKDIR /app
-# pg_dump for the optional database backups (Debian's client matches the PostgreSQL 17 server in compose).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends postgresql-client ca-certificates \
+ && apt-get install -y --no-install-recommends ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
 FROM base AS build

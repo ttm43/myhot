@@ -79,6 +79,12 @@ docker compose run --rm setup && docker compose up -d
 
 下面按时间从新到旧列出每次更新要注意的事。
 
+#### 硬分叉精简（2026 年 10 月 18 日）
+
+MyHOT 不再跟进上游，只留采集、预筛、摘要、归组和自己读的页面。下面每条是一项删掉的功能；迁移只删表，不调用模型，删掉的表里的数据找不回来，要留的先用下方 [备份](#备份) 导出。
+
+- **内置备份**：`ops.backup` 定时任务和 `DB_BACKUP_STORE_*` 都去掉了，`.env` 里的这几项可以删掉；镜像不再带 `pg_dump`。备份改用下方的手动导出或自己的脚本。`settings` 表里的 `backup.last` 不再读，可以手动删：`DELETE FROM settings WHERE key = 'backup.last';`
+
 日报缺期告警按北京时间的具体日期跟踪，跨午夜不会自动恢复；只有对应日报存在才发恢复通知。新缺期检查最近 7 个日历日（含今天），不早于最早的日报或 reports.compose 运行记录；没有历史记录时只检查今天。已告警的日期在这 7 天里一直跟踪，关闭采集/模型或 worker 启动宽限期也不会把缺期当成恢复；超出 7 天仍没有日报的，发一条“没能补出、停止提醒”后不再提醒。旧的 report.daily 状态自动按首次告警时间迁移，保留提醒间隔。出刊后两小时告警、每小时提醒及飞书开关保持不变；无需数据库迁移。自定义 responder 若按旧 `report.daily` 精确匹配，需改为识别 `report.daily:YYYY-MM-DD` 日期键。
 
 #### 读者文字的改用词（2026 年 10 月 9 日）
@@ -199,19 +205,13 @@ MCP 的 `subscriptions/listen` 现在立即返回 HTTP 404 和 JSON-RPC `-32601 
 
 ### 备份
 
-在 `.env` 里配置 `DB_BACKUP_STORE_*`（任何 S3 兼容的对象存储），每天 04:10 自动备份到那里。`DB_BACKUP_STORE_SECRET_ID`、`DB_BACKUP_STORE_SECRET_KEY`、`DB_BACKUP_STORE_BUCKET`、`DB_BACKUP_STORE_REGION` 四项都要填；不填 `DB_BACKUP_STORE_DOMAIN` 时按腾讯云 COS 拼地址（`<桶名>.cos.<地域>.myqcloud.com`），用其他 S3 兼容存储时，把这个存储桶的访问域名（含桶名，例如 AWS S3 的 `<桶名>.s3.<地域>.amazonaws.com`）填进 `DB_BACKUP_STORE_DOMAIN`。
-
-一次完整备份包含同一时间戳的数据库 `.dump` 和文件包 `.tar.gz`，文件名取自数据库名：Docker 里数据库叫 `aihot`，所以是 `aihot-<时间>.dump` 和 `aihot-files-<时间>.tar.gz`。文件包保留 `uploads/` 以及仍存本地的 `feedback-screenshots/`，不包含图片缓存或本地备份目录。已经转发到飞书的图片只保留数据库中的外部引用，文件包不保存飞书上的图片。
-
-恢复时同时取回这一对文件：使用与数据库版本兼容的 `pg_restore` 将 `.dump` 恢复到空数据库，再把文件包解压到数据目录根目录（Docker 中为 `/data`，非 Docker 使用 `AIHOT_DATA_DIR`，默认 `.data`），保留包内的子目录结构，并确保运行进程可读取这些文件。只恢复数据库不能找回仍由 `local:` 引用的反馈截图；旧备份中没有包含的文件也无法凭数据库引用恢复。
-
-下面的手动导出只包含数据库，不包含上述附件目录：
+程序不自带备份。数据库用 `pg_dump` 从 db 容器里导出：
 
 ```bash
 docker compose exec -T db pg_dump -U aihot aihot | gzip > myhot-$(date +%F).sql.gz
 ```
 
-数据都在三个 Docker 卷里：`db`（数据库）、`data`（上传的图片、图片缓存、本地备份）、`caddy`（证书）。`docker compose down` 不会删除它们；`docker compose down -v` 会。
+数据都在三个 Docker 卷里：`db`（数据库）、`data`（图片缓存）、`caddy`（证书）。`docker compose down` 不会删除它们；`docker compose down -v` 会。
 
 ### 看日志
 
