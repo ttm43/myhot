@@ -154,7 +154,7 @@ async function queryPool(query: PoolQuery, now: Date): Promise<PoolResponse> {
       return { rows, total: query.now ? await listedCount(query, now) : await poolTotal(query) };
     }
     if (tab === "relevance") {
-      // Rank narrow rows first: no article bodies or translations enter the sort/count. The public
+      // Rank narrow rows first: no article bodies enter the sort/count. The public
       // total stops at 2,000, even though ranking must consider every matching item.
       // For an unfiltered trigram search, match each indexed field separately. OR across fields
       // can make PostgreSQL scan every toasted body instead. Keep other searches inline so short

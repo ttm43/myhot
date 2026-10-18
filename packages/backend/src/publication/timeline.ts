@@ -106,7 +106,7 @@ export async function loadTimeline(q: TimelineQuery): Promise<Omit<TimelineRespo
 
   const factIds = page.filter((g) => g.gk.startsWith("f")).map((g) => Number(g.gk.slice(1)));
 
-  // Read only ranking fields for the whole group; bodies, media and translations are hydrated for this page's representatives.
+  // Read only ranking fields for the whole group; bodies and media are hydrated for this page's representatives.
   type Member = RepresentativeRow & Pick<ItemRow, "id"> & { fact_id: number };
   const [members, pool] = await Promise.all([
     factIds.length

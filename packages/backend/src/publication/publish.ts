@@ -135,7 +135,7 @@ export async function publishArticle(articleId: string, options: PublishOptions 
     await tx`SELECT 1 FROM articles WHERE id = ${articleId} FOR UPDATE`;
     const [previous] = await tx<{ story_id: number | null }[]>`SELECT story_id FROM publications WHERE article_id = ${articleId}`;
     const result = await publishArticleTx(tx, articleId, options);
-    // Body and translation writes announce their own changes; an unchanged projection needs no purge.
+    // Body writes announce their own changes; an unchanged projection needs no purge.
     if (previous && result?.changed) await emit("articleChanged", {
       id: articleId, reason: "republication", kind: result.changeKind, reduced: result.reduced, previousStoryIds: previous.story_id === null ? [] : [previous.story_id],
     }, tx);
@@ -176,7 +176,7 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
 
   const f = override?.fields ?? {};
   const isChineseTitle = article.language === "zh" || /[一-鿿]/.test(article.title);
-  // An X post carries its Chinese in the summary and translation; without a Chinese title its own
+  // An X post carries its Chinese in the summary; without a Chinese title its own
   // text is the title, where an article would still be a half-finished card.
   const zhTitle = analysis?.title_zh?.trim() ? analysis.title_zh : null;
   const original = originalPostCopy(article.x_post, article.url, article.x_article);
