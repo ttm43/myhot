@@ -158,6 +158,9 @@ export function fromHtml(html: string, base: string, source: SourceRow): Candida
     const titleEl = c.titleSelector ? (el.is(c.titleSelector) ? el : el.find(c.titleSelector).first()) : linkEl;
     const title = collapseWhitespace(titleEl.text() || linkEl.attr("title") || "");
     if (!title) continue;
+    // The item's own summary (a repository's description on GitHub Trending), stored as its excerpt.
+    const summaryEl = c.summarySelector ? (el.is(c.summarySelector) ? el : el.find(c.summarySelector).first()) : null;
+    const excerpt = summaryEl ? collapseWhitespace(summaryEl.text()) : "";
     let publishedAt: Date | null = null;
     if (c.publishedAtSelector) {
       const dateEl = el.find(c.publishedAtSelector).first();
@@ -168,7 +171,7 @@ export function fromHtml(html: string, base: string, source: SourceRow): Candida
       publishedAt = parseLooseDate(m?.[1], c.publishedAtUtcOffset);
     }
     seen.add(url);
-    out.push({ url, title, publishedAt });
+    out.push({ url, title, publishedAt, ...(excerpt && excerpt !== title ? { excerpt } : {}) });
   }
   return out;
 }

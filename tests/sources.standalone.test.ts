@@ -69,6 +69,19 @@ test("Markdown card links become posts with their own titles", () => {
   ]);
 });
 
+test("an item's summary selector is read inside each item and becomes its excerpt", () => {
+  const html = `<main>
+    <article class="Box-row"><h2><a href="/acme/rocket">acme / rocket</a></h2><p class="desc">  A tiny
+      rocket engine.  </p></article>
+    <article class="Box-row"><h2><a href="/acme/quiet">acme / quiet</a></h2></article>
+  </main><p>Footer text that is not a description</p>`;
+  const out = fromHtml(html, "https://github.com/trending", source({ url: "https://github.com/trending", itemSelector: "article.Box-row", linkSelector: "h2 a", titleSelector: "h2", summarySelector: "p" }));
+  assert.deepEqual(out.map((c) => [c.url, c.title, c.excerpt ?? null]), [
+    ["https://github.com/acme/rocket", "acme / rocket", "A tiny rocket engine."],
+    ["https://github.com/acme/quiet", "acme / quiet", null],
+  ], "an item without the element has no excerpt; text outside the item is never borrowed");
+});
+
 test("anchors into the listing page itself are navigation, not posts", () => {
   // mimo.xiaomi.com links its own sections (#paper, #blog, #join): all one address once the fragment goes.
   const html = [
