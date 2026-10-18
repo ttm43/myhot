@@ -1,10 +1,10 @@
-// Process heartbeats for the runs view and the watchdog: one settings row per process role.
+// Process heartbeats for the runs view: one settings row per process role.
 import { hostname } from "node:os";
 import { sql } from "../db.ts";
 
 const startedAt = new Date().toISOString();
 
-/** What a process writes to `settings.heartbeat.<role>` (the runs view and the watchdog read it). */
+/** What a process writes to `settings.heartbeat.<role>` (the runs view reads it). */
 export type Heartbeat = {
   pid: number;
   host: string;

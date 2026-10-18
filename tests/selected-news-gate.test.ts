@@ -1,6 +1,6 @@
 // Failure cases before implementation: elapsed time or a stale grouped_at must not publish an
 // unresolved selection; it stays readable in all. Completion publishes once across every outlet;
-// another report cannot push the same news again; low incremental value stays outside selection.
+// low incremental value stays outside selection.
 import { tag } from "./setup.ts";
 import assert from "node:assert/strict";
 import { after, before, mock, test } from "node:test";
@@ -8,7 +8,6 @@ import { closeDb, sql } from "@aihot/backend/db";
 import { upsertMaterial } from "@aihot/backend/content/materials";
 import { getBoss, stopBoss } from "@aihot/backend/jobs/queue";
 import { publishArticle } from "@aihot/backend/publication/publish";
-import { selectedContent } from "@aihot/backend/notify/selected-content";
 import { buildApp } from "../apps/api/src/app.ts";
 
 const T = tag();
@@ -44,18 +43,14 @@ test('an unresolved selection never leaks after the old deadline and completion 
   for (const path of ['/api/site/pool', '/api/v1/items?mode=all', `/api/site/items/${id}`]) {
     assert.ok((await read(path)).includes(id), `${path} hid otherwise readable content`);
   }
-  assert.equal((await selectedContent(id)).status, 'skipped');
   assert.equal((await sql`SELECT 1 FROM selected_ledger WHERE article_id=${id}`).length, 0, 'no premature sync upsert');
-  assert.equal((await sql`SELECT 1 FROM pgboss.job WHERE name='notify.selected' AND data->>'articleId'=${id}`).length, 0);
 
   await sql`UPDATE articles SET grouping_status='complete',grouped_at=now(),grouping_error=NULL,selection_adds_value=true WHERE id=${id}`;
   await publishArticle(id);
   mock.timers.tick(5_100); // the public timeline's existing five-second grouped snapshot expires
   for (const path of selectedOutlets) assert.ok((await read(path)).includes(id), `${path} missed completed news`);
-  assert.equal((await selectedContent(id)).status, 'ready');
   await publishArticle(id);
   assert.equal((await sql`SELECT 1 FROM selected_ledger WHERE article_id=${id} AND op='upsert'`).length, 1);
-  assert.equal((await sql`SELECT 1 FROM pgboss.job WHERE name='notify.selected' AND data->>'articleId'=${id}`).length, 1);
 });
 
 test('a confirmed but redundant explanation stays in all, and an editor can explicitly select it', async () => {
@@ -66,7 +61,6 @@ test('a confirmed but redundant explanation stays in all, and an editor can expl
   mock.timers.tick(5_100); // read past the previous test's snapshot, or this check passes on stale rows
   assert.ok(!(await read('/api/site/timeline?limit=40')).includes(id));
   assert.ok((await read('/api/v1/items?mode=all')).includes(id));
-  assert.equal((await selectedContent(id)).status, 'skipped');
   await sql`INSERT INTO editorial_overrides(article_id,fields,reason,updated_by)
     VALUES (${id},'{"selected":true}','editor verified independent value','test')`;
   await publishArticle(id);

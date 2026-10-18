@@ -8,7 +8,6 @@ import type { z } from "zod";
 import type { Brand } from "@aihot/contracts/site";
 import type { Db } from "./db.ts";
 import type { QueueOptions } from "./jobs/queue.ts";
-import type { Finding } from "./notify/feishu.ts";
 import type { Topic, TopicMember } from "./publication/topics.ts";
 
 /** A cron schedule (Asia/Shanghai), recorded in job_runs like the engine's (apps/worker/src/schedules.ts). */
@@ -19,21 +18,6 @@ export interface Scheduled {
   missed?: "skip" | "once";
   /** Read when the worker starts, after the modules are installed: false removes the schedule and its execution queue; run history remains. */
   when?: () => boolean;
-}
-
-/**
- * A module's notification routing policy (ServerModule.responder):
- * the owner hears only what it hands back; held findings do not imply recovery.
- */
-export interface Responder {
-  /**
-   * Every problem the alerts check found (operations/alerts.ts); a problem it held that is missing has ended.
-   * `tell` is what the owner should hear about now; `held` names the problems still open, so the owner is not
-   * told that something they heard about earlier has ended while it lasts.
-   */
-  take: (found: Finding[], now: number) => Promise<{ tell: Finding[]; held: string[] }>;
-  /** A problem found while the alerts check cannot run (operations/watch.ts: the worker is down); what the owner should hear about it, if anything. */
-  raise: (found: Finding, now: number) => Promise<Finding | null>;
 }
 
 /** A model step (editorial/models.ts); its default model comes from site/models.ts, else `default`. */
@@ -228,14 +212,6 @@ export interface ServerModule {
   models?: Record<string, ModelStep>;
   /** Cron schedules (the worker). */
   schedules?: Scheduled[];
-  /** What is wrong now, for the owner's alerts (operations/alerts.ts), after the engine's problems. */
-  alerts?: (now: number) => Promise<Finding[]>;
-  /**
-   * Chooses which problems the owner hears about: the first installed module with one (operations/alerts.ts,
-   * operations/watch.ts). What it holds back is the module's to hand to whoever handles it; with one, the
-   * daily digest and the weekly source report have no schedule (apps/worker/src/schedules.ts).
-   */
-  responder?: Responder;
   /** Its share of the daily retention run (operations/retention.ts): what it deleted or aggregated. */
   retention?: (now: Date) => Promise<Record<string, unknown>>;
   on?: Partial<EngineHooks>;
@@ -268,12 +244,8 @@ export interface ServerModule {
     resumed?: (sourceId: string, tx: Db) => Promise<void>;
     fetchNow?: (source: { id: string; config: Record<string, unknown> }) => Promise<Record<string, unknown>>;
   }>;
-  /** Lines of the Monday source-health report (operations/reports.ts), after the source counts. */
-  sourceHealth?: (now: number) => Promise<string[]>;
   /** Job queues of its own (jobs/queue.ts). */
   queues?: ModuleQueue[];
-  /** Follow-ups (level later), after the engine's (operations/alerts.ts). */
-  followUps?: (now: number) => Promise<Finding[]>;
   /** Further hosts the site answers on, over https: MCP accepts them as Host and as a browser's Origin (routes/mcp.ts). */
   hosts?: string[];
   /** Reminders for the person behind a request, by exit (RequestNotices). */
@@ -295,11 +267,6 @@ export function installModules(modules: readonly ServerModule[]): void {
 
 export function serverModules(): readonly ServerModule[] {
   return installed;
-}
-
-/** The first installed module's responder, if any. */
-export function responder(): Responder | null {
-  return installed.find((m) => m.responder)?.responder ?? null;
 }
 
 /** The first installed module's reminder for the person behind this request, at this exit. */

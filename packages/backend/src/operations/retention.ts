@@ -1,4 +1,4 @@
-// Daily housekeeping: expired leases, old run history and derived caches,
+// Daily housekeeping: old run history and derived caches,
 // and the site's modules' own periods (their server.ts retention).
 import { readdir, stat, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -32,7 +32,6 @@ export async function dailyRetention(now = new Date()) {
   // The modules' periods first (their aggregates before their deletions, as the engine's).
   const modules: Record<string, unknown> = {};
   for (const m of serverModules()) if (m.retention) Object.assign(modules, await m.retention(now));
-  const leases = await sql`DELETE FROM delivery_leases WHERE expires_at < ${now}`;
   // Scheduled-task history: 30 days (failures 90) is enough for the runs view.
   const runs = await sql`DELETE FROM job_runs WHERE started_at < ${new Date(now.getTime() - 30 * 86400_000)} AND (status IS DISTINCT FROM 'failed' OR started_at < ${new Date(now.getTime() - 90 * 86400_000)})`;
   const monthMs = 30 * 86400_000;
@@ -40,7 +39,6 @@ export async function dailyRetention(now = new Date()) {
   const prunedCache = (await removeOlderThan(path.join(config.dataDir, "imgcache"), monthMs, now.getTime())) + (await removeOlderThan(path.join(config.dataDir, "ogcache"), monthMs, now.getTime()));
   return {
     ...modules,
-    deletedLeases: leases.count,
     deletedJobRuns: runs.count,
     prunedCache,
   };

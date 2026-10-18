@@ -1,33 +1,11 @@
-// Operator settings: notification targets (switching a group on records enabled_at so older content is
-// never back-filled) and per-service request budgets (the circuit breaker paid calls check before sending).
-import type { AdminBudget, AdminNotifyTarget, AdminSettings, BeforeJson } from "@aihot/contracts/admin";
-import { config } from "../config.ts";
+// Operator settings: per-service request budgets (the circuit breaker paid calls check before sending).
+import type { AdminBudget, AdminSettings, BeforeJson } from "@aihot/contracts/admin";
 import { sql } from "../db.ts";
 import { audit } from "../audit.ts";
 
-/** The settings page: content push targets and paid-service budgets. */
+/** The settings page: paid-service budgets. */
 export async function settingsOverview(): Promise<BeforeJson<AdminSettings>> {
-  const [targets, budgets] = await Promise.all([listTargets(), listBudgets()]);
-  return { targets, budgets };
-}
-
-export async function listTargets(): Promise<BeforeJson<AdminNotifyTarget>[]> {
-  return sql<BeforeJson<AdminNotifyTarget>[]>`
-    SELECT t.key, t.purpose, t.kind, t.enabled, t.enabled_at, t.config_ref, t.note, t.updated_at,
-           (SELECT count(*)::int FROM deliveries d WHERE d.target_key = t.key AND d.created_at > now() - interval '7 days') AS deliveries_7d,
-           (SELECT max(d.sent_at) FROM deliveries d WHERE d.target_key = t.key) AS last_sent_at
-    FROM notify_targets t ORDER BY t.purpose, t.key`;
-}
-
-export async function setTargetEnabled(key: string, enabled: boolean, reason: string, actor: string) {
-  if (!reason?.trim()) throw new Error("reason is required");
-  const [before] = await sql`SELECT enabled, enabled_at FROM notify_targets WHERE key = ${key}`;
-  if (!before) return null;
-  const [after] = await sql`
-    UPDATE notify_targets SET enabled = ${enabled}, enabled_at = CASE WHEN ${enabled} AND NOT enabled THEN now() ELSE enabled_at END, updated_at = now()
-    WHERE key = ${key} RETURNING key, enabled, enabled_at`;
-  await audit(actor, enabled ? "notify.enable" : "notify.disable", `notify-target:${key}`, reason, before, after);
-  return { ...after, pushEnabledHere: config.feishuContentPushEnabled };
+  return { budgets: await listBudgets() };
 }
 
 export async function listBudgets(): Promise<BeforeJson<AdminBudget>[]> {

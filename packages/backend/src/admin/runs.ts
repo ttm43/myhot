@@ -1,6 +1,5 @@
 // Runs view: task timeline, queue backlog, source lag, error classes, process
-// heartbeats, and the receipts and deliveries whose outcome needs an operator (resolved in
-// operations/recover.ts and notify/deliver.ts).
+// heartbeats, and the receipts whose outcome needs an operator (resolved in operations/recover.ts).
 import type { AdminRuns, BeforeJson } from "@aihot/contracts/admin";
 import { sql } from "../db.ts";
 import type { Heartbeat } from "../operations/heartbeat.ts";
@@ -24,7 +23,6 @@ export async function runsOverview(): Promise<Runs> {
     lagging,
     receipts,
     receiptIssues,
-    deliveries,
     errors,
     ingest,
     grouping,
@@ -66,10 +64,6 @@ export async function runsOverview(): Promise<Runs> {
       SELECT id, service, model, purpose, subject, status, attempts, left(error, 240) AS error, created_at, updated_at FROM receipts
       WHERE status = 'unknown' OR (status = 'failed' AND updated_at > now() - interval '3 days') OR (status = 'pending' AND updated_at < now() - interval '15 minutes')
       ORDER BY status = 'unknown' DESC, updated_at DESC, id DESC LIMIT 40`,
-    sql<Runs["deliveries"]>`
-      SELECT id, target_key, subject_kind, subject_id, status, attempts, left(response, 240) AS response, created_at, updated_at FROM deliveries
-      WHERE status IN ('unknown', 'failed') OR (status = 'sending' AND updated_at < now() - interval '15 minutes')
-      ORDER BY status = 'unknown' DESC, updated_at DESC, id DESC LIMIT 40`,
     sql<Runs["errors"]>`
       SELECT ${failureGroupSql()} AS error, count(*)::int AS n, max(discovered_at) AS last,
              (array_agg(id ORDER BY discovered_at DESC))[1] AS example
@@ -97,7 +91,6 @@ export async function runsOverview(): Promise<Runs> {
     grouping: groupingOverview(grouping, now),
     lagging,
     receipts: { counts: Object.fromEntries(receipts.map((r) => [r.status, r.n])), issues: receiptIssues },
-    deliveries,
     errors,
     retrying: { count: retrying?.n ?? 0, next: retrying?.next ?? null },
     ingest,

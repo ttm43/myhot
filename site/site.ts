@@ -152,16 +152,6 @@ export const REPORTS = {
   quiet: { title: "今日安静，无大事发生", paragraph: `${subjectAfter("北京时间 {start} 至 {end}，没有新的", "大事")}。` },
 };
 
-/** 运维告警（只发给站长）里随部署而变的几处说法。 */
-export const ALERTS = {
-  /** 多少分钟没有收录新文章就告警“网站停止收录新内容”（最多一天）；环境变量 ALERT_QUIET_MINUTES 优先。 */
-  quietMinutes: 360,
-  /** 同一条告警里，“没有”后面补一句平时的收录量；null 就不写。 */
-  usualFlow: null as string | null,
-  /** worker 停了的告警里，怎么看它的日志。 */
-  workerLogs: "看 worker 的日志（docker compose logs worker）",
-};
-
 /** 后台新建信源时的默认设置。 */
 export const SOURCE_DEFAULTS = {
   /** 站内展示全文；false 时只显示摘要和原文链接。 */

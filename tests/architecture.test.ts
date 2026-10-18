@@ -74,11 +74,10 @@ test("public routes read content only through the public read layer", () => {
 });
 
 // Tables whose rules must not be rewritten elsewhere: the public projection and its sync ledger, paid
-// receipts, content pushes, grouping, and the audit trail. Other code reads them freely.
+// receipts, grouping, and the audit trail. Other code reads them freely.
 const OWNERS: Record<string, string> = {
   publications: "publication/", selected_ledger: "publication/", selected_state: "publication/", pool_search: "publication/",
   receipts: "providers/receipts.ts", receipt_attempts: "providers/receipts.ts",
-  deliveries: "notify/",
   facts: "events/", fact_articles: "events/", stories: "events/", story_signals: "events/", story_aliases: "events/", story_links: "events/",
   story_digests: "events/", grouping_decisions: "events/", grouping_overrides: "events/",
   audit_log: "audit.ts",

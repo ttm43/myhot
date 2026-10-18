@@ -2,22 +2,17 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { ZodError } from "zod";
 import type { AdminMe } from "@aihot/contracts/admin";
-import { DEPLOYMENT, SITE } from "@aihot/site";
+import { DEPLOYMENT } from "@aihot/site";
 import { config } from "@aihot/backend/config";
 import {
-  completeLogin,
   cookie,
   endSession,
-  feishuLoginConfigured,
   LoginRejected,
-  loginRedirect,
-  parseCookies,
   passwordLogin,
   safeReturn,
   SESSION_COOKIE,
   SESSION_DAYS,
   sessionPrincipal,
-  STATE_COOKIE,
   type AdminPrincipal,
 } from "@aihot/backend/admin/auth";
 import { sendProblem } from "../http/respond.ts";
@@ -72,28 +67,19 @@ export function adminHandler(fn: AdminHandler) {
   };
 }
 
-/** Feishu sign-in: the state cookie, then Feishu's authorization page. */
-function feishuRedirect(reply: FastifyReply, returnTo: string) {
-  const { url, stateCookie } = loginRedirect(returnTo);
-  reply.header("Set-Cookie", cookie(STATE_COOKIE, stateCookie, 600, secure())).header("Cache-Control", "no-store");
-  return reply.redirect(url, 302);
-}
-
 export function registerAdminAuth(app: FastifyInstance) {
-  // The web admin sends a signed-out visitor here with ?return=, a reverse proxy with the site's header.
-  // With Feishu as the only way in, sign-in starts there at once; otherwise the sign-in page (in the web
-  // app) offers the ways in.
+  // The web admin sends a signed-out visitor here with ?return=, a reverse proxy with the site's header;
+  // the sign-in page is in the web app.
   app.get("/api/auth/login", async (req, reply) => {
     const returnTo = String(
       (req.query as Record<string, string>).return
       ?? (DEPLOYMENT.loginReturnHeader ? req.headers[DEPLOYMENT.loginReturnHeader.toLowerCase()] : undefined)
       ?? "/admin",
     );
-    if (feishuLoginConfigured() && !config.adminPassword) return feishuRedirect(reply, returnTo);
     return reply.header("Cache-Control", "no-store").redirect(loginPage(returnTo), 302);
   });
 
-  app.get("/api/auth/options", async (_req, reply) => reply.header("Cache-Control", "no-store").send({ password: !!config.adminPassword, feishu: feishuLoginConfigured() }));
+  app.get("/api/auth/options", async (_req, reply) => reply.header("Cache-Control", "no-store").send({ password: !!config.adminPassword }));
 
   // The sign-in form posts as a plain HTML form; only this route reads that format.
   app.register(async (form) => {
@@ -114,28 +100,6 @@ export function registerAdminAuth(app: FastifyInstance) {
         return reply.redirect(loginPage(returnTo, error instanceof LoginRejected && /ADMIN_PASSWORD/.test(error.message) ? "unset" : "wrong"), 303);
       }
     });
-  });
-
-  // Feishu sign-in (FEISHU_LOGIN_APP_ID / FEISHU_LOGIN_APP_SECRET and an allowlist), from the sign-in page.
-  app.get("/api/auth/feishu", async (req, reply) => {
-    const returnTo = String((req.query as Record<string, string>).return ?? "/admin");
-    if (!feishuLoginConfigured()) return reply.header("Cache-Control", "no-store").redirect(loginPage(returnTo), 302);
-    return feishuRedirect(reply, returnTo);
-  });
-
-  // The callback registered in the Feishu open platform: the state cookie comes back here.
-  app.get("/api/auth/callback", async (req, reply) => {
-    const q = req.query as Record<string, string>;
-    reply.header("Cache-Control", "no-store");
-    try {
-      const { token, returnTo } = await completeLogin(String(q.code ?? ""), String(q.state ?? ""), parseCookies(req.headers.cookie)[STATE_COOKIE], req.headers["user-agent"]);
-      reply.header("Set-Cookie", [cookie(SESSION_COOKIE, token, SESSION_DAYS * 86400, secure()), cookie(STATE_COOKIE, "", 0, secure())]);
-      return reply.redirect(returnTo, 302);
-    } catch (error) {
-      const message = error instanceof LoginRejected ? error.message : "登录失败，请稍后再试";
-      if (!(error instanceof LoginRejected)) req.log.error({ err: error }, "admin login failed");
-      return reply.code(403).type("text/html; charset=utf-8").send(`<!doctype html><meta charset="utf-8"><title>登录失败 · ${SITE.name}</title><p style="font:16px system-ui;padding:40px">${message}。<a href="/api/auth/login">重新登录</a></p>`);
-    }
   });
 
   // For a reverse proxy that guards /admin itself (auth_request): 204 with a live session, else 401.

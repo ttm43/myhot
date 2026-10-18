@@ -188,7 +188,7 @@ export interface AdminPublication {
   updated_at: Timestamp;
 }
 
-/** An item's whole chain: source → discoveries → revisions → judgements → publication → grouping → deliveries. */
+/** An item's whole chain: source → discoveries → revisions → judgements → publication → grouping. */
 export interface AdminContentChain {
   article: {
     id: string; source_id: string; url: string; identity_key: string; title: string; author: string | null; language: string | null;
@@ -208,7 +208,6 @@ export interface AdminContentChain {
   ledger: Array<{ seq: number; op: string; visible_at: Timestamp; changed_at: Timestamp }>;
   membership: Array<{ fact_id: number; role: string; manual: boolean; fact_public_id: string; fact_title: string; story_id: number | null; story_public_id: string | null; story_title: string | null }>;
   decisions: Array<{ verdict: string; fact_id: number | null; story_id: number | null; receipt_id: number | null; candidates: unknown; created_at: Timestamp }>;
-  deliveries: Array<{ target_key: string; dedupe_key: string; status: string; attempts: number; response: string | null; created_at: Timestamp; sent_at: Timestamp | null }>;
   history: AdminAuditEntry[];
 }
 
@@ -223,18 +222,6 @@ export interface AdminReceiptIssue {
   status: string;
   attempts: number;
   error: string | null;
-  created_at: Timestamp;
-  updated_at: Timestamp;
-}
-
-export interface AdminDeliveryIssue {
-  id: number;
-  target_key: string;
-  subject_kind: string;
-  subject_id: string;
-  status: string;
-  attempts: number;
-  response: string | null;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -256,7 +243,6 @@ export interface AdminRuns {
     next_fetch_at: Timestamp | null; interval_minutes: number; last_error: string | null;
   }>;
   receipts: { counts: Record<string, number>; issues: AdminReceiptIssue[] };
-  deliveries: AdminDeliveryIssue[];
   errors: Array<{ error: string; n: number; last: Timestamp; example: string }>;
   retrying: { count: number; next: Timestamp | null };
   ingest: Array<{ client: string; kind: string; status: string; error: string | null; summary: unknown; created_at: Timestamp }>;
@@ -265,19 +251,6 @@ export interface AdminRuns {
 }
 
 // Settings
-
-export interface AdminNotifyTarget {
-  key: string;
-  purpose: string;
-  kind: string;
-  enabled: boolean;
-  enabled_at: Timestamp | null;
-  config_ref: string | null;
-  note: string | null;
-  updated_at: Timestamp;
-  deliveries_7d: number;
-  last_sent_at: Timestamp | null;
-}
 
 export interface AdminBudget {
   service: string;
@@ -291,7 +264,6 @@ export interface AdminBudget {
 }
 
 export interface AdminSettings {
-  targets: AdminNotifyTarget[];
   budgets: AdminBudget[];
 }
 

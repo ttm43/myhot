@@ -213,7 +213,7 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
                 <span className="text-ink-4">没有进入过精选同步流</span>
               )}
             </Step>
-            <Step title="事件归组" tone={story ? "accent" : "muted"} meta={a.grouped_at ? `归组于 ${bj(a.grouped_at, true)}` : "未归组"}>
+            <Step title="事件归组" last tone={story ? "accent" : "muted"} meta={a.grouped_at ? `归组于 ${bj(a.grouped_at, true)}` : "未归组"}>
               {c.membership.map((m) => (
                 <div key={m.fact_id} className="mb-2">
                   <div>
@@ -243,21 +243,6 @@ export default function ContentItem({ loaderData }: Route.ComponentProps) {
                 {c.membership.length > 0 && <Button size="sm" onClick={() => setDialog("detach")}>移出事件</Button>}
                 {story?.story_id && <Button size="sm" onClick={() => setDialog("merge")}>把这个事件并入…</Button>}
               </div>
-            </Step>
-            <Step title="投递" last meta={`${c.deliveries.length} 条`} tone={c.deliveries.some((d) => d.status === "unknown") ? "bad" : c.deliveries.length ? "accent" : "muted"}>
-              {c.deliveries.length ? (
-                <ul className="space-y-1">
-                  {c.deliveries.map((d, i) => (
-                    <li key={i} className="flex flex-wrap gap-2">
-                      <span>{d.target_key}</span>
-                      <Badge tone={d.status === "sent" ? "ok" : d.status === "unknown" ? "bad" : "muted"}>{d.status}</Badge>
-                      <span className="num text-ink-4">{bj(d.created_at)}{d.sent_at ? ` → ${bj(d.sent_at)}` : ""}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <span className="text-ink-4">没有推送记录</span>
-              )}
             </Step>
           </ol>
         </Card>

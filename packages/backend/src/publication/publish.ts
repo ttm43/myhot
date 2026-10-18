@@ -411,11 +411,9 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
     await tx`DELETE FROM pool_search WHERE article_id = ${articleId}`;
   }
 
-  // Content-group push: once, for an item that arrives live and becomes selected (never for imports,
+  // Prepare its images once, for an item that arrives live and becomes selected (never for imports,
   // backfill or stale-on-discovery material).
   if (selected && !previous?.selected && !options.releasedAt && !article.backfill && visibility === "public") {
-    await enqueue(QUEUES.notifySelected, { articleId }, { singletonKey: `selected:${articleId}`, startAfter: new Date(now.getTime() + 5_000) }, tx);
-    // Prepare its images alongside the newly confirmed selection.
     await enqueue(QUEUES.prepareMedia, { articleId }, { singletonKey: `media:${articleId}` }, tx);
   }
 

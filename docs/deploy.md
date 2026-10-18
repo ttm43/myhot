@@ -83,6 +83,7 @@ docker compose run --rm setup && docker compose up -d
 
 MyHOT 不再跟进上游，只留采集、预筛、摘要、归组和自己读的页面。下面每条是一项删掉的功能；迁移只删表，不调用模型，删掉的表里的数据找不回来，要留的先用下方 [备份](#备份) 导出。
 
+- **飞书和告警**：飞书内容群推送（`notify.selected` 队列）、内部群告警（`ops.alerts`、`ops.digest`、`reports.source-health`、api 里的 worker 看门狗）和飞书登录后台都去掉了，后台“设置”只剩付费请求上限，“运行”页不再有投递。迁移 `0088`–`0090` 删掉 `delivery_leases`、`deliveries`、`notify_targets` 三张表，`0091` 删掉 `admin_users.feishu_union_id`；飞书登录的旧会话失效，用管理员密码登录。`.env` 里的 `FEISHU_*`、`ADMIN_FEISHU_UNION_IDS`、`ADMIN_EMAILS`、`ALERT_QUIET_MINUTES` 不再读，可以删掉；`site/site.ts` 去掉了 `ALERTS`。`settings` 表里的 `alerts.state`、`watchdog.worker`、`egress.imgproxy` 不再读。
 - **读者反馈和几张公开站点的页面**：`/feedback`（连同后台“反馈”页、`feedback.forward` 定时任务）、`/about`（连同 `/contact/*` 二维码和后台的二维码设置）、`/terms`、`/privacy`、`/changelog`（连同红点）和 `/starred`（卡片和文章页上的收藏按钮）都去掉了；`site/pages/`、`site/changelog.json` 删除，`site/site.ts` 去掉 `ABOUT`、`feedback*`、`footerNote`、`POLICY.privacy`。迁移 `0086`、`0087` 删掉 `feedback_bans`、`feedback` 两张表；数据卷里的 `uploads/`、`feedback-screenshots/` 目录不再使用，可以删掉。`settings` 表里的 `contact_qr` 不再读。
 - **内置备份**：`ops.backup` 定时任务和 `DB_BACKUP_STORE_*` 都去掉了，`.env` 里的这几项可以删掉；镜像不再带 `pg_dump`。备份改用下方的手动导出或自己的脚本。`settings` 表里的 `backup.last` 不再读，可以手动删：`DELETE FROM settings WHERE key = 'backup.last';`
 
@@ -224,9 +225,9 @@ docker compose logs -f --tail 100 api worker web
 
 ### 管理员会话与配置变更
 
-会话绑定登录方式、登录时的管理员凭据或飞书身份。修改管理员密码、飞书管理员名单或会话密钥后，应重启所有 API 进程，使它们加载相同的新配置；只编辑配置文件不代表正在运行的进程已生效，混用旧代码或旧配置的进程不能提供统一撤权。
+会话绑定登录时的管理员密码。修改管理员密码或会话密钥后，应重启所有 API 进程，使它们加载相同的新配置；只编辑配置文件不代表正在运行的进程已生效，混用旧代码或旧配置的进程不能提供统一撤权。
 
-有效配置改变后，密码会话不再接受旧密码的授权，飞书会话按登录时实际取得的 union ID 或邮箱检查当前名单（两者任一仍获授权即可）。停用飞书登录应用或更换应用 ID 会使飞书会话失效；只轮换同一应用的 secret 不会使仍获授权的飞书会话退出。轮换或移除 `SESSION_SECRET` 会使两种会话都失效。
+有效配置改变后，会话不再接受旧密码的授权；轮换或移除 `SESSION_SECRET` 也会使会话失效。
 
 鉴权时确认失效的会话会被删除，恢复旧配置也不会让它复活。系统不记录全局凭据变更历史：某次配置变化若从未被进程加载，或在恢复前从未被会话检查观察到，不能据此追溯撤销会话。
 

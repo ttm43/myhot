@@ -14,7 +14,6 @@ import { buildScoreInput, loadAnalyzeInput } from '@aihot/backend/editorial/anal
 import { collectSource } from '@aihot/backend/sources/collect';
 import { groupArticle } from '@aihot/backend/events/group';
 import { publishArticle } from '@aihot/backend/publication/publish';
-import { selectedContent } from '@aihot/backend/notify/selected-content';
 import { dailyEdition } from '@aihot/backend/reports/edition';
 import { stopBoss } from '@aihot/backend/jobs/queue';
 import { buildApp } from '../apps/api/src/app.ts';
@@ -45,7 +44,7 @@ async function highScore(id:string){
   await publishArticle(id);
 }
 
-test('a previously unseen, undated tail cannot become selected news, heat, a report or a queued push',async()=>{
+test('a previously unseen, undated tail cannot become selected news, heat or a report',async()=>{
   const now=new Date();
   listing=Array.from({length:60},(_,i)=>({url:`${base}/known-${i}`,title:`Known ${i}`,date:now.toISOString(),summary:body}));
   await collectSource(SOURCE);
@@ -66,9 +65,6 @@ test('a previously unseen, undated tail cannot become selected news, heat, a rep
   assert.equal((await app.inject({method:'GET',url:`/api/site/items/${a!.id}`})).statusCode,200,'the material remains readable');
   const edition=await dailyEdition('2026-10-04',new Date(Date.now()-86400000),new Date(Date.now()+1000));
   assert.ok(!edition.entries.some(e=>e.entry.itemId===a!.id));
-  assert.equal((await selectedContent(a!.id)).status,'skipped');
-  await sql`UPDATE publications SET selected=true,backfill=false WHERE article_id=${a!.id}`;
-  assert.equal((await selectedContent(a!.id)).status,'skipped','a card queued under the old rules is rechecked');
 });
 
 test('an original source can supply a missing date without changing the text; discovery and explicit backfill are preserved',async()=>{
@@ -85,8 +81,6 @@ test('an original source can supply a missing date without changing the text; di
     assert.equal(a.backfill,mode!=='fresh');
     assert.equal(a.timeline_at.getTime(),mode==='fresh'?discoveredAt.getTime():publishedAt.getTime());
     assert.equal((await upsertMaterial({...material,publishedAt})).revised,false);
-    await highScore(created.articleId);
-    assert.equal((await selectedContent(created.articleId)).status,mode==='fresh'?'ready':'skipped');
   }
 });
 

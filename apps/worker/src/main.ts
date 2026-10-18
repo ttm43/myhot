@@ -8,21 +8,19 @@ import { SERVER_MODULES } from "@aihot/site/modules/server";
 import { registerContentJobs } from "@aihot/backend/jobs/content";
 import { registerSourceJobs } from "@aihot/backend/jobs/sources";
 import { registerEventJobs } from "@aihot/backend/jobs/events";
-import { registerNotifyJobs } from "@aihot/backend/jobs/notify";
+import { registerMediaJobs } from "@aihot/backend/jobs/media";
 import { registerPublicationJobs } from "@aihot/backend/jobs/publication";
 import { registerSchedules } from "./schedules.ts";
-import { ensureContentTargets } from "@aihot/backend/notify/deliver";
 import { startHeartbeat } from "@aihot/backend/operations/heartbeat";
 
 installModules(SERVER_MODULES);
 assertProductionSecrets([["auth", "IMG_PROXY_SIGN_SECRET"]]);
 
-await ensureContentTargets();
 const boss = await getBoss();
 await registerContentJobs(boss);
 if (process.env.COLLECT_ENABLED === "true") await registerSourceJobs(boss);
 await registerEventJobs(boss);
-await registerNotifyJobs(boss);
+await registerMediaJobs(boss);
 await registerPublicationJobs(boss);
 await workModuleQueues(boss);
 await registerSchedules(boss);

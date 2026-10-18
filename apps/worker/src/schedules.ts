@@ -2,7 +2,7 @@
 // job_runs; missed slots run once.
 import type { PgBoss } from "pg-boss";
 import { ensureQueue, recordRun } from "@aihot/backend/jobs/queue";
-import { responder, serverModules, type Scheduled } from "@aihot/backend/modules";
+import { serverModules, type Scheduled } from "@aihot/backend/modules";
 import { sweepUnprocessed } from "@aihot/backend/jobs/content";
 import { translatePending } from "@aihot/backend/editorial/translate";
 import { adaptIntervals, scheduleDueSources } from "@aihot/backend/sources/collect";
@@ -14,9 +14,7 @@ import { linkRelatedStories } from "@aihot/backend/events/consolidate";
 import { composeDueReports } from "@aihot/backend/reports/compose";
 import { dailyRetention } from "@aihot/backend/operations/retention";
 import { submitIndexNow } from "@aihot/backend/operations/indexnow";
-import { checkAlerts, sendDigest } from "@aihot/backend/operations/alerts";
 import { recoverStaleWork } from "@aihot/backend/operations/recover";
-import { sourceHealthWeekly } from "@aihot/backend/operations/reports";
 
 const collecting = process.env.COLLECT_ENABLED === "true";
 
@@ -35,13 +33,8 @@ const ENGINE_SCHEDULES: Scheduled[] = [
   // IndexNow for added, changed and removed discovery URLs (off unless INDEXNOW_SUBMIT_ENABLED).
   { name: "seo.indexnow", cron: "50 5 * * *", missed: "once", run: () => submitIndexNow() },
   // Work a stopped process left half way becomes visible, and unknown paid requests get their one
-  // automatic release; ops.alerts runs in parallel and sees the result by its next run at the latest.
+  // automatic release.
   { name: "ops.recover", cron: "*/10 * * * *", run: () => recoverStaleWork() },
-  { name: "ops.alerts", cron: "*/10 * * * *", run: () => checkAlerts() },
-  // One message with other follow-ups and their actual impact (nothing when there are none); a site's
-  // responder supplies its own notification policy instead.
-  { name: "ops.digest", cron: "0 9 * * *", missed: "once", run: () => sendDigest(), when: () => !responder() },
-  { name: "reports.source-health", cron: "0 9 * * 1", missed: "once", run: () => sourceHealthWeekly(), when: () => !responder() },
   ...(collecting
     ? [
         { name: "sources.schedule", cron: "* * * * *", run: () => scheduleDueSources() },

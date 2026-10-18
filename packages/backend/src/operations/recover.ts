@@ -1,5 +1,5 @@
-// In-doubt work. A stopped process leaves "pending" receipts and deliveries: they become
-// "unknown" and are never re-sent on their own. An unknown receipt is released once automatically after
+// In-doubt work. A stopped process leaves "pending" receipts: they become "unknown" and are never
+// re-sent on their own. An unknown receipt is released once automatically after
 // half an hour without checking the provider's bill, so a lost answer costs at most one repeat; one that
 // turns unknown again waits for the admin, who checks the bill and releases it with a note. A released
 // receipt lets its request call again, and an article that stopped on it goes back to processing.
@@ -8,7 +8,6 @@ import { sql } from "../db.ts";
 import { resumeAfterRelease } from "../jobs/content.ts";
 import { sweepUngrouped } from "../jobs/events.ts";
 import { retryReleasedReceiptJobs } from "../jobs/queue.ts";
-import { markStaleDeliveries } from "../notify/deliver.ts";
 import { markStalePendingReceipts, releaseUnknownReceipt } from "../providers/receipts.ts";
 
 const AUTO_RELEASE_AFTER_MS = 30 * 60_000;
@@ -36,7 +35,7 @@ export async function releaseReceipt(id: number, input: { billed: boolean; note:
 
 /**
  * Unknown receipts older than half an hour, released without checking the provider's bill. A request
- * released this way once and unknown again stays for the admin (the alerts' follow-ups list it).
+ * released this way once and unknown again stays for the admin (the runs page lists it).
  */
 export async function autoReleaseUnknownReceipts(now = Date.now()) {
   const rows = await sql<{ id: number }[]>`
@@ -56,5 +55,5 @@ export async function autoReleaseUnknownReceipts(now = Date.now()) {
 
 /** ops.recover, every 10 minutes. */
 export async function recoverStaleWork() {
-  return { receipts: await markStalePendingReceipts(), released: await autoReleaseUnknownReceipts(), jobs: await retryReleasedReceiptJobs(), grouping: await sweepUngrouped(), deliveries: await markStaleDeliveries() };
+  return { receipts: await markStalePendingReceipts(), released: await autoReleaseUnknownReceipts(), jobs: await retryReleasedReceiptJobs(), grouping: await sweepUngrouped() };
 }

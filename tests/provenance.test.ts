@@ -100,7 +100,6 @@ for (const entrance of ["publisher", "source-mode"] as const) test(`${entrance} 
   const [pending] = await sql`SELECT p.selection_candidate,p.selected,a.grouping_status FROM publications p JOIN articles a ON a.id=p.article_id WHERE a.id=${fresh}`;
   assert.deepEqual({ ...pending }, { selection_candidate: true, selected: false, grouping_status: "pending" });
   assert.equal((await sql`SELECT 1 FROM selected_ledger WHERE article_id=${fresh}`).length, 0);
-  assert.equal((await sql`SELECT 1 FROM pgboss.job WHERE name='notify.selected' AND data->>'articleId'=${fresh}`).length, 0);
 });
 
 test("a T1 channel linking another publisher is still a discovery, not that URL's publisher", async () => {

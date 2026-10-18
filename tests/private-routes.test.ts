@@ -20,13 +20,10 @@ after(async () => {
 test("an unrelated malformed cookie leaves a real admin session usable without admitting invalid sessions", async () => {
   const token = `session-${tag()}`;
   const [user] = await sql<{ id: number }[]>`INSERT INTO admin_users (display_name) VALUES ('Cookie test') RETURNING id`;
-  const claims = { appId: "test-session-app", unionId: "test-session-user", email: null };
-  process.env.FEISHU_LOGIN_APP_ID = claims.appId;
-  process.env.FEISHU_LOGIN_APP_SECRET = "test-app-secret";
-  config.adminUnionIds = [claims.unionId];
-  const binding = createHmac("sha256", process.env.SESSION_SECRET!).update(JSON.stringify(["admin-session-v1", "feishu", claims])).digest("hex");
+  config.adminPassword = "test-admin-password-0123";
+  const binding = createHmac("sha256", process.env.SESSION_SECRET!).update(JSON.stringify(["admin-session-v1", "password", config.adminPassword])).digest("hex");
   await sql`INSERT INTO admin_sessions (id_hash, user_id, csrf_token, expires_at, auth_method, auth_binding, auth_claims)
-            VALUES (${sha256(token)}, ${user!.id}, 'cookie-test-csrf', now() + interval '1 hour', 'feishu', ${binding}, ${sql.json(claims)})`;
+            VALUES (${sha256(token)}, ${user!.id}, 'cookie-test-csrf', now() + interval '1 hour', 'password', ${binding}, NULL)`;
 
   for (const cookie of ["unrelated=%", "aihot_admin=%; unrelated=%E0%A4", "aihot_admin=forged; unrelated=%"]) {
     const denied = await app.inject({ url: "/api/auth/check", headers: { cookie } });
