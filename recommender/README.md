@@ -19,7 +19,7 @@ recommender/
 └── out/                    预测、标注、缓存、日志（不进 git）
 ```
 
-依赖：MyHOT 在上一级目录跑着（`docker compose up -d`），本机有 Python 3.11+ 和 `requirements.txt` 里的包；小模型的权重通过公共模型库 `models/registry.yaml` 解析（`$MODEL_STORE`，否则往上找第一个 `models/registry.yaml`）。
+依赖：MyHOT 在上一级目录跑着（`docker compose up -d`），本机有 Python 3.11+ 和 `requirements.txt` 里的包（Windows 上用 `schtasks /run /tn AutoredInstallDeps` 跑 `install_deps.bat` 来装：在 Claude 里 pip 装的包落在 MSIX 虚拟化目录，计划任务看不到）；小模型的权重通过公共模型库 `models/registry.yaml` 解析（`$MODEL_STORE`，否则往上找第一个 `models/registry.yaml`）。
 
 ## LLM Judge（个人推荐第一版）
 
