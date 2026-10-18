@@ -245,7 +245,7 @@ Content-Type: application/json
   "sourceId": "my-crawler",
   "sourceName": "我的抓取脚本",
   "items": [
-    { "title": "必填", "url": "必填", "publishedAt": "2026-10-01T08:00:00+08:00", "author": "可选" }
+    { "title": "必填", "url": "必填", "publishedAt": "2026-10-01T08:00:00+08:00", "author": "可选", "body": "可选，正文纯文本" }
   ]
 }
 ```
@@ -255,4 +255,5 @@ Content-Type: application/json
 - 返回 `{"ok": true, "created": <新建条数>}`。不是 JSON 对象的条目、缺标题或网址的条目会被跳过，同一请求里重复的网址只取第一条。
 - `sourceId` 不存在时会自动建一个 `external` 信源，默认不进公开页面：到后台把它的参与方式改成 `editorial` 才会出现在站上。
 - 在后台暂停信源后，推送接口返回 409，不再接收新文章；恢复信源后可以继续推送。
+- `body`（MyHOT 本地补丁）：条目自己的正文，纯文本，最多保留 5 万字；带了就直接当正文用，不再去抓网页。已经推过的网址再推一次带上 `body`，会按修订重新分析。
 - 条目的 `raw._aihot.backfill` 为 `true` 时按历史回灌处理（不进入“今天”、不推送）。

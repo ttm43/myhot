@@ -7,6 +7,8 @@ import { queueProcessing } from "../jobs/content.ts";
 import { normalizeUrl } from "../lib/url.ts";
 
 export const MAX_ITEMS = 50;
+/** local patch: longest body kept from a pushed item. */
+const MAX_BODY = 50_000;
 
 export class IngestError extends Error {
   readonly status: number;
@@ -21,6 +23,8 @@ interface ItemIn {
   url?: unknown;
   publishedAt?: unknown;
   author?: unknown;
+  // local patch: the pushed post's own text as its body (catbus has it; x.com pages cannot be fetched).
+  body?: unknown;
   raw?: { _aihot?: { backfill?: boolean; baseline?: boolean } } & Record<string, unknown>;
 }
 
@@ -50,6 +54,7 @@ export async function ingestItems(body: { sourceId?: unknown; sourceName?: unkno
     seen.add(url);
     const published = typeof it.publishedAt === "string" ? new Date(it.publishedAt) : null;
     const flags = it.raw?._aihot ?? {};
+    const body = typeof it.body === "string" ? it.body.trim().slice(0, MAX_BODY) : ""; // local patch
     const res = await upsertMaterial({
       sourceId: source!.id,
       // Normalize only for deduplication. Ownership needs the reported origin (including www and
@@ -58,6 +63,7 @@ export async function ingestItems(body: { sourceId?: unknown; sourceName?: unkno
       title,
       author: typeof it.author === "string" ? it.author.slice(0, 200) : null,
       publishedAt: published && Number.isFinite(published.getTime()) ? published : null,
+      ...(body ? { bodyText: body, bodyStatus: "ok" as const } : {}), // local patch
       raw: it.raw ?? null,
       via: "ingest",
       backfill: flags.backfill ? "reported-backfill" : flags.baseline ? "reported-baseline" : null,
