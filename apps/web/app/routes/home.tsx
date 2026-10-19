@@ -7,7 +7,6 @@ import { filterParams, hasFeedFilters, itemListLd, listPath, pageMeta, readFilte
 import type { Screen } from "../components/shell/screens";
 import { Timeline } from "../features/feed/Timeline";
 import { ActiveFilters, CategoryTabs, FeedBar, SearchField } from "../features/feed/Filters";
-import { Radar } from "../features/feed/Radar";
 
 export const handle: Screen = { tab: "featured", name: "精选" };
 export { pageHeaders as headers } from "../lib/api.server";
@@ -35,7 +34,7 @@ export default function Home() {
   const title = filters.tag ? `#${filters.tag}` : "精选";
   return (
     <div className="pb-6">
-      {/* Phones: the bar (精选 | 全部, filter, search), the filter in use, the folded 雷达, the feed. */}
+      {/* Phones: the bar (精选 | 全部, filter, search), the filter in use, the feed. */}
       <FeedBar base="/" category={filters.category} channel={filters.channel} />
       <ActiveFilters base="/" category={filters.category} channel={filters.channel} tag={filters.tag} />
       <div className="hidden lg:block">
@@ -45,8 +44,6 @@ export default function Home() {
           <SearchField keep={{ category: filters.category }} />
         </div>
       </div>
-
-      {!hasFeedFilters(filters) && <Radar />}
 
       <Timeline initial={data} filters={data.filters} />
     </div>

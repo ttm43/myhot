@@ -105,17 +105,25 @@ export interface GroupReport {
   originalUrl: string;
 }
 
-/** The home page's 雷达 (/api/site/radar): raw recent items of the collect-only sources, by source. */
+/** 雷达 (/radar, /api/site/radar): raw recent items of the collect-only sources, by source. */
 export interface RadarItem {
   title: string;
   /** The original link. */
   url: string;
   excerpt: string | null;
   discoveredAt: string;
+  /** Discovered in the last 24 hours (新). */
+  fresh: boolean;
 }
 
+/** The windows the radar offers, in days. */
+export const RADAR_DAYS = [3, 7] as const;
+export type RadarDays = (typeof RADAR_DAYS)[number];
+
 export interface RadarResponse {
-  sources: Array<{ sourceId: string; sourceName: string; items: RadarItem[] }>;
+  days: RadarDays;
+  /** `url`: the page the source lists (web listings only). */
+  sources: Array<{ sourceId: string; sourceName: string; url: string | null; items: RadarItem[] }>;
 }
 
 export interface GroupReportsResponse {

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { subjectAfter } from "@aihot/site";
 import { webModules } from "../../site-modules";
 import {
-  IconBolt, IconList, IconUser,
+  IconBolt, IconList, IconRadar, IconUser,
 } from "../icons";
 
 export interface NavItem {
@@ -21,6 +21,7 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
     items: [
       { to: "/", label: "精选", icon: IconBolt, end: true },
       { to: "/all", label: subjectAfter("全部", "动态"), icon: IconList },
+      { to: "/radar", label: "雷达", icon: IconRadar },
     ],
   },
 ];
@@ -47,12 +48,13 @@ export function sidebarIsActive(item: NavItem, pathname: string): boolean {
 }
 
 /**
- * The phone tab bar: 全部 lives beside 精选 as a switch, and "我的" at /more holds
- * 外观 and the tools. Which tab a page sits under is declared by the page
+ * The phone tab bar: 全部 lives beside 精选 as a switch, 雷达 has its own tab, and "我的" at /more
+ * holds 外观 and the tools. Which tab a page sits under is declared by the page
  * itself (components/shell/screens.ts).
  */
 export type TabKey =
   | "featured"
+  | "radar"
   | "me"
   // A module's tab.
   | (string & {});
@@ -66,6 +68,7 @@ export interface Tab {
 
 const ENGINE_TABS: Tab[] = [
   { key: "featured", to: "/", label: "精选", icon: IconBolt },
+  { key: "radar", to: "/radar", label: "雷达", icon: IconRadar },
   { key: "me", to: "/more", label: "我的", icon: IconUser },
 ];
 

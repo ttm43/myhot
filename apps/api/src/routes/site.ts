@@ -8,6 +8,7 @@ import { loadPool, SearchBusyError } from "@aihot/backend/publication/pool";
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { loadGroupReports } from "@aihot/backend/publication/groups";
 import { loadRadar } from "@aihot/backend/publication/radar";
+import { RADAR_DAYS } from "@aihot/contracts/site";
 import { looseQuery, sendJsonWithEtag, sendProblem } from "../http/respond.ts";
 
 type Handler = (req: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
@@ -75,7 +76,10 @@ export function registerSite(app: FastifyInstance) {
   }));
 
   app.get("/api/site/radar", siteHandler(async (req, reply) => {
-    return sendJsonWithEtag(req, reply, await loadRadar(), { etagPrefix: "radar", cacheControl: "public, max-age=60, s-maxage=60" });
+    const raw = looseQuery(req).days ?? "3";
+    const days = RADAR_DAYS.find((d) => String(d) === raw);
+    if (!days) throw new BadRequest("invalid days");
+    return sendJsonWithEtag(req, reply, await loadRadar(days), { etagPrefix: "radar", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
   app.get("/api/site/groups/:factId/reports", siteHandler(async (req, reply) => {

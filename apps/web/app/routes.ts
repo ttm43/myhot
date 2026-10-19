@@ -15,6 +15,7 @@ const moduleAdminPages: RouteConfigEntry[] = MODULES.flatMap((m) => (m.adminPage
 export default [
   index("routes/home.tsx"),
   route("all", "routes/all.tsx"),
+  route("radar", "routes/radar.tsx"),
   route("all/search-busy", "routes/search-busy.tsx", { id: "all-search-busy" }),
   route("search-busy", "routes/search-busy.tsx", { id: "search-busy" }),
   route("items/:id", "routes/item.tsx"),

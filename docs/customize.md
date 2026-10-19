@@ -26,7 +26,7 @@
 - `github`：源码仓库的地址（选填），填了就在侧栏和“我的”页底部显示“GitHub 开源”。
 - `rootIcons`：标准图标以外也放在网站根目录的图标，`site/brand/` 里的文件名（选填）。
 - `ITEM_COPY`：模型写的那句理由叫什么（`reasonLabel`，默认“推荐理由”），读者在网页上看不看得到 AI 评分（`showScore`；只管显示，MCP 照样带分数）。
-- `RADAR`：首页「雷达」里排在最前的信源（`pinned`，填信源 id）。
+- `RADAR`：「雷达」页（`/radar`）里排在最前的信源（`pinned`，填信源 id，默认 GitHub Trending、Hugging Face Daily Papers）。
 - `SOURCE_DEFAULTS`：后台新建信源时默认展不展示全文。
 - `ADMIN`：后台几处给管理员的提示（选填）。
 - `DEPLOYMENT`：这个部署自己的安排：凭据文件放在哪、生产 API 启动时额外检查哪些凭据（`requiredSecrets`，默认空）、CDN 回源用的域名、后台登录回跳用的请求头、图片代理的流量上限、采集和图片直连（不走出网代理）的域名、精选评测默认用的样本，都可以不填。
@@ -54,7 +54,7 @@
 | `config` | 每种信源的配置，见 [信源](sources.md) |
 | `tier` | 信源分级：`T1` 官方一手、`T1_5` 官方账号与准官方、`T2` 媒体与个人、`EXCLUDE_MP` 不参与精选。`T1` 就是“一手”，不用另外标 |
 | `owner_entity_id` | 可选，这个信源属于哪家公司（`ENTITIES` 的 id）。`T1_5` 的官方账号要当代表报道，要填它（见 [信源](sources.md)） |
-| `participation_mode` | `editorial` 进精选和全部动态；`hot_signal` 只收不分析、不归组，原样列在首页「雷达」里；`isolated` 不进任何公开页面 |
+| `participation_mode` | `editorial` 进精选和全部动态；`hot_signal` 只收不分析、不归组，原样列在「雷达」页（`/radar`）里；`isolated` 不进任何公开页面 |
 | `site_fulltext` | 站内能不能展示全文。**默认关**：只展示摘要和原文链接。只有来源明确允许时才打开 |
 
 ## 4. 提示词：`industry/prompts/`

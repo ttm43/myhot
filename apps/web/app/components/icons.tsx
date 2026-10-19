@@ -12,6 +12,7 @@ function Svg({ size = 18, children, ...rest }: P & { children: React.ReactNode }
 }
 
 export const IconBolt = (p: P) => (<Svg {...p}><path d="M13 2.5L4.5 13.5H11l-1 8L19.5 10.5H13z" /></Svg>);
+export const IconRadar = (p: P) => (<Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5a4.5 4.5 0 1 0 4.5 4.5" /><path d="M12 12l5.5-5.5" /></Svg>);
 export const IconList = (p: P) => (<Svg {...p}><path d="M8 6h13M8 12h13M8 18h13" /><circle cx="3.5" cy="6" r="1" /><circle cx="3.5" cy="12" r="1" /><circle cx="3.5" cy="18" r="1" /></Svg>);
 export const IconSearch = (p: P) => (<Svg {...p}><circle cx="11" cy="11" r="6.5" /><path d="M20 20l-4.2-4.2" /></Svg>);
 /** The GitHub mark (filled, not stroked). */
