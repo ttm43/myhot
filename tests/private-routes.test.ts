@@ -68,3 +68,24 @@ test("ingest skips malformed entries and still accepts and deduplicates the vali
   const [source] = await sql<{ participation_mode: string }[]>`SELECT participation_mode FROM sources WHERE id = ${sourceId}`;
   assert.equal(source!.participation_mode, "isolated");
 });
+
+test("ingest text returns the stored body for a known URL, and only with the token", async () => {
+  const sourceId = `text-${tag()}`;
+  const url = `https://example.com/${sourceId}`;
+  const headers = { authorization: `Bearer ${process.env.INGEST_TOKEN}` };
+  const push = await app.inject({ method: "POST", url: "/api/ingest/items", headers, payload: { sourceId, items: [{ title: "post", url, body: "the stored text" }] } });
+  assert.equal(push.statusCode, 200);
+  const query = (u: string) => `/api/ingest/text?url=${encodeURIComponent(u)}`;
+
+  assert.equal((await app.inject({ url: query(url) })).statusCode, 401);
+  const found = await app.inject({ url: query(`${url}?utm_source=x`), headers });
+  assert.equal(found.statusCode, 200);
+  assert.equal(found.headers["cache-control"], "no-store");
+  const { article } = found.json();
+  assert.equal(article.url, url);
+  assert.equal(article.body, "the stored text");
+  assert.equal(article.source, sourceId);
+  assert.equal((await app.inject({ url: query(`https://example.com/missing-${sourceId}`), headers })).statusCode, 404);
+  assert.equal((await app.inject({ url: "/api/ingest/text?url=ftp%3A%2F%2Fa", headers })).statusCode, 400);
+  assert.equal((await app.inject({ url: "/api/ingest/text", headers })).statusCode, 400);
+});

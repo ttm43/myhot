@@ -11,7 +11,7 @@ recommender/
 ├── scripts/secondhand.py   同事件二手稿判断（select 时用）
 ├── scripts/aihot_admin.py  管理接口客户端（登录 + csrf）
 ├── config/models.yaml      用哪些向量模型（只写注册表 key）
-├── configs/profile.example.md  画像模板，复制成 profile.md 再填（profile*.md 不进 git）
+├── configs/profile.example.md  画像模板，复制成 profile.md 再填（profile*.md 不进 git）；画像怎么来见上一级 README 的「画像怎么来」
 ├── docs/                   实验设计、开源方案调研
 ├── tests/
 ├── cron.bat                定时任务入口

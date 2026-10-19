@@ -5,6 +5,7 @@ import { timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { credential } from "@aihot/backend/config";
 import { IngestError, ingestItems } from "@aihot/backend/ingest/items";
+import { articleText } from "@aihot/backend/ingest/text";
 
 const PLACEHOLDER = /^(|changeme|change-me|placeholder|xxx+|todo|test|dev|your[-_]?token.*)$/i;
 
@@ -46,5 +47,16 @@ export function registerIngest(app: FastifyInstance) {
       req.log.error({ err: error }, "ingest items failed");
       return reply.code(500).send({ ok: false, error: "internal error" });
     }
+  });
+
+  // local patch: what the site already has for a URL, so the owner's tools do not fetch the page again.
+  app.get("/api/ingest/text", async (req, reply) => {
+    reply.header("Cache-Control", "no-store");
+    if (!authorized(req)) return unauthorized(reply);
+    const url = (req.query as { url?: unknown }).url;
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url) || url.length > 2048) return reply.code(400).send({ ok: false, error: "url required" });
+    const article = await articleText(url);
+    if (!article) return reply.code(404).send({ ok: false, error: "not found" });
+    return { ok: true, article };
   });
 }
