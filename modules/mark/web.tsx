@@ -57,10 +57,13 @@ const BOOT = String.raw`(function () {
     var line = bar.querySelector(".mark-ai");
     if (line) {
       if (ai) {
-        line.textContent = "AI：" + ZH[ai.label] + " " + Math.round(ai.score) + (ai.reason ? " · " + ai.reason : "");
+        line.textContent = "";
+        // 详情页：理由已经出现在页面上（没中文摘要时「AI 导读」退回用的就是这句理由），就只写档位和分数
+        var dup = bar.getAttribute("data-detail") && ai.reason && (document.querySelector("main") || document.body).textContent.indexOf(ai.reason) >= 0;
+        line.textContent = "AI：" + ZH[ai.label] + " " + Math.round(ai.score) + (ai.reason && !dup ? " · " + ai.reason : "");
         line.title = (ai.fact ? "触发事实：" + ai.fact : "") + (ai.version ? "\n版本：" + ai.version : "");
-        line.style.display = "block";
-      } else { line.style.display = "none"; }
+        line.hidden = false;
+      } else { line.hidden = true; }
     }
   }
   var STATE = {};
@@ -74,15 +77,16 @@ const BOOT = String.raw`(function () {
     d.className = "mark-bar"; d.setAttribute("data-mark-id", id);
     d.style.cssText = "position:relative;z-index:5;margin-top:8px;font-size:12px;line-height:1.4;";
     var line = document.createElement("div");
-    line.className = "mark-ai";
-    line.style.cssText = "display:none;margin-bottom:6px;color:#6b7280;font-size:12px;white-space:normal;";
+    line.className = "mark-ai"; line.hidden = true;
+    // 卡片上默认收成一行，点一下展开全文（详情页始终全文）
+    line.addEventListener("click", function (e) { if (d.getAttribute("data-detail")) return; e.preventDefault(); e.stopPropagation(); line.classList.toggle("open"); });
     d.appendChild(line);
     var row = document.createElement("div");
-    row.style.cssText = "display:flex;gap:6px;line-height:1;";
+    row.className = "mark-row";
     LABELS.forEach(function (p) {
       var b = document.createElement("button");
       b.type = "button"; b.textContent = p[1]; b.setAttribute("data-label", p[0]);
-      b.style.cssText = "padding:4px 10px;border:1px solid rgba(128,128,128,.45);border-radius:999px;background:transparent;color:inherit;cursor:pointer;font:inherit;font-size:12px;";
+      b.style.cssText = "border:1px solid rgba(128,128,128,.45);border-radius:999px;background:transparent;color:inherit;cursor:pointer;font:inherit;";
       b.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); send(id, p[0]); });
       row.appendChild(b);
     });
@@ -118,7 +122,16 @@ const BOOT = String.raw`(function () {
       })
       .catch(function () {});
   }
+  // 样式放一处：按钮在触屏上放大到 44px 高；AI 那一行用正文色加透明度，深浅主题下对比度都够（以前写死 #6b7280，深色下只有 3.67）
+  var CSS = ".mark-row{display:flex;gap:6px;line-height:1}" +
+    ".mark-row button{padding:4px 10px;font-size:12px;min-height:24px}" +
+    "@media (pointer:coarse){.mark-row{gap:10px}.mark-row button{padding:0 18px;font-size:14px;min-height:44px}}" +
+    ".mark-ai{margin-bottom:6px;font-size:12px;opacity:.78;white-space:normal;cursor:pointer}" +
+    ".mark-ai[hidden]{display:none}" +
+    ".mark-bar:not([data-detail]) .mark-ai:not(.open){display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}" +
+    ".mark-bar[data-detail] .mark-ai{cursor:auto}";
   function boot() {
+    var st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st);
     scan();
     new MutationObserver(function () { clearTimeout(window.__markTimer); window.__markTimer = setTimeout(scan, 200); })
       .observe(document.body, { childList: true, subtree: true });

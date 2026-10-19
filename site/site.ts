@@ -54,8 +54,9 @@ export const SITE = {
 export const ITEM_COPY = {
   /** 模型写的那句理由叫什么：卡片、详情页、Markdown 导出和 MCP 的回答都用它。 */
   reasonLabel: "推荐理由",
-  /** 读者在网页上看不看得到 AI 评分。只管显示：MCP 的数据照样带 score，后台照常显示。 */
-  showScore: true,
+  /** 读者在网页上看不看得到 AI 评分。只管显示：MCP 的数据照样带 score，后台照常显示。
+   * MyHOT 关掉：分数来自 recommender 的 judge（0–10），卡片上的「AI：档位 分数 · 理由」那一行（modules/mark）已经显示它。 */
+  showScore: false,
 };
 
 /** 后台页面上给管理员的提示（选填）。 */

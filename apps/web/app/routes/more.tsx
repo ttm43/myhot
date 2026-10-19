@@ -75,11 +75,13 @@ export default function MorePage() {
             </Select>
           </li>
         </Group>
-        <Group title="工具与入口">
-          {tools().map((r) => (
-            <RowLink key={r.to} row={r} />
-          ))}
-        </Group>
+        {tools().length > 0 && (
+          <Group title="工具与入口">
+            {tools().map((r) => (
+              <RowLink key={r.to} row={r} />
+            ))}
+          </Group>
+        )}
       </div>
       <div className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-1 text-[12px] leading-[2] text-ink-4">
         {SITE.github && <a href={SITE.github} target="_blank" rel="noopener noreferrer" className="hover:text-ink-2">GitHub 开源</a>}

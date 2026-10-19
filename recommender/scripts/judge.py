@@ -41,7 +41,7 @@ PROFILE = ROOT / "configs" / "profile.md"
 PROMPT_VERSION = "v1.4"  # 牛逼定义放宽（画像 v5）
 BODY_CAP = 40_000
 BATCH_CHARS = 120_000
-MIN_BODY = 500
+MIN_BODY = 40  # 官方号短帖、HN 条目、短笔记也要打分（2026-10-19 前是 500，「全部」里六成没有 AI 判断）
 DEV_RANDOM = 70  # 分层随机部分；按池子比例定（2026-10-16 池子 512 篇，约 13%）
 DEV_SEED = 20261016
 FUZZY_THRESHOLD = 0.6
@@ -1033,7 +1033,9 @@ def cmd_select(args) -> int:
         chain = admin.get(f"/api/admin/content/{i}")
         version = (chain.get("override") or {}).get("version") or 0
         # 分数也写进覆盖：AIHOT 不再自己打分，代表文章挑选和各处排序就用 judge 的分数
-        fields: dict = {"selected": selected, "score": round(min(max(float(preds.get(i, {}).get("score", 0)), 0), 100))}
+        fields: dict = {"selected": selected}
+        if "score" in preds.get(i, {}):  # 没有预测就不写分数（以前默认写 0，卡片上出现过「AI 评分 0」却判牛逼 9）
+            fields["score"] = round(min(max(float(preds[i]["score"]), 0), 100))
         if selected:
             # 被 AIHOT 预筛挡住（非 AI 相关）或还没中文摘要的，用 judge 的理由顶上，让它够得上入池条件
             fields["relevance"] = "pass"
