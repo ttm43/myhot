@@ -58,9 +58,17 @@ const BOOT = String.raw`(function () {
     if (line) {
       if (ai) {
         line.textContent = "";
-        // 详情页：理由已经出现在页面上（没中文摘要时「AI 导读」退回用的就是这句理由），就只写档位和分数
-        var dup = bar.getAttribute("data-detail") && ai.reason && (document.querySelector("main") || document.body).textContent.indexOf(ai.reason) >= 0;
-        line.textContent = "AI：" + ZH[ai.label] + " " + Math.round(ai.score) + (ai.reason && !dup ? " · " + ai.reason : "");
+        // 详情页：理由里已经出现在页面上的那几段去掉（没中文摘要时「AI 导读」退回用的就是老师那句理由）。
+        // 理由形如「Harrier 270M：牛逼 63% · 老师判牛逼：<老师的理由>」，按「 · 」分段、比冒号后面的正文。
+        var reason = ai.reason || "";
+        if (bar.getAttribute("data-detail") && reason) {
+          var page = (document.querySelector("main") || document.body).textContent;
+          reason = reason.split(" · ").filter(function (seg) {
+            var body = seg.slice(seg.indexOf("：") + 1).trim();
+            return !(body.length >= 20 && page.indexOf(body.slice(0, 60)) >= 0);
+          }).join(" · ");
+        }
+        line.textContent = "AI：" + ZH[ai.label] + " " + Math.round(ai.score) + (reason ? " · " + reason : "");
         line.title = (ai.fact ? "触发事实：" + ai.fact : "") + (ai.version ? "\n版本：" + ai.version : "");
         line.hidden = false;
       } else { line.hidden = true; }
